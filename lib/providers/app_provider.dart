@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/note.dart';
 import '../models/settings.dart';
 import '../services/storage_service.dart';
@@ -152,11 +154,50 @@ class AppProvider extends ChangeNotifier {
   // ---- Folder selection ----
 
   /// Choose the notes folder (user's "repository"). Loads existing notes.
-  Future<void> chooseFolder(String path) async {
+  ///
+  /// On Android this requests all-files access (required to write into an
+  /// arbitrary user-picked folder on API 30+), then verifies the folder is
+  /// actually writable before relying on it — so a bad pick surfaces an error
+  /// instead of silently dropping notes.
+  Future<String> chooseFolder(String path) async {
+    if (Platform.isAndroid) {
+      final status = await Permission.manageExternalStorage.status;
+      if (!status.isGranted) {
+        final requested = await Permission.manageExternalStorage.request();
+        if (!requested.isGranted) {
+          _statusMessage = '需要「所有文件访问」权限才能把笔记写入所选文件夹';
+          notifyListeners();
+          return _statusMessage!;
+        }
+      }
+    }
+
+    final writable = await _storage.probeWritable(path);
+    if (!writable) {
+      _statusMessage = '该文件夹无法写入，请换一个文件夹或授予存储权限';
+      notifyListeners();
+      return _statusMessage!;
+    }
+
     _settings.notesFolderPath = path;
     await _storage.setFolder(path);
     await _storage.saveSettings(_settings);
     _notes = await _storage.loadNotes();
+    _statusMessage = null;
+    notifyListeners();
+    return '';
+  }
+
+  /// Reload notes from disk (e.g. after an external file was written).
+  Future<void> reloadNotes() async {
+    _notes = await _storage.loadNotes();
+    notifyListeners();
+  }
+
+  /// Insert a freshly created note into the in-memory list and persist it.
+  Future<void> addNoteAndPersist(Note note) async {
+    _notes.add(note);
+    await _persist();
     notifyListeners();
   }
 
@@ -235,7 +276,12 @@ class AppProvider extends ChangeNotifier {
   // ---- Private helpers ----
 
   Future<void> _persist() async {
-    await _storage.saveNotes(_notes);
+    try {
+      await _storage.saveNotes(_notes);
+    } catch (e) {
+      _statusMessage = '保存失败：$e';
+      notifyListeners();
+    }
   }
 
   void _setLoading(bool value) {

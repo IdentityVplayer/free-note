@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../services/ai_service.dart';
 import '../l10n/app_localizations.dart';
 import '../models/settings.dart';
+import '../screens/folder_picker_screen.dart';
 
 /// Settings screen — folder, language, dark mode, theme color, AI config, GitHub config.
 class SettingsScreen extends StatefulWidget {
@@ -90,9 +90,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _changeFolder() async {
-    final path = await FilePicker.getDirectoryPath();
-    if (path != null && mounted) {
-      await context.read<AppProvider>().chooseFolder(path);
+    if (mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const FolderPickerScreen()),
+      );
       setState(() {});
     }
   }

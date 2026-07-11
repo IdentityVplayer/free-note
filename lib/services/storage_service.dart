@@ -29,6 +29,24 @@ class StorageService {
 
   bool get hasFolder => currentFolder != null && currentFolder!.isNotEmpty;
 
+  /// Test whether [path] is a real, writable directory by writing a tiny probe
+  /// file and reading it back. Returns false on any failure (e.g. Android SAF
+  /// tree URIs, missing permission). Used to validate a folder before we rely
+  /// on it for note storage.
+  Future<bool> probeWritable(String path) async {
+    try {
+      final dir = Directory(path);
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+      final probe = File('${dir.path}/.wubianji_probe.tmp');
+      probe.writeAsStringSync('ok');
+      final read = probe.readAsStringSync();
+      probe.deleteSync();
+      return read == 'ok';
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> setFolder(String path) async {
     currentFolder = path;
     final dir = Directory(path);
@@ -67,9 +85,14 @@ class StorageService {
     for (final note in notes) {
       final rel = note.relativePath ?? note.fileName;
       final file = File(p.join(dir.path, rel));
-      file.parent.createSync(recursive: true);
-      file.writeAsStringSync(note.toMarkdownFile());
-      written.add(file.path);
+      try {
+        file.parent.createSync(recursive: true);
+        file.writeAsStringSync(note.toMarkdownFile());
+        written.add(file.path);
+      } catch (_) {
+        // Skip notes we cannot write (e.g. permission revoked) rather than
+        // aborting the whole save and losing everything else.
+      }
     }
     // Remove orphaned app-managed note files (those whose name matches the
     // generated numeric id pattern) that are no longer in the list. We only
@@ -101,6 +124,22 @@ class StorageService {
     if (!hasFolder) return;
     final file = File(p.join(currentFolder!, relativePathOrFileName));
     if (file.existsSync()) file.deleteSync();
+  }
+
+  /// Write a standalone markdown file (e.g. an exported AI chat) into the
+  /// selected notes folder. Falls back to the private app dir when no folder
+  /// is configured, so a save never silently disappears.
+  Future<String> writeMarkdownFile(String fileName, String markdown) async {
+    final Directory dir;
+    if (hasFolder) {
+      dir = Directory(currentFolder!);
+    } else {
+      dir = await _privateDir;
+    }
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    final file = File(p.join(dir.path, fileName));
+    file.writeAsStringSync(markdown);
+    return file.path;
   }
 
   // ── Settings: private app dir ──
