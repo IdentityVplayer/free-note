@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../services/ai_service.dart';
 import '../l10n/app_localizations.dart';
 
 /// AI Assistant screen — standalone chat-like interface for Q&A.
@@ -37,7 +38,13 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     });
     _scrollToBottom();
 
-    final answer = await provider.aiService.ask(question);
+    final answer = await (() async {
+      try {
+        return await provider.aiService.ask(question);
+      } on AIException catch (e) {
+        return '⚠️ ${e.message}';
+      }
+    })();
 
     if (mounted) {
       setState(() {

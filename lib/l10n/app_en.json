@@ -1,5 +1,5 @@
 {
-  "appTitle": "Free Note",
+  "appTitle": "Borderless Notes",
   "notes": "Notes",
   "newNote": "New Note",
   "editNote": "Edit Note",
@@ -67,7 +67,7 @@
   "insertList": "List",
   "insertQuote": "Quote",
   "about": "About",
-  "aboutDesc": "Free Note — a multifunctional cross-platform note app.",
+  "aboutDesc": "Borderless Notes — a multifunctional cross-platform note app.",
   "exportAsMarkdown": "Export as Markdown",
   "notesFolder": "Notes Folder",
   "currentFolder": "Current Folder",

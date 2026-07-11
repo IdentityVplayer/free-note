@@ -110,7 +110,15 @@ class AppProvider extends ChangeNotifier {
   }
 
   void deleteNote(String id) {
-    _notes.removeWhere((n) => n.id == id);
+    final idx = _notes.indexWhere((n) => n.id == id);
+    Note? note;
+    if (idx >= 0) {
+      note = _notes[idx];
+      _notes.removeAt(idx);
+    }
+    if (note != null) {
+      _storage.deleteNoteFile(note.relativePath ?? note.fileName);
+    }
     _persist();
     notifyListeners();
   }

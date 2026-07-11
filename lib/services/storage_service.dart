@@ -35,21 +35,25 @@ class StorageService {
     if (!dir.existsSync()) dir.createSync(recursive: true);
   }
 
-  // ── Notes: markdown files in the user folder ──
+  // ── Notes: markdown files in the user folder (recursive) ──
 
+  /// Load every `.md` file in the selected folder AND its subfolders.
+  /// Notes keep their relative path so they are saved back in place.
   Future<List<Note>> loadNotes() async {
     if (!hasFolder) return [];
     final dir = Directory(currentFolder!);
     if (!dir.existsSync()) return [];
     final notes = <Note>[];
-    final files = dir.listSync().whereType<File>();
-    for (final f in files) {
-      if (!f.path.endsWith('.md')) continue;
+    final entities = dir.listSync(recursive: true, followLinks: false);
+    for (final entity in entities) {
+      if (entity is! File) continue;
+      if (!entity.path.endsWith('.md')) continue;
+      final relative = p.relative(entity.path, from: dir.path);
       try {
-        final note = Note.fromMarkdownFile(f.readAsStringSync());
-        if (note != null) notes.add(note);
+        final content = entity.readAsStringSync();
+        notes.add(Note.fromMarkdownFileOrAdopt(content, relative));
       } catch (_) {
-        // Skip unreadable / non-note markdown files.
+        // Skip unreadable files.
       }
     }
     return notes;
@@ -59,19 +63,26 @@ class StorageService {
     if (!hasFolder) return;
     final dir = Directory(currentFolder!);
     if (!dir.existsSync()) dir.createSync(recursive: true);
-    final keep = <String>{};
+    final written = <String>{};
     for (final note in notes) {
-      final file = File(p.join(dir.path, note.fileName));
+      final rel = note.relativePath ?? note.fileName;
+      final file = File(p.join(dir.path, rel));
+      file.parent.createSync(recursive: true);
       file.writeAsStringSync(note.toMarkdownFile());
-      keep.add(note.fileName);
+      written.add(file.path);
     }
-    // Remove orphaned .md files no longer in the list.
-    for (final f in dir.listSync().whereType<File>()) {
-      if (f.path.endsWith('.md') && !keep.contains(p.basename(f.path))) {
-        try {
-          f.deleteSync();
-        } catch (_) {}
-      }
+    // Remove orphaned app-managed note files (those whose name matches the
+    // generated numeric id pattern) that are no longer in the list. We only
+    // touch app-generated files so the user's own .md files (and adopted
+    // files) are never auto-deleted.
+    final managed = RegExp(r'^\d{10,}\.md$');
+    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      if (!managed.hasMatch(p.basename(entity.path))) continue;
+      if (written.contains(entity.path)) continue;
+      try {
+        entity.deleteSync();
+      } catch (_) {}
     }
   }
 
@@ -79,13 +90,16 @@ class StorageService {
     if (!hasFolder) return;
     final dir = Directory(currentFolder!);
     if (!dir.existsSync()) dir.createSync(recursive: true);
-    final file = File(p.join(dir.path, note.fileName));
+    final rel = note.relativePath ?? note.fileName;
+    final file = File(p.join(dir.path, rel));
+    file.parent.createSync(recursive: true);
     file.writeAsStringSync(note.toMarkdownFile());
   }
 
-  Future<void> deleteNoteFile(String id) async {
+  /// Delete the on-disk file for a note, using its relative path when known.
+  Future<void> deleteNoteFile(String relativePathOrFileName) async {
     if (!hasFolder) return;
-    final file = File(p.join(currentFolder!, '$id.md'));
+    final file = File(p.join(currentFolder!, relativePathOrFileName));
     if (file.existsSync()) file.deleteSync();
   }
 

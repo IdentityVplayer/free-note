@@ -18,7 +18,7 @@ class WordCountPlugin extends FreeNotePlugin {
   String get version => '1.0.0';
 
   @override
-  String get author => 'Free Note';
+  String get author => 'Borderless Notes';
 
   @override
   PluginType get type => PluginType.utility;
@@ -57,7 +57,7 @@ class TextFormatterPlugin extends FreeNotePlugin {
   String get version => '1.0.0';
 
   @override
-  String get author => 'Free Note';
+  String get author => 'Borderless Notes';
 
   @override
   PluginType get type => PluginType.editor;
@@ -82,7 +82,7 @@ class ExportPlugin extends FreeNotePlugin {
   String get version => '1.0.0';
 
   @override
-  String get author => 'Free Note';
+  String get author => 'Borderless Notes';
 
   @override
   PluginType get type => PluginType.exporter;

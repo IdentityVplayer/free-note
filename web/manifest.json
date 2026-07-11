@@ -1,6 +1,6 @@
 {
-    "name": "free_note",
-    "short_name": "free_note",
+    "name": "无边记",
+    "short_name": "无边记",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,8 +1,18 @@
-# Free Note — Features & Changelog
+# 无边记 (Borderless Notes) — Features & Changelog
 
 This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
+
+## 1.3.0
+
+### New Features
+- **递归文件夹扫描** — 选择笔记文件夹后，自动识别该文件夹**及其所有子目录**下的 `.md` 文件。没有 frontmatter 的普通 Markdown 文件也会被识别为笔记（按相对路径生成稳定 id），并保持原有子目录结构。
+- **应用改名「无边记」** — 各平台显示名（Android / Windows / Linux / Web / 应用内标题与多语言）统一改为「无边记」(Borderless Notes)。Dart 包名 `free_note` 与 Android 包名 `com.note.apps` 保持不变。
+
+### Fixed
+- **AI 功能可用性问题** — 之前任何 API 调用失败（如所选服务商的默认模型不匹配、网络错误）都会被静默当成「未配置」提示，导致填了密钥也像没生效。现在会**如实显示真实错误信息**（HTTP 状态码 + 服务商返回的具体原因）。新增按服务商自动填入默认模型：OpenAI `gpt-3.5-turbo`、DeepSeek `deepseek-chat`、Moonshot `moonshot-v1-8k`、Google `gemini-1.5-flash`、Ollama `llama3`，切到对应服务商即自动带上，开箱即用。
+- **GitHub 同步提示修正** — 仓库输入框示例从错误的 `username/free--note` 改为正确的 `username/free-note`，避免用户照抄后 404。
 
 ## 1.2.0
 

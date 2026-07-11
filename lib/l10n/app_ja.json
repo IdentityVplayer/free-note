@@ -1,5 +1,5 @@
 {
-  "appTitle": "フリーノート",
+  "appTitle": "無辺ノート",
   "notes": "ノート",
   "newNote": "新規ノート",
   "editNote": "ノートを編集",
@@ -67,7 +67,7 @@
   "insertList": "リスト",
   "insertQuote": "引用",
   "about": "について",
-  "aboutDesc": "フリーノート - 多機能クロスプラットフォームノートアプリ。",
+  "aboutDesc": "無辺ノート - 多機能クロスプラットフォームノートアプリ。",
   "exportAsMarkdown": "Markdownとしてエクスポート",
   "notesFolder": "ノートフォルダ",
   "currentFolder": "現在のフォルダ",

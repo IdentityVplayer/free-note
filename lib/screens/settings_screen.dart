@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../services/ai_service.dart';
 import '../l10n/app_localizations.dart';
 import '../models/settings.dart';
 
@@ -179,7 +180,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   )
                   .toList(),
-              onChanged: (v) => setState(() => _aiProvider = v!),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() {
+                  _aiProvider = v;
+                  // Pick a sensible default model for the chosen provider so
+                  // the feature works right after the user enters a key. Only
+                  // overwrite when the current model is empty or one of the
+                  // built-in defaults (don't clobber a model the user typed).
+                  final current = _aiModelController.text.trim();
+                  if (current.isEmpty ||
+                      AIService.isKnownDefaultModel(current)) {
+                    _aiModelController.text = AIService.defaultModelFor(v);
+                  }
+                });
+              },
             ),
           ),
           if (_aiProvider == 'custom') ...[
@@ -243,7 +258,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               decoration: InputDecoration(
                 labelText: l10n.t('githubRepo'),
                 border: const OutlineInputBorder(),
-                hintText: 'username/free--note',
+                hintText: 'username/free-note',
               ),
             ),
           ),

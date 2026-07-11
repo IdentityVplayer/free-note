@@ -1,5 +1,5 @@
 {
-  "appTitle": "自由笔记",
+  "appTitle": "无边记",
   "notes": "笔记",
   "newNote": "新建笔记",
   "editNote": "编辑笔记",
@@ -67,7 +67,7 @@
   "insertList": "列表",
   "insertQuote": "引用",
   "about": "关于",
-  "aboutDesc": "自由笔记 - 多功能跨平台笔记应用。",
+  "aboutDesc": "无边记 - 多功能跨平台笔记应用。",
   "exportAsMarkdown": "导出为 Markdown",
   "notesFolder": "笔记文件夹",
   "currentFolder": "当前文件夹",

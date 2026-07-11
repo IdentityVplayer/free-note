@@ -86,25 +86,22 @@ class _EditorScreenState extends State<EditorScreen> {
 
     setState(() => _aiLoading = true);
     try {
-      String result;
-      if (mode == WritingMode.continue_ || mode == WritingMode.expand) {
-        result = await provider.aiService.assistWriting(
-          _contentController.text,
-          mode: mode,
-        );
-        if (mode == WritingMode.continue_) {
-          _contentController.text += '\n\n$result';
-        } else {
-          _contentController.text = result;
-        }
+      final result = await provider.aiService.assistWriting(
+        _contentController.text,
+        mode: mode,
+      );
+      if (mode == WritingMode.continue_) {
+        _contentController.text += '\n\n$result';
       } else {
-        result = await provider.aiService.assistWriting(
-          _contentController.text,
-          mode: mode,
-        );
         _contentController.text = result;
       }
       setState(() => _hasChanges = true);
+    } on AIException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(

@@ -19,7 +19,7 @@ class FolderPickerScreen extends StatelessWidget {
 
   Future<void> _useDefault(BuildContext context) async {
     final dir = await getApplicationDocumentsDirectory();
-    final path = '${dir.path}/free_note_notes';
+    final path = '${dir.path}/wubianji_notes';
     if (context.mounted) {
       await context.read<AppProvider>().chooseFolder(path);
     }

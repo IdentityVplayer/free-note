@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="free_note"
+        android:label="无边记"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

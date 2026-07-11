@@ -7,7 +7,7 @@ import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
 import 'screens/folder_picker_screen.dart';
 
-/// Free Note — A multifunctional cross-platform note-taking app.
+/// Borderless Notes (无边记) — A multifunctional cross-platform note-taking app.
 /// Features: Markdown, Plugins, AI Writing, GitHub Sync, i18n, Dark Mode.
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +26,7 @@ class FreeNoteApp extends StatelessWidget {
         builder: (context, provider, _) {
           final seed = provider.themeColor ?? defaultSeed;
           return MaterialApp(
-            title: 'Free Note',
+            title: 'Borderless Notes',
             debugShowCheckedModeBanner: false,
             theme: _buildLightTheme(seed),
             darkTheme: _buildDarkTheme(seed),

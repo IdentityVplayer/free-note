@@ -1,6 +1,16 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+/// Thrown when an AI request fails (not configured, network, or API error).
+/// Carries a user-facing message so the UI can show what actually went wrong
+/// instead of silently pretending the key was never set.
+class AIException implements Exception {
+  final String message;
+  const AIException(this.message);
+  @override
+  String toString() => message;
+}
+
 /// AI service for writing assistance and Q&A.
 /// Supports OpenAI-compatible API endpoints.
 class AIService {
@@ -16,10 +26,32 @@ class AIService {
 
   bool get isConfigured => apiKey != null && apiKey!.isNotEmpty;
 
+  /// Sensible default model per provider so the feature works out of the box
+  /// once the user fills in a key.
+  static const Map<String, String> defaultModel = {
+    'openai': 'gpt-3.5-turbo',
+    'deepseek': 'deepseek-chat',
+    'moonshot': 'moonshot-v1-8k',
+    'google': 'gemini-1.5-flash',
+    'ollama': 'llama3',
+    'custom': 'gpt-3.5-turbo',
+  };
+
+  static String defaultModelFor(String provider) =>
+      defaultModel[provider] ?? defaultModel['openai']!;
+
+  /// Whether [model] looks like one of the built-in defaults (vs. a model the
+  /// user typed themselves). Used to decide whether to auto-switch the model
+  /// when the provider changes.
+  static bool isKnownDefaultModel(String model) =>
+      defaultModel.values.contains(model);
+
   /// Ask AI a question and get a response.
   Future<String> ask(String question, {String? context}) async {
     if (!isConfigured) {
-      return _localFallback(question);
+      throw const AIException(
+        'AI 未配置：请先在「设置 → AI」中填写 API Key。',
+      );
     }
     try {
       final messages = <Map<String, String>>[
@@ -61,20 +93,30 @@ class AIService {
         if (choices.isNotEmpty) {
           return choices[0]['message']['content'] as String;
         }
+        throw AIException('AI 返回了空结果。');
       }
-      return _localFallback(question);
-    } catch (_) {
-      return _localFallback(question);
+
+      // Surface the real error from the provider instead of masking it.
+      final detail = _extractError(response);
+      throw AIException(
+        'AI 请求失败 (HTTP ${response.statusCode})$detail',
+      );
+    } on AIException {
+      rethrow;
+    } catch (e) {
+      throw AIException('AI 请求出错：$e');
     }
   }
 
-  /// AI-assisted writing: continue or improve text.
+  /// AI-assisted writing: continue, improve, summarize, translate, or expand.
   Future<String> assistWriting(
     String text, {
     WritingMode mode = WritingMode.continue_,
   }) async {
     if (!isConfigured) {
-      return '$text\n\n[AI not configured. Please set API key in settings.]';
+      throw const AIException(
+        'AI 未配置：请先在「设置 → AI」中填写 API Key。',
+      );
     }
     final prompt = switch (mode) {
       WritingMode.continue_ =>
@@ -92,15 +134,23 @@ class AIService {
     return ask(prompt);
   }
 
-  /// Fallback when AI is not configured — provides basic text utilities.
-  String _localFallback(String question) {
-    final lower = question.toLowerCase();
-    if (lower.contains('hello') ||
-        lower.contains('hi') ||
-        lower.contains('你好')) {
-      return 'Hello! I\'m your AI writing assistant. To enable full AI capabilities, please configure your API key in Settings.\n\n你好！我是你的 AI 写作助手。要启用完整的 AI 功能，请在设置中配置 API 密钥。';
+  /// Pull a human-readable message out of a non-200 API response body.
+  String _extractError(http.Response response) {
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final msg = body['error']?['message'] ??
+          body['message'] ??
+          body['error'];
+      if (msg != null && msg.toString().isNotEmpty) {
+        return '：$msg';
+      }
+    } catch (_) {
+      // Ignore — fall through to raw body snippet.
     }
-    return 'AI is not configured. Please set your API key in Settings.\n\nAI 未配置，请在设置中填写 API 密钥。\n\nYour question was: "$question"';
+    final snippet = response.body.length > 300
+        ? '${response.body.substring(0, 300)}…'
+        : response.body;
+    return snippet.isNotEmpty ? '：$snippet' : '';
   }
 }
 
