@@ -4,6 +4,16 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.6.0
+
+### New Features
+- **子文件夹（子目录）保存** — 编辑器新增「保存位置」行，可**在已选笔记文件夹内**挑选或新建子文件夹，把笔记直接存进 `子文件夹/xxx.md`，而**无需回到设置里切换根文件夹**。不切换根文件夹即可读取、写入子目录下的文件。
+- **编辑器显示真实保存位置** — 编辑器顶部（保存位置行）实时显示笔记将写入的**根文件夹 + 子文件夹**（如 `根目录` 或 `work/projects`），不再显示 `/data` 等隐藏路径。未选择文件夹时显示「默认（应用私有目录）」。
+- **导出写入所选文件夹** — 修复「导出」按钮（右上角下载图标）曾把 `xxx.md` 写进应用私有 `/data/.../exports` 的问题，现在导出文件与笔记一样落在用户选择的笔记文件夹里。
+
+### Changed
+- **移动笔记自动清理旧文件** — 当一篇笔记的相对路径（所在子文件夹）发生变化时，`updateNote` 会先删除旧位置的 `.md` 文件，避免移动后在两个目录留下重复副本。
+
 ## 1.5.0
 
 ### New Features

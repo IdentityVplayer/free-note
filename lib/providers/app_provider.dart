@@ -105,7 +105,13 @@ class AppProvider extends ChangeNotifier {
   void updateNote(Note note) {
     final idx = _notes.indexWhere((n) => n.id == note.id);
     if (idx >= 0) {
+      final oldRel = _notes[idx].relativePath;
       _notes[idx] = note;
+      // If the note moved to a different subfolder, remove the stale file so
+      // we don't leave duplicates behind.
+      if (oldRel != null && oldRel != note.relativePath) {
+        _storage.deleteNoteFile(oldRel);
+      }
       _persist();
       notifyListeners();
     }

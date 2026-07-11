@@ -164,13 +164,21 @@ class StorageService {
 
   // ── Export ──
 
+  /// Export a single note as a standalone `.md` file into the **selected
+  /// notes folder** (so it lands next to the user's other notes, not in a
+  /// hidden `/data` path). Falls back to the private app dir when no folder
+  /// is configured.
   Future<String> exportNoteAsMarkdown(Note note) async {
-    final dir = await _privateDir;
-    final exportDir = Directory('${dir.path}/exports');
-    if (!exportDir.existsSync()) exportDir.createSync(recursive: true);
+    final Directory dir;
+    if (hasFolder) {
+      dir = Directory(currentFolder!);
+    } else {
+      dir = await _privateDir;
+    }
+    if (!dir.existsSync()) dir.createSync(recursive: true);
     final filename =
         '${note.title.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(RegExp(r'\s+'), '_')}.md';
-    final file = File('${exportDir.path}/$filename');
+    final file = File(p.join(dir.path, filename));
     file.writeAsStringSync(note.toMarkdownFile());
     return file.path;
   }

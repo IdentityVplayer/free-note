@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/note.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import 'subfolder_picker_screen.dart';
 
 /// Editor screen — Markdown editing with live preview and AI tools.
 class EditorScreen extends StatefulWidget {
@@ -60,6 +62,39 @@ class _EditorScreenState extends State<EditorScreen> {
       updatedAt: DateTime.now(),
     );
     provider.updateNote(updated);
+  }
+
+  /// The note's current subfolder (relative to the base notes folder), or
+  /// null when it sits at the top level.
+  String? get _currentSubfolder {
+    final rp = _note.relativePath;
+    if (rp == null || rp.isEmpty) return null;
+    final dir = p.dirname(rp);
+    return dir == '.' ? null : dir;
+  }
+
+  /// Choose a subfolder inside the selected notes folder (without changing
+  /// the base folder in Settings). The note's relativePath is updated so the
+  /// file is written into that subfolder on next save.
+  Future<void> _pickSubfolder() async {
+    final base = StorageService.instance.currentFolder;
+    if (base == null) return;
+    final rel = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SubfolderPickerScreen(
+          baseFolder: base,
+          initialRelative: _note.relativePath,
+        ),
+      ),
+    );
+    if (rel != null) {
+      final newRel = rel.isEmpty ? _note.fileName : p.join(rel, _note.fileName);
+      setState(() {
+        _note = _note.copyWith(relativePath: newRel);
+        _hasChanges = true;
+      });
+    }
   }
 
   void _insertText(String before, [String? after]) {
@@ -183,10 +218,85 @@ class _EditorScreenState extends State<EditorScreen> {
     final path = await StorageService.instance.exportNoteAsMarkdown(_note);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${l10n.t('exportSuccess')}: $path')),
+        SnackBar(
+          content: Text('${l10n.t('exportSuccess')}: ${p.basename(path)}'),
+        ),
       );
     }
   }
+
+  /// A compact, tappable row showing where this note is saved and letting the
+  /// user pick a subfolder inside the selected notes folder.
+  Widget _buildSaveLocation(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final base = StorageService.instance.currentFolder;
+    final theme = Theme.of(context);
+
+    if (base == null) {
+      return InkWell(
+        onTap: _pickSubfolder,
+        child: _saveRow(
+          theme,
+          Icons.folder_outlined,
+          '${l10n.t('saveLocation')}: ${l10n.t('defaultSaveHint')}',
+          null,
+        ),
+      );
+    }
+
+    final sub = _currentSubfolder;
+    final subLabel = sub ?? l10n.t('topLevel');
+    return InkWell(
+      onTap: _pickSubfolder,
+      child: _saveRow(
+        theme,
+        Icons.folder_outlined,
+        '${l10n.t('saveLocation')}: $base',
+        '${l10n.t('subfolder')}: $subLabel',
+      ),
+    );
+  }
+
+  Widget _saveRow(
+    ThemeData theme,
+    IconData icon,
+    String line1,
+    String? line2,
+  ) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    child: Row(
+      children: [
+        Icon(icon, size: 18, color: theme.colorScheme.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                line1,
+                style: theme.textTheme.bodySmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (line2 != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  line2,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
+        const Icon(Icons.chevron_right, size: 18),
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -282,6 +392,9 @@ class _EditorScreenState extends State<EditorScreen> {
               ],
             ),
           ),
+          const Divider(),
+          // Save location + subfolder picker
+          _buildSaveLocation(context),
           const Divider(),
           // Markdown toolbar (edit mode only)
           if (!_isPreview) ...[
