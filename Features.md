@@ -4,6 +4,15 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.7.0
+
+### Changed
+- **配置移出 Markdown 文本，改存 `.config` 文件夹** — 笔记的元数据（标题、标签、置顶、收藏、时间戳、相对路径）不再以 YAML frontmatter 写在 `.md` 顶部，而是单独存到笔记文件夹下的隐藏目录 `.config/<id>.json`；`.md` 文件只保留纯正文。打开/编辑笔记不再被 frontmatter 干扰，目录结构也更干净。旧版带 frontmatter 的 `.md` 会在首次加载时自动迁移。
+
+### New Features
+- **AI 对话文件加标记行** — 用 AI 助手保存的对话（`Chat-YYYY-MM-DD-HH-MM-SS.md`）现在文件首行固定写入 `! Free note ai chat`，便于识别与解析。
+- **ai-context 插件** — 新增内置插件 `AI Context`。在编辑器中打开由 Free Note 生成的 AI 对话时，右上角会出现一个**上传图标**；点击后，插件解析该文件并把整段对话作为上下文直接填充进 AI 助手，可接着聊。插件在「插件」页可见、可开关。
+
 ## 1.6.0
 
 ### New Features

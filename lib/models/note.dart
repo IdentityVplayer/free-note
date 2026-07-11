@@ -40,7 +40,38 @@ class Note {
     'tags': tags,
     'isPinned': isPinned,
     'isFavorite': isFavorite,
+    'relativePath': relativePath,
   };
+
+  /// Serialize app-managed metadata into a `.config/<id>.json` entry.
+  ///
+  /// Note content lives in a *separate* `.md` file, so it is intentionally
+  /// NOT included here — this keeps the markdown body clean (no frontmatter).
+  Map<String, dynamic> toConfigJson() => {
+    'id': id,
+    'title': title,
+    'tags': tags,
+    'pinned': isPinned,
+    'favorite': isFavorite,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+    'relativePath': relativePath,
+  };
+
+  /// Build a Note from a `.config/<id>.json` entry plus the note's markdown
+  /// content (read separately from the `.md` file on disk).
+  factory Note.fromConfigJson(Map<String, dynamic> json, String content) =>
+      Note(
+        id: json['id'] as String,
+        title: json['title'] as String? ?? 'Untitled',
+        content: content,
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        updatedAt: DateTime.parse(json['updatedAt'] as String),
+        tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
+        isPinned: json['pinned'] as bool? ?? false,
+        isFavorite: json['favorite'] as bool? ?? false,
+        relativePath: json['relativePath'] as String?,
+      );
 
   factory Note.fromJson(Map<String, dynamic> json, [String? relativePath]) =>
       Note(

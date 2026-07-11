@@ -54,22 +54,67 @@ class StorageService {
   }
 
   // ── Notes: markdown files in the user folder (recursive) ──
+  //
+  // Storage model: the note *content* lives in a standalone `.md` file, while
+  // its *metadata* (title, tags, pinned, favorite, timestamps, relativePath)
+  // lives in a sibling `.config/<id>.json` file. This keeps the markdown body
+  // clean — no YAML frontmatter at the top of the text — and groups all app
+  // config under one hidden `.config` directory.
 
-  /// Load every `.md` file in the selected folder AND its subfolders.
-  /// Notes keep their relative path so they are saved back in place.
+  /// Path of the `.config` directory (created on demand). Falls back to the
+  /// private app dir when no notes folder is configured.
+  Future<String> get _configDirPath async {
+    final base = hasFolder ? currentFolder! : (await _privateDir).path;
+    final dir = p.join(base, '.config');
+    if (!Directory(dir).existsSync()) {
+      Directory(dir).createSync(recursive: true);
+    }
+    return dir;
+  }
+
+  /// Load every note in the selected folder AND its subfolders.
+  ///
+  /// 1. Notes with a `.config/<id>.json` entry are authoritative: their
+  ///    content is read from the matching `.md` file by `relativePath`.
+  /// 2. Any `.md` not covered by a config (the user's own files, or old
+  ///    frontmatter files being migrated) is adopted as a note.
   Future<List<Note>> loadNotes() async {
     if (!hasFolder) return [];
     final dir = Directory(currentFolder!);
     if (!dir.existsSync()) return [];
     final notes = <Note>[];
-    final entities = dir.listSync(recursive: true, followLinks: false);
-    for (final entity in entities) {
+    final covered = <String>{}; // relative paths already claimed by a config
+
+    // 1) App-managed notes from .config.
+    final cfgDir = Directory(await _configDirPath);
+    if (cfgDir.existsSync()) {
+      for (final entity in cfgDir.listSync()) {
+        if (entity is! File) continue;
+        if (!entity.path.endsWith('.json')) continue;
+        try {
+          final json =
+              jsonDecode(entity.readAsStringSync()) as Map<String, dynamic>;
+          final rel = (json['relativePath'] as String?) ?? '${json['id']}.md';
+          covered.add(rel);
+          final mdFile = File(p.join(dir.path, rel));
+          final content = mdFile.existsSync() ? mdFile.readAsStringSync() : '';
+          notes.add(Note.fromConfigJson(json, content));
+        } catch (_) {
+          // Skip corrupt config entries.
+        }
+      }
+    }
+
+    // 2) Adopt any .md not covered by a config.
+    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
       if (entity is! File) continue;
       if (!entity.path.endsWith('.md')) continue;
       final relative = p.relative(entity.path, from: dir.path);
+      if (covered.contains(relative)) continue;
       try {
         final content = entity.readAsStringSync();
         notes.add(Note.fromMarkdownFileOrAdopt(content, relative));
+        covered.add(relative);
       } catch (_) {
         // Skip unreadable files.
       }
@@ -81,14 +126,20 @@ class StorageService {
     if (!hasFolder) return;
     final dir = Directory(currentFolder!);
     if (!dir.existsSync()) dir.createSync(recursive: true);
+    final cfgDir = Directory(await _configDirPath);
     final written = <String>{};
+    final writtenConfigs = <String>{};
     for (final note in notes) {
       final rel = note.relativePath ?? note.fileName;
       final file = File(p.join(dir.path, rel));
       try {
         file.parent.createSync(recursive: true);
-        file.writeAsStringSync(note.toMarkdownFile());
+        // Content only — metadata goes to .config/<id>.json.
+        file.writeAsStringSync(note.content);
         written.add(file.path);
+        final cfg = File(p.join(cfgDir.path, '${note.id}.json'));
+        cfg.writeAsStringSync(jsonEncode(note.toConfigJson()));
+        writtenConfigs.add(cfg.path);
       } catch (_) {
         // Skip notes we cannot write (e.g. permission revoked) rather than
         // aborting the whole save and losing everything else.
@@ -107,6 +158,16 @@ class StorageService {
         entity.deleteSync();
       } catch (_) {}
     }
+    // Remove orphaned config files for notes that no longer exist.
+    if (cfgDir.existsSync()) {
+      for (final entity in cfgDir.listSync()) {
+        if (entity is! File || !entity.path.endsWith('.json')) continue;
+        if (writtenConfigs.contains(entity.path)) continue;
+        try {
+          entity.deleteSync();
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> saveNote(Note note) async {
@@ -116,14 +177,23 @@ class StorageService {
     final rel = note.relativePath ?? note.fileName;
     final file = File(p.join(dir.path, rel));
     file.parent.createSync(recursive: true);
-    file.writeAsStringSync(note.toMarkdownFile());
+    file.writeAsStringSync(note.content); // content only
+    final cfg = File(p.join(await _configDirPath, '${note.id}.json'));
+    cfg.writeAsStringSync(jsonEncode(note.toConfigJson())); // metadata
   }
 
-  /// Delete the on-disk file for a note, using its relative path when known.
+  /// Delete the note's `.md` file, using its relative path when known.
   Future<void> deleteNoteFile(String relativePathOrFileName) async {
     if (!hasFolder) return;
     final file = File(p.join(currentFolder!, relativePathOrFileName));
     if (file.existsSync()) file.deleteSync();
+  }
+
+  /// Delete the note's metadata file under `.config/<id>.json`.
+  Future<void> deleteNoteConfig(String id) async {
+    if (!hasFolder) return;
+    final cfg = File(p.join(await _configDirPath, '$id.json'));
+    if (cfg.existsSync()) cfg.deleteSync();
   }
 
   /// Write a standalone markdown file (e.g. an exported AI chat) into the
@@ -167,7 +237,7 @@ class StorageService {
   /// Export a single note as a standalone `.md` file into the **selected
   /// notes folder** (so it lands next to the user's other notes, not in a
   /// hidden `/data` path). Falls back to the private app dir when no folder
-  /// is configured.
+  /// is configured. Only the markdown *content* is written — no frontmatter.
   Future<String> exportNoteAsMarkdown(Note note) async {
     final Directory dir;
     if (hasFolder) {
@@ -179,7 +249,10 @@ class StorageService {
     final filename =
         '${note.title.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(RegExp(r'\s+'), '_')}.md';
     final file = File(p.join(dir.path, filename));
-    file.writeAsStringSync(note.toMarkdownFile());
+    final body = note.content.trim().isEmpty
+        ? '# ${note.title}\n'
+        : note.content;
+    file.writeAsStringSync(body);
     return file.path;
   }
 }

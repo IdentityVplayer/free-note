@@ -3,11 +3,17 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import '../models/chat_message.dart';
+import '../plugins/ai_context_plugin.dart';
 import '../l10n/app_localizations.dart';
 
 /// AI Assistant screen — standalone chat-like interface for Q&A.
 class AIAssistantScreen extends StatefulWidget {
-  const AIAssistantScreen({super.key});
+  /// Optional conversation to pre-load as context (e.g. when opening a Free
+  /// Note AI chat file via the ai-context plugin).
+  final List<ChatMessage>? initialMessages;
+
+  const AIAssistantScreen({super.key, this.initialMessages});
 
   @override
   State<AIAssistantScreen> createState() => _AIAssistantScreenState();
@@ -16,7 +22,7 @@ class AIAssistantScreen extends StatefulWidget {
 class _AIAssistantScreenState extends State<AIAssistantScreen> {
   final TextEditingController _questionController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<_ChatMessage> _messages = [];
+  final List<ChatMessage> _messages = [];
   bool _loading = false;
   String? _currentModel;
 
@@ -25,6 +31,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     super.initState();
     final models = context.read<AppProvider>().settings.allModels;
     _currentModel = models.isNotEmpty ? models.first : null;
+    if (widget.initialMessages != null) {
+      _messages.addAll(widget.initialMessages!);
+    }
   }
 
   @override
@@ -46,7 +55,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         : null;
 
     setState(() {
-      _messages.add(_ChatMessage(role: 'user', text: question));
+      _messages.add(ChatMessage(role: 'user', text: question));
       _loading = true;
       _questionController.clear();
     });
@@ -62,7 +71,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
 
     if (mounted) {
       setState(() {
-        _messages.add(_ChatMessage(role: 'assistant', text: answer));
+        _messages.add(ChatMessage(role: 'assistant', text: answer));
         _loading = false;
       });
       _scrollToBottom();
@@ -127,6 +136,8 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
 
   String _buildChatMarkdown() {
     final buf = StringBuffer();
+    buf.writeln(aiChatMagic);
+    buf.writeln();
     buf.writeln('# Chat ${_timestamp(DateTime.now())}');
     buf.writeln();
     for (final m in _messages) {
@@ -304,11 +315,4 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
       ),
     );
   }
-}
-
-class _ChatMessage {
-  final String role;
-  final String text;
-
-  _ChatMessage({required this.role, required this.text});
 }

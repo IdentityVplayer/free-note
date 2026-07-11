@@ -8,6 +8,7 @@ import '../services/ai_service.dart';
 import '../services/github_sync_service.dart';
 import '../plugins/plugin_manager.dart';
 import '../plugins/builtin_plugins.dart';
+import '../plugins/ai_context_plugin.dart';
 
 /// Central app state provider — manages notes, settings, AI, sync, and plugins.
 class AppProvider extends ChangeNotifier {
@@ -81,6 +82,7 @@ class AppProvider extends ChangeNotifier {
     pluginManager.register(WordCountPlugin());
     pluginManager.register(TextFormatterPlugin());
     pluginManager.register(ExportPlugin());
+    pluginManager.register(AiContextPlugin());
 
     _setLoading(false);
   }
@@ -126,6 +128,7 @@ class AppProvider extends ChangeNotifier {
     }
     if (note != null) {
       _storage.deleteNoteFile(note.relativePath ?? note.fileName);
+      _storage.deleteNoteConfig(note.id);
     }
     _persist();
     notifyListeners();
