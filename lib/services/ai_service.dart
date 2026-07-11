@@ -49,9 +49,7 @@ class AIService {
   /// Ask AI a question and get a response.
   Future<String> ask(String question, {String? context}) async {
     if (!isConfigured) {
-      throw const AIException(
-        'AI 未配置：请先在「设置 → AI」中填写 API Key。',
-      );
+      throw const AIException('AI 未配置：请先在「设置 → AI」中填写 API Key。');
     }
     try {
       final messages = <Map<String, String>>[
@@ -98,9 +96,7 @@ class AIService {
 
       // Surface the real error from the provider instead of masking it.
       final detail = _extractError(response);
-      throw AIException(
-        'AI 请求失败 (HTTP ${response.statusCode})$detail',
-      );
+      throw AIException('AI 请求失败 (HTTP ${response.statusCode})$detail');
     } on AIException {
       rethrow;
     } catch (e) {
@@ -114,9 +110,7 @@ class AIService {
     WritingMode mode = WritingMode.continue_,
   }) async {
     if (!isConfigured) {
-      throw const AIException(
-        'AI 未配置：请先在「设置 → AI」中填写 API Key。',
-      );
+      throw const AIException('AI 未配置：请先在「设置 → AI」中填写 API Key。');
     }
     final prompt = switch (mode) {
       WritingMode.continue_ =>
@@ -138,9 +132,7 @@ class AIService {
   String _extractError(http.Response response) {
     try {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final msg = body['error']?['message'] ??
-          body['message'] ??
-          body['error'];
+      final msg = body['error']?['message'] ?? body['message'] ?? body['error'];
       if (msg != null && msg.toString().isNotEmpty) {
         return '：$msg';
       }

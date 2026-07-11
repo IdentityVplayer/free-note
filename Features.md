@@ -4,6 +4,11 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.3.1
+
+### Fixed
+- **AI 与 GitHub 同步在发布版用不了（根因）** — Android 清单缺少 `INTERNET` 权限，导致发布版（release）下所有网络请求（AI 调用、`api.github.com` 同步）一律失败；调试版由 Flutter 自动授予该权限，所以只在真机/发布版暴露。已补上 `android.permission.INTERNET`（及 `ACCESS_NETWORK_STATE`），AI 与 GitHub 同步恢复正常。
+
 ## 1.3.0
 
 ### New Features
