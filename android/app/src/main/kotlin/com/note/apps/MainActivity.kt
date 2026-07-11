@@ -1,4 +1,4 @@
-package com.workbuddy.free_note
+package com.note.apps
 
 import io.flutter.embedding.android.FlutterActivity
 

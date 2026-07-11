@@ -68,5 +68,18 @@
   "insertQuote": "引用",
   "about": "关于",
   "aboutDesc": "自由笔记 - 多功能跨平台笔记应用。",
-  "exportAsMarkdown": "导出为 Markdown"
+  "exportAsMarkdown": "导出为 Markdown",
+  "notesFolder": "笔记文件夹",
+  "currentFolder": "当前文件夹",
+  "changeFolder": "更改",
+  "themeColor": "主题色",
+  "aiProvider": "AI 提供商",
+  "baseUrl": "接口地址",
+  "customProvider": "自定义",
+  "selectFolderTitle": "选择笔记仓库",
+  "selectFolderHint": "请选择一个文件夹用于存放笔记，每篇笔记会以独立的 .md 文件保存在其中。",
+  "selectFolder": "选择文件夹",
+  "useDefaultFolder": "使用默认位置",
+  "notSet": "未设置",
+  "appearance": "外观"
 }

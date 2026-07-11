@@ -140,26 +140,44 @@ jobs:
           cp artifacts/web-build/free-note-web.zip release/
           ls -la release/
 
+      - name: Extract changelog for this version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Release version: $VERSION"
+          if [ -f Features.md ]; then
+            awk -v ver="## $VERSION" '
+              $0==ver {f=1; next}
+              f && /^## / {exit}
+              f {print}
+            ' Features.md > release_notes.md
+          fi
+          if [ ! -s release_notes.md ]; then
+            cat > release_notes.md <<EOF
+          ## Free Note $VERSION
+
+          ### Downloads
+          - **Android APK**: Choose the APK matching your device architecture (arm64-v8a recommended for modern devices)
+          - **Windows**: Unzip and run \`free_note.exe\`
+          - **Web**: Unzip and serve with any static file server
+
+          ### Features
+          - ✅ Markdown editing with live preview (HTML supported)
+          - ✅ Plugin system (extensible)
+          - ✅ AI writing & Q&A assistant (custom providers)
+          - ✅ GitHub notes sync (one-tap sync)
+          - ✅ Multi-language (English, Chinese, Japanese)
+          - ✅ Dark mode + custom theme color
+          EOF
+          fi
+          echo "----- Release notes -----"
+          cat release_notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Free Note ${{ github.ref_name }}
-          body: |
-            ## Free Note ${{ github.ref_name }}
-
-            ### Downloads
-            - **Android APK**: Choose the APK matching your device architecture (arm64-v8a recommended for modern devices)
-            - **Windows**: Unzip and run `free_note.exe`
-            - **Web**: Unzip and serve with any static file server
-
-            ### Features
-            - ✅ Markdown editing with live preview
-            - ✅ Plugin system (extensible)
-            - ✅ AI writing & Q&A assistant
-            - ✅ GitHub notes sync
-            - ✅ Multi-language (English, Chinese, Japanese)
-            - ✅ Dark mode
+          body_path: release_notes.md
           files: release/*
           draft: false
           prerelease: false

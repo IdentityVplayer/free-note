@@ -1,7 +1,7 @@
 name: free_note
 description: "Free Note - A multifunctional cross-platform note-taking app with Markdown, Plugins, AI, GitHub Sync, i18n and Dark Mode."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ^3.12.2
@@ -11,9 +11,10 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
-  # Markdown
+  # Markdown & HTML rendering
   flutter_markdown: ^0.7.0
   markdown: ^7.1.0
+  flutter_html: ^3.0.0
 
   # State Management
   provider: ^6.1.2
@@ -21,6 +22,9 @@ dependencies:
   # Local Storage
   shared_preferences: ^2.2.2
   path_provider: ^2.1.2
+  path: ^1.9.0
+  file_picker: ^8.0.0
+  yaml: ^3.1.2
 
   # HTTP & AI
   http: ^1.2.0

@@ -28,6 +28,20 @@ class AppProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get statusMessage => _statusMessage;
   bool get isDarkMode => _settings.isDarkMode;
+  bool get needsFolderSelection => !_storage.hasFolder;
+
+  /// Resolved theme color from settings, or null for default.
+  Color? get themeColor {
+    final hex = _settings.themeColorHex;
+    if (hex == null || hex.isEmpty) return null;
+    try {
+      return Color(
+        int.parse(hex.replaceFirst('#', ''), radix: 16) | 0xFF000000,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Notes sorted: pinned first, then by updated time descending.
   List<Note> get sortedNotes {
@@ -44,10 +58,18 @@ class AppProvider extends ChangeNotifier {
   Future<void> init() async {
     _setLoading(true);
     _settings = await _storage.loadSettings();
+    if (_settings.notesFolderPath != null &&
+        _settings.notesFolderPath!.isNotEmpty) {
+      await _storage.setFolder(_settings.notesFolderPath!);
+    }
     _notes = await _storage.loadNotes();
 
     // Initialize services with loaded settings.
-    aiService = AIService(apiKey: _settings.aiApiKey, model: _settings.aiModel);
+    aiService = AIService(
+      apiKey: _settings.aiApiKey,
+      model: _settings.aiModel,
+      baseUrl: _settings.resolvedAiBaseUrl,
+    );
     githubService = GitHubSyncService(
       token: _settings.githubToken,
       repo: _settings.githubRepo,
@@ -119,12 +141,24 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  // ---- Folder selection ----
+
+  /// Choose the notes folder (user's "repository"). Loads existing notes.
+  Future<void> chooseFolder(String path) async {
+    _settings.notesFolderPath = path;
+    await _storage.setFolder(path);
+    await _storage.saveSettings(_settings);
+    _notes = await _storage.loadNotes();
+    notifyListeners();
+  }
+
   // ---- Settings ----
 
   Future<void> updateSettings(AppSettings settings) async {
     _settings = settings;
     aiService.apiKey = settings.aiApiKey;
     aiService.model = settings.aiModel;
+    aiService.baseUrl = settings.resolvedAiBaseUrl;
     githubService.token = settings.githubToken;
     githubService.repo = settings.githubRepo;
     await _storage.saveSettings(settings);
@@ -143,9 +177,21 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setThemeColor(String? hex) {
+    _settings.themeColorHex = hex;
+    _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
   // ---- GitHub Sync ----
 
+  /// Sync notes to GitHub now (immediate sync).
   Future<String> syncToGitHub() async {
+    if (!githubService.isConfigured) {
+      _statusMessage = 'GitHub 未配置，请先在设置中填写 Token 和仓库';
+      notifyListeners();
+      return _statusMessage!;
+    }
     _setLoading(true);
     final result = await githubService.syncNotes(_notes);
     _statusMessage = result.message;
@@ -155,14 +201,19 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<String> pullFromGitHub() async {
+    if (!githubService.isConfigured) {
+      _statusMessage = 'GitHub 未配置，请先在设置中填写 Token 和仓库';
+      notifyListeners();
+      return _statusMessage!;
+    }
     _setLoading(true);
     final remoteNotes = await githubService.pullNotes();
     if (remoteNotes != null) {
       _notes = remoteNotes;
       await _persist();
-      _statusMessage = 'Pulled ${remoteNotes.length} notes from GitHub';
+      _statusMessage = '已从 GitHub 拉取 ${remoteNotes.length} 篇笔记';
     } else {
-      _statusMessage = 'Failed to pull from GitHub';
+      _statusMessage = '从 GitHub 拉取失败';
     }
     _setLoading(false);
     notifyListeners();

@@ -68,5 +68,18 @@
   "insertQuote": "引用",
   "about": "について",
   "aboutDesc": "フリーノート - 多機能クロスプラットフォームノートアプリ。",
-  "exportAsMarkdown": "Markdownとしてエクスポート"
+  "exportAsMarkdown": "Markdownとしてエクスポート",
+  "notesFolder": "ノートフォルダ",
+  "currentFolder": "現在のフォルダ",
+  "changeFolder": "変更",
+  "themeColor": "テーマカラー",
+  "aiProvider": "AI プロバイダー",
+  "baseUrl": "ベースURL",
+  "customProvider": "カスタム",
+  "selectFolderTitle": "ノートフォルダを選択",
+  "selectFolderHint": "ノートを保存するフォルダを選択してください。各ノートは独立した .md ファイルとして保存されます。",
+  "selectFolder": "フォルダを選択",
+  "useDefaultFolder": "デフォルト位置を使用",
+  "notSet": "未設定",
+  "appearance": "外観"
 }

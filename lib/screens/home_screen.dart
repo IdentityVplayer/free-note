@@ -66,6 +66,17 @@ class _HomeScreenState extends State<HomeScreen> {
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
             ),
           ),
+          IconButton(
+            icon: provider.isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.cloud_upload),
+            tooltip: l10n.t('syncNow'),
+            onPressed: provider.isLoading ? null : () => _syncNow(context),
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
@@ -223,6 +234,14 @@ class _HomeScreenState extends State<HomeScreen> {
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  Future<void> _syncNow(BuildContext context) async {
+    final provider = context.read<AppProvider>();
+    final msg = await provider.syncToGitHub();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
   }
 
   void _confirmDelete(

@@ -1,0 +1,36 @@
+# Free Note — Features & Changelog
+
+This file records feature highlights and version history. On each GitHub
+Release, the section matching the current version (from `pubspec.yaml`) is
+used as the release description.
+
+## 1.1.0
+
+### New Features
+- **Local folder as your notes repository** — On first launch you now pick a
+  folder; every note is stored as a standalone `.md` file (with YAML
+  frontmatter), so you can manage them with any tool or sync them yourself.
+- **HTML rendering in preview** — Markdown preview now renders embedded HTML.
+- **Click-to-open links** — Tapping a link in the preview opens it in your
+  default browser.
+- **Custom AI providers** — Choose OpenAI, DeepSeek, Moonshot (Kimi), Google
+  Gemini, Ollama (local), or a fully custom OpenAI-compatible endpoint with
+  your own Base URL.
+- **Theme color** — Pick a primary color for the app (6 presets + default).
+- **GitHub "Sync Now"** — One-tap immediate sync from the home screen, plus
+  clearer error messages (invalid token, missing repo, no permission).
+
+### Changed
+- Package name changed to `com.note.apps`.
+- GitHub sync reworked for reliability (base64 normalization, status feedback).
+
+## 1.0.0
+
+### Initial Release
+- Markdown editing with live preview and formatting toolbar.
+- Extensible plugin system (word count, text formatter, exporter).
+- AI writing assistant (continue, improve, summarize, translate, expand) + Q&A.
+- GitHub notes sync (push / pull).
+- Multi-language (English, 中文, 日本語).
+- Dark mode with Material 3 themes.
+- Cross-platform: Android, Windows, Web (Linux/Linux desktop build ready).

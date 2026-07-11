@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_html/flutter_html.dart';
+import 'package:markdown/markdown.dart' as md;
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/note.dart';
@@ -334,9 +336,23 @@ class _EditorScreenState extends State<EditorScreen> {
           // Editor / Preview
           Expanded(
             child: _isPreview
-                ? Markdown(
-                    data: _contentController.text,
+                ? SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
+                    child: Html(
+                      data: md.markdownToHtml(
+                        _contentController.text,
+                        extensionSet: md.ExtensionSet.gitHubFlavored,
+                      ),
+                      onLinkTap: (url, _, _) {
+                        if (url != null) _launchUrl(url);
+                      },
+                      style: {
+                        'body': Style(fontSize: FontSize(16.0)),
+                        'a': Style(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      },
+                    ),
                   )
                 : Stack(
                     children: [
@@ -409,5 +425,13 @@ class _EditorScreenState extends State<EditorScreen> {
       onPressed: onTap,
       visualDensity: VisualDensity.compact,
     );
+  }
+
+  /// Open a URL in the default browser.
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 }

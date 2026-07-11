@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'providers/app_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
+import 'screens/folder_picker_screen.dart';
 
 /// Free Note — A multifunctional cross-platform note-taking app.
 /// Features: Markdown, Plugins, AI Writing, GitHub Sync, i18n, Dark Mode.
@@ -18,36 +19,43 @@ class FreeNoteApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const defaultSeed = Color(0xFF6750A4);
     return ChangeNotifierProvider(
       create: (_) => AppProvider()..init(),
       child: Consumer<AppProvider>(
         builder: (context, provider, _) {
+          final seed = provider.themeColor ?? defaultSeed;
           return MaterialApp(
             title: 'Free Note',
             debugShowCheckedModeBanner: false,
-            theme: _buildLightTheme(),
-            darkTheme: _buildDarkTheme(),
+            theme: _buildLightTheme(seed),
+            darkTheme: _buildDarkTheme(seed),
             themeMode: provider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
             locale: Locale(provider.settings.languageCode),
             supportedLocales: const [Locale('en'), Locale('zh'), Locale('ja')],
             localizationsDelegates: const [
               AppLocalizationsDelegate(),
-              // Flutter's built-in localization delegates for material widgets.
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            home: const HomeScreen(),
+            home: provider.isLoading
+                ? const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  )
+                : provider.needsFolderSelection
+                ? const FolderPickerScreen()
+                : const HomeScreen(),
           );
         },
       ),
     );
   }
 
-  ThemeData _buildLightTheme() {
+  ThemeData _buildLightTheme(Color seed) {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF6750A4),
+        seedColor: seed,
         brightness: Brightness.light,
       ),
       useMaterial3: true,
@@ -55,10 +63,10 @@ class FreeNoteApp extends StatelessWidget {
     );
   }
 
-  ThemeData _buildDarkTheme() {
+  ThemeData _buildDarkTheme(Color seed) {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF6750A4),
+        seedColor: seed,
         brightness: Brightness.dark,
       ),
       useMaterial3: true,

@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/note.dart';
 
 /// GitHub sync service — syncs notes to a GitHub repository via the REST API.
+/// Notes are stored as a single `notes/notes.json` file (with frontmatter
+/// mirrored locally as individual `.md` files by the storage layer).
 class GitHubSyncService {
   String? token;
   String? repo; // format: owner/repo
@@ -22,16 +24,31 @@ class GitHubSyncService {
     'X-GitHub-Api-Version': '2022-11-28',
   };
 
+  String _describeError(int status) {
+    switch (status) {
+      case 401:
+        return 'GitHub Token 无效或已过期 (401)';
+      case 403:
+        return '无权限写入该仓库，请检查 Token 的 repo 权限 (403)';
+      case 404:
+        return '仓库不存在或无访问权限，请确认 owner/repo 是否正确 (404)';
+      case 422:
+        return '提交内容无效 (422)';
+      default:
+        return 'GitHub API 错误: $status';
+    }
+  }
+
   /// Sync all notes to GitHub — uploads a single notes.json file.
   Future<SyncResult> syncNotes(List<Note> notes) async {
     if (!isConfigured) {
-      return SyncResult(success: false, message: 'GitHub not configured');
+      return SyncResult(success: false, message: 'GitHub 未配置（请填写 Token 和仓库）');
     }
     try {
-      final content = base64Encode(
-        utf8.encode(jsonEncode(notes.map((n) => n.toJson()).toList())),
-      );
-      final path = 'notes/notes.json';
+      final json = jsonEncode(notes.map((n) => n.toJson()).toList());
+      // Remove newlines from base64 so the API accepts it reliably.
+      final content = base64Encode(utf8.encode(json)).replaceAll('\n', '');
+      const path = 'notes/notes.json';
 
       // Get existing file SHA (if any) for update.
       String? sha;
@@ -44,6 +61,11 @@ class GitHubSyncService {
           sha =
               (jsonDecode(getRes.body) as Map<String, dynamic>)['sha']
                   as String?;
+        } else if (getRes.statusCode != 404) {
+          return SyncResult(
+            success: false,
+            message: _describeError(getRes.statusCode),
+          );
         }
       } catch (_) {
         // File doesn't exist yet — that's fine.
@@ -56,24 +78,26 @@ class GitHubSyncService {
       };
       if (sha != null) body['sha'] = sha;
 
-      final res = await http.put(
-        Uri.parse('$_apiBase/contents/$path'),
-        headers: _headers,
-        body: jsonEncode(body),
-      );
+      final res = await http
+          .put(
+            Uri.parse('$_apiBase/contents/$path'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
 
       if (res.statusCode == 200 || res.statusCode == 201) {
         return SyncResult(
           success: true,
-          message: 'Synced ${notes.length} notes to GitHub',
+          message: '已同步 ${notes.length} 篇笔记到 GitHub',
         );
       }
       return SyncResult(
         success: false,
-        message: 'GitHub API error: ${res.statusCode}',
+        message: _describeError(res.statusCode),
       );
     } catch (e) {
-      return SyncResult(success: false, message: 'Sync error: $e');
+      return SyncResult(success: false, message: '同步失败: $e');
     }
   }
 
@@ -81,10 +105,12 @@ class GitHubSyncService {
   Future<List<Note>?> pullNotes() async {
     if (!isConfigured) return null;
     try {
-      final res = await http.get(
-        Uri.parse('$_apiBase/contents/notes/notes.json?ref=$branch'),
-        headers: _headers,
-      );
+      final res = await http
+          .get(
+            Uri.parse('$_apiBase/contents/notes/notes.json?ref=$branch'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 30));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final content = data['content'] as String;
@@ -104,10 +130,12 @@ class GitHubSyncService {
   Future<bool> verifyConnection() async {
     if (!isConfigured) return false;
     try {
-      final res = await http.get(
-        Uri.parse('https://api.github.com/repos/$repo'),
-        headers: _headers,
-      );
+      final res = await http
+          .get(
+            Uri.parse('https://api.github.com/repos/$repo'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 15));
       return res.statusCode == 200;
     } catch (_) {
       return false;
