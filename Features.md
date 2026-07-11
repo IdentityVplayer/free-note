@@ -4,6 +4,14 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.1.2
+
+### Bug Fixes
+- **Android build fixed** — Applied the Built-in Kotlin Gradle Plugin to the
+  app module so `file_picker` 11.x Kotlin sources compile under AGP 9. The
+  Android APK / App Bundle build now succeeds (was failing with
+  `cannot find symbol FilePickerPlugin`).
+
 ## 1.1.1
 
 ### New Features

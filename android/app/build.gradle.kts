@@ -1,5 +1,7 @@
 plugins {
     id("com.android.application")
+    // Built-in Kotlin: required so AGP 9 plugins (e.g. file_picker) ship Kotlin sources.
+    id("org.jetbrains.kotlin.android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
