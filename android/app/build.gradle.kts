@@ -31,12 +31,16 @@ android {
         create("release") {
             val keystorePropertiesFile = rootProject.file("key.properties")
             if (keystorePropertiesFile.exists()) {
-                val keystoreProperties = java.util.Properties()
-                keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
+                // Parse key.properties with plain Kotlin (no java.util/java.io
+                // imports, which Gradle's Kotlin DSL does not expose here).
+                val props = keystorePropertiesFile.readLines()
+                    .map { it.split("=", limit = 2) }
+                    .filter { it.size == 2 }
+                    .associate { it[0].trim() to it[1].trim() }
+                keyAlias = props["keyAlias"]
+                keyPassword = props["keyPassword"]
+                storeFile = file(props["storeFile"]!!)
+                storePassword = props["storePassword"]
             }
         }
     }
