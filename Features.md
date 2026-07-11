@@ -4,6 +4,14 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.1.4
+
+### Bug Fixes
+- **Android build fixed (Kotlin timing)** — Apply Built-in Kotlin to the
+  `file_picker` module from `settings.gradle.kts` (`gradle.allprojects`) during
+  its configuration, so `FilePickerPlugin.kt` compiles on AGP 9 (previous
+  `afterEvaluate` hook ran too late).
+
 ## 1.1.3
 
 ### Bug Fixes
