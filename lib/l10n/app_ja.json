@@ -116,5 +116,6 @@
   "clearContext": "コンテキストをクリア",
   "contextActive": "コンテキスト：{0}",
   "selectContextFile": "コンテキストとして使うMarkdownファイルを選択",
-  "contextNeedFolder": "設定でノートフォルダを選択してください"
+  "contextNeedFolder": "設定でノートフォルダを選択してください",
+  "folderEmpty": "このフォルダは空です"
 }

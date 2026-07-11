@@ -26,6 +26,58 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Folder keys that are currently expanded (collapsed by default).
   final Set<String> _expanded = {};
 
+  /// Top-level folder names scanned from the notes directory tree,
+  /// **including empty folders**, so a folder the user just created shows up
+  /// on the home list even before it holds any note. null until the first
+  /// scan completes. Merged with the folders derived from notes below, so
+  /// both "folders with notes" and "empty folders" appear.
+  Set<String>? _scannedFolders;
+  String? _lastFolder;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFolders();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final cur = StorageService.instance.currentFolder;
+    if (cur != _lastFolder) {
+      _lastFolder = cur;
+      _loadFolders();
+    }
+  }
+
+  /// Scan the notes directory tree and collect every top-level folder name
+  /// (excluding folders whose name contains a dot, e.g. `.config`). Empty
+  /// folders are included so they remain visible on the home list.
+  Future<void> _loadFolders() async {
+    final base = StorageService.instance.currentFolder;
+    final result = <String>{};
+    if (base != null && base.isNotEmpty) {
+      final dir = Directory(base);
+      if (dir.existsSync()) {
+        try {
+          for (final entity in dir.listSync(
+            recursive: true,
+            followLinks: false,
+          )) {
+            if (entity is! Directory) continue;
+            final rel = p.relative(entity.path, from: dir.path);
+            if (rel == '.' || rel.isEmpty) continue;
+            final top = p.split(rel).first;
+            if (!top.contains('.')) result.add(top);
+          }
+        } catch (_) {
+          // Ignore unreadable folders; we fall back to note-derived groups.
+        }
+      }
+    }
+    if (mounted) setState(() => _scannedFolders = result);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -50,7 +102,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final key = _groupKey(n);
       if (key.isNotEmpty) folders.putIfAbsent(key, () => []).add(n);
     }
-    final folderKeys = folders.keys.toList()..sort();
+    final folderKeys = <String>{...folders.keys};
+    if (_scannedFolders != null) folderKeys.addAll(_scannedFolders!);
+    final sortedKeys = folderKeys.toList()..sort();
 
     return Scaffold(
       appBar: AppBar(
@@ -148,13 +202,34 @@ class _HomeScreenState extends State<HomeScreen> {
                 ...rootNotes.map(
                   (note) => _buildNoteCard(context, l10n, provider, note),
                 ),
-                ...folderKeys.expand(
+                ...sortedKeys.expand(
                   (key) => [
                     _buildFolderHeader(context, key),
                     if (_expanded.contains(key))
-                      ...folders[key]!.map(
-                        (note) => _buildNoteCard(context, l10n, provider, note),
-                      ),
+                      ...(folders[key]?.isEmpty ?? true
+                          ? [
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 16,
+                                  top: 4,
+                                  bottom: 8,
+                                ),
+                                child: Text(
+                                  l10n.t('folderEmpty'),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ),
+                            ]
+                          : folders[key]!
+                                .map(
+                                  (note) => _buildNoteCard(
+                                    context,
+                                    l10n,
+                                    provider,
+                                    note,
+                                  ),
+                                )
+                                .toList()),
                   ],
                 ),
               ],
@@ -366,6 +441,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final dir = Directory(p.join(base, name.replaceAll(RegExp(r'[/\\]'), '_')));
     try {
       await dir.create(recursive: true);
+      _loadFolders();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${l10n.t('newFolder')}: $name')),

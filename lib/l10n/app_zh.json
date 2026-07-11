@@ -116,5 +116,6 @@
   "clearContext": "清除上下文",
   "contextActive": "上下文：{0}",
   "selectContextFile": "选择作为上下文的 Markdown 文件",
-  "contextNeedFolder": "请先在设置中选择笔记文件夹"
+  "contextNeedFolder": "请先在设置中选择笔记文件夹",
+  "folderEmpty": "此文件夹暂无笔记"
 }

@@ -4,6 +4,11 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.8.3
+
+### Fixed
+- **首页文件夹分组现在显示所有文件夹（含空文件夹）** — 之前分组只列出「含有笔记」的文件夹，因此刚用「新建文件夹」建好的空文件夹不会出现在首页，看起来像文件夹功能失效。现改为扫描笔记目录的真实目录树，把**所有**非点文件夹（`.config` 等含点的仍隐藏）都列出来；空文件夹展开后显示「此文件夹暂无笔记」。新建文件夹、切换笔记目录后会自动刷新该列表。
+
 ## 1.8.2
 
 ### Changed
