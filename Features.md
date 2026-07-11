@@ -4,6 +4,11 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.8.1
+
+### Fixed
+- **上下文文件选择器现在显示所有文件夹** — 之前只把「含有 `.md` 的文件夹」列成分组，空文件夹和尚未放笔记的子目录不显示。现改为直接扫描笔记目录的真实目录树：所有子文件夹（含空文件夹）都会列出，点开才显示其中的 `.md` 文件，顶层 `.md` 仍直接显示。
+
 ## 1.8.0
 
 ### Changed

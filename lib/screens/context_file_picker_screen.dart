@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import '../services/storage_service.dart';
@@ -6,20 +7,35 @@ import '../l10n/app_localizations.dart';
 
 /// Picks a markdown file to use as AI context.
 ///
-/// Files are grouped by their containing folder (relative to the notes
-/// folder): top-level `.md` files are shown directly, while files inside a
-/// subfolder appear under a collapsible folder header — tap the folder to
-/// reveal its files.
+/// Files are grouped by their containing folder: top-level `.md` files are
+/// shown directly, while files inside a subfolder appear under a collapsible
+/// folder header — tap the folder to reveal its files. **Every** folder under
+/// the notes directory is listed (even empty ones), because we scan the real
+/// directory tree rather than only notes that already carry metadata.
 class ContextFilePickerScreen extends StatefulWidget {
   const ContextFilePickerScreen({super.key});
 
   @override
-  State<ContextFilePickerScreen> createState() =>
-      _ContextFilePickerScreenState();
+  State<ContextFilePickerScreen> createState() => _ContextFilePickerScreenState();
+}
+
+/// A node in the notes-folder tree.
+class _TreeNode {
+  final String name;
+  final String relativePath;
+  final bool isDir;
+  final List<_TreeNode> children;
+
+  _TreeNode({
+    required this.name,
+    required this.relativePath,
+    required this.isDir,
+    this.children = const [],
+  });
 }
 
 class _ContextFilePickerScreenState extends State<ContextFilePickerScreen> {
-  List<Note> _notes = [];
+  List<_TreeNode> _root = [];
   bool _loading = true;
   String? _error;
   final Set<String> _expanded = {};
@@ -37,7 +53,17 @@ class _ContextFilePickerScreenState extends State<ContextFilePickerScreen> {
       _error = null;
     });
     try {
-      _notes = await StorageService.instance.loadNotes();
+      final base = StorageService.instance.currentFolder;
+      if (base == null || base.isEmpty) {
+        _root = [];
+      } else {
+        final dir = Directory(base);
+        if (!dir.existsSync()) {
+          _root = [];
+        } else {
+          _root = _buildTree(dir, '').children;
+        }
+      }
     } catch (e) {
       _error = '${l10n.t('folderAccessError')}: $e';
     } finally {
@@ -45,23 +71,52 @@ class _ContextFilePickerScreenState extends State<ContextFilePickerScreen> {
     }
   }
 
-  List<Note> get _topLevel {
-    final list = <Note>[];
-    for (final n in _notes) {
-      final dir = p.dirname(n.relativePath ?? '');
-      if (dir == '.' || dir.isEmpty) list.add(n);
+  /// Recursively build the folder tree, skipping hidden entries (e.g. the
+  /// `.config` metadata directory). Dirs sort before files; both by name.
+  _TreeNode _buildTree(Directory dir, String rel) {
+    final entries = dir
+        .listSync()
+        .whereType<FileSystemEntity>()
+        .where((e) => !p.basename(e.path).startsWith('.'))
+        .toList()
+      ..sort((a, b) {
+        final aDir = a is Directory;
+        final bDir = b is Directory;
+        if (aDir != bDir) return aDir ? -1 : 1;
+        return p
+            .basename(a.path)
+            .toLowerCase()
+            .compareTo(p.basename(b.path).toLowerCase());
+      });
+
+    final children = <_TreeNode>[];
+    for (final e in entries) {
+      final name = p.basename(e.path);
+      final childRel = rel.isEmpty ? name : p.join(rel, name);
+      if (e is Directory) {
+        children.add(
+          _TreeNode(
+            name: name,
+            relativePath: childRel,
+            isDir: true,
+            children: _buildTree(e, childRel).children,
+          ),
+        );
+      } else if (e is File && e.path.endsWith('.md')) {
+        children.add(_TreeNode(name: name, relativePath: childRel, isDir: false));
+      }
     }
-    return list;
+    return _TreeNode(name: p.basename(dir.path), relativePath: rel, isDir: true, children: children);
   }
 
-  Map<String, List<Note>> get _folders {
-    final map = <String, List<Note>>{};
-    for (final n in _notes) {
-      final dir = p.dirname(n.relativePath ?? '');
-      if (dir == '.' || dir.isEmpty) continue;
-      map.putIfAbsent(dir, () => []).add(n);
-    }
-    return map;
+  Future<void> _pickFile(String relativePath) async {
+    final base = StorageService.instance.currentFolder;
+    if (base == null) return;
+    final file = File(p.join(base, relativePath));
+    if (!file.existsSync()) return;
+    final content = file.readAsStringSync();
+    final note = Note.fromMarkdownFileOrAdopt(content, relativePath);
+    if (mounted) Navigator.pop(context, note);
   }
 
   @override
@@ -102,61 +157,44 @@ class _ContextFilePickerScreenState extends State<ContextFilePickerScreen> {
                 ),
               ),
             )
-          : _notes.isEmpty
+          : _root.isEmpty
           ? Center(child: Text(l10n.t('noNotes')))
-          : _buildList(l10n),
+          : ListView(children: _renderNodes(_root)),
     );
   }
 
-  Widget _buildList(AppLocalizations l10n) {
-    final folders = _folders;
-    final folderNames = folders.keys.toList()..sort();
-    final children = <Widget>[];
-
-    // Top-level files shown directly.
-    for (final note in _topLevel) {
-      children.add(_fileTile(note));
-    }
-
-    // Folder groups (collapsible).
-    for (final name in folderNames) {
-      final isOpen = _expanded.contains(name);
-      children.add(
-        ListTile(
-          leading: const Icon(Icons.folder),
-          title: Text(name),
-          trailing: Icon(isOpen ? Icons.expand_less : Icons.expand_more),
-          onTap: () => setState(() {
-            if (isOpen) {
-              _expanded.remove(name);
-            } else {
-              _expanded.add(name);
-            }
-          }),
-        ),
-      );
-      if (isOpen) {
-        for (final note in folders[name]!) {
-          children.add(_fileTile(note, indent: true));
-        }
+  List<Widget> _renderNodes(List<_TreeNode> nodes, {int depth = 0}) {
+    final widgets = <Widget>[];
+    for (final node in nodes) {
+      if (node.isDir) {
+        final open = _expanded.contains(node.relativePath);
+        widgets.add(
+          ListTile(
+            leading: const Icon(Icons.folder),
+            title: Text(node.name),
+            trailing: Icon(open ? Icons.expand_less : Icons.expand_more),
+            contentPadding: EdgeInsets.only(left: 16.0 + depth * 16),
+            onTap: () => setState(() {
+              if (open) {
+                _expanded.remove(node.relativePath);
+              } else {
+                _expanded.add(node.relativePath);
+              }
+            }),
+          ),
+        );
+        if (open) widgets.addAll(_renderNodes(node.children, depth: depth + 1));
+      } else {
+        widgets.add(
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: Text(node.name),
+            contentPadding: EdgeInsets.only(left: 16.0 + depth * 16),
+            onTap: () => _pickFile(node.relativePath),
+          ),
+        );
       }
     }
-
-    return ListView(children: children);
-  }
-
-  Widget _fileTile(Note note, {bool indent = false}) {
-    final rp = note.relativePath ?? '${note.id}.md';
-    return ListTile(
-      leading: const Icon(Icons.description_outlined),
-      title: Text(p.basename(rp)),
-      subtitle: note.title != p.basenameWithoutExtension(rp)
-          ? Text(note.title)
-          : null,
-      contentPadding: indent
-          ? const EdgeInsets.only(left: 32, right: 16)
-          : null,
-      onTap: () => Navigator.pop(context, note),
-    );
+    return widgets;
   }
 }
