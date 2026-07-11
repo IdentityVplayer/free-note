@@ -1,4 +1,4 @@
-# 无边记 (Borderless Notes)
+# 无边记 (Free Notes)
 
 A multifunctional, cross-platform note-taking app built with Flutter.
 
