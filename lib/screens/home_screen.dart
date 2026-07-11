@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
+import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../services/storage_service.dart';
 import '../l10n/app_localizations.dart';
@@ -22,6 +23,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   bool _fabOpen = false;
 
+  /// Folder keys that are currently expanded (collapsed by default).
+  final Set<String> _expanded = {};
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -34,6 +38,19 @@ class _HomeScreenState extends State<HomeScreen> {
           note.content.toLowerCase().contains(q) ||
           note.tags.any((t) => t.toLowerCase().contains(q));
     }).toList();
+
+    // Group notes by their top-level folder. Folders whose name contains a dot
+    // (e.g. ".config") are hidden entirely — both the header and their notes.
+    final visibleNotes = filteredNotes
+        .where((n) => !_hiddenByDotFolder(n))
+        .toList();
+    final rootNotes = visibleNotes.where((n) => _groupKey(n).isEmpty).toList();
+    final folders = <String, List<Note>>{};
+    for (final n in visibleNotes) {
+      final key = _groupKey(n);
+      if (key.isNotEmpty) folders.putIfAbsent(key, () => []).add(n);
+    }
+    final folderKeys = folders.keys.toList()..sort();
 
     return Scaffold(
       appBar: AppBar(
@@ -125,110 +142,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             )
-          : ListView.builder(
+          : ListView(
               padding: const EdgeInsets.all(8),
-              itemCount: filteredNotes.length,
-              itemBuilder: (context, index) {
-                final note = filteredNotes[index];
-                return Card(
-                  child: ListTile(
-                    leading: note.isFavorite
-                        ? const Icon(Icons.star, color: Colors.amber)
-                        : const Icon(Icons.note_outlined),
-                    title: Row(
-                      children: [
-                        if (note.isPinned)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 4),
-                            child: Icon(
-                              Icons.push_pin,
-                              size: 16,
-                              color: Colors.blue,
-                            ),
-                          ),
-                        Expanded(
-                          child: Text(
-                            note.title,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          note.preview,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (note.tags.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Wrap(
-                            spacing: 4,
-                            children: note.tags
-                                .map(
-                                  (tag) => Chip(
-                                    label: Text(
-                                      tag,
-                                      style: const TextStyle(fontSize: 10),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    materialTapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ],
-                      ],
-                    ),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (value) {
-                        switch (value) {
-                          case 'pin':
-                            provider.togglePin(note.id);
-                            break;
-                          case 'favorite':
-                            provider.toggleFavorite(note.id);
-                            break;
-                          case 'delete':
-                            _confirmDelete(context, provider, note.id);
-                            break;
-                        }
-                      },
-                      itemBuilder: (_) => [
-                        PopupMenuItem(
-                          value: 'pin',
-                          child: Text(
-                            note.isPinned ? l10n.t('unpin') : l10n.t('pin'),
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'favorite',
-                          child: Text(
-                            note.isFavorite
-                                ? l10n.t('unfavorite')
-                                : l10n.t('favorite'),
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Text(l10n.t('deleteNote')),
-                        ),
-                      ],
-                    ),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => EditorScreen(noteId: note.id),
+              children: [
+                ...rootNotes.map(
+                  (note) => _buildNoteCard(context, l10n, provider, note),
+                ),
+                ...folderKeys.expand(
+                  (key) => [
+                    _buildFolderHeader(context, key),
+                    if (_expanded.contains(key))
+                      ...folders[key]!.map(
+                        (note) => _buildNoteCard(context, l10n, provider, note),
                       ),
-                    ),
-                  ),
-                );
-              },
+                  ],
+                ),
+              ],
             ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -255,6 +184,135 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Icon(_fabOpen ? Icons.close : Icons.add),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Top-level folder segment a note belongs to, or '' if it lives at root.
+  String _groupKey(Note note) {
+    final rel = note.relativePath ?? '';
+    if (rel.isEmpty) return '';
+    final dir = p.dirname(rel);
+    if (dir == '.' || dir.isEmpty) return '';
+    return p.split(dir).first;
+  }
+
+  /// True if any folder segment in the note's path contains a dot
+  /// (e.g. the ".config" metadata directory). Such notes are hidden on the
+  /// home list so internal config files are never shown to the user.
+  bool _hiddenByDotFolder(Note note) {
+    final rel = note.relativePath ?? '';
+    if (rel.isEmpty) return false;
+    final dir = p.dirname(rel);
+    if (dir == '.' || dir.isEmpty) return false;
+    return p.split(dir).any((seg) => seg.contains('.'));
+  }
+
+  /// Collapsible folder header; tap to reveal/hide the notes inside it.
+  Widget _buildFolderHeader(BuildContext context, String folderKey) {
+    final open = _expanded.contains(folderKey);
+    return Card(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: ListTile(
+        leading: const Icon(Icons.folder),
+        title: Text(
+          folderKey,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        trailing: Icon(open ? Icons.expand_less : Icons.expand_more),
+        onTap: () => setState(() {
+          if (open) {
+            _expanded.remove(folderKey);
+          } else {
+            _expanded.add(folderKey);
+          }
+        }),
+      ),
+    );
+  }
+
+  /// A single note's card (extracted from the old flat list item).
+  Widget _buildNoteCard(
+    BuildContext context,
+    AppLocalizations l10n,
+    AppProvider provider,
+    Note note,
+  ) {
+    return Card(
+      child: ListTile(
+        leading: note.isFavorite
+            ? const Icon(Icons.star, color: Colors.amber)
+            : const Icon(Icons.note_outlined),
+        title: Row(
+          children: [
+            if (note.isPinned)
+              const Padding(
+                padding: EdgeInsets.only(right: 4),
+                child: Icon(Icons.push_pin, size: 16, color: Colors.blue),
+              ),
+            Expanded(
+              child: Text(
+                note.title,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(note.preview, maxLines: 2, overflow: TextOverflow.ellipsis),
+            if (note.tags.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 4,
+                children: note.tags
+                    .map(
+                      (tag) => Chip(
+                        label: Text(tag, style: const TextStyle(fontSize: 10)),
+                        padding: EdgeInsets.zero,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          ],
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'pin':
+                provider.togglePin(note.id);
+                break;
+              case 'favorite':
+                provider.toggleFavorite(note.id);
+                break;
+              case 'delete':
+                _confirmDelete(context, provider, note.id);
+                break;
+            }
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: 'pin',
+              child: Text(note.isPinned ? l10n.t('unpin') : l10n.t('pin')),
+            ),
+            PopupMenuItem(
+              value: 'favorite',
+              child: Text(
+                note.isFavorite ? l10n.t('unfavorite') : l10n.t('favorite'),
+              ),
+            ),
+            PopupMenuItem(value: 'delete', child: Text(l10n.t('deleteNote'))),
+          ],
+        ),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => EditorScreen(noteId: note.id)),
+        ),
       ),
     );
   }

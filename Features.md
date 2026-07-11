@@ -4,6 +4,11 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.8.2
+
+### Changed
+- **首页笔记按文件夹分组** — 笔记列表不再平铺，改为按顶层文件夹分组：顶层笔记直接显示，位于子文件夹的笔记归入可展开的文件夹分组（文件夹默认折叠，点击展开）。名称含点（`.`）的文件夹（如 `.config` 元数据目录）及其中的文件会被整体隐藏，不出现在首页。
+
 ## 1.8.1
 
 ### Fixed
