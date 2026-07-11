@@ -71,7 +71,9 @@ class _EditorScreenState extends State<EditorScreen> {
     );
     _contentController.value = TextEditingValue(
       text: newText,
-      selection: TextSelection.collapsed(offset: selection.start + before.length + selectedText.length),
+      selection: TextSelection.collapsed(
+        offset: selection.start + before.length + selectedText.length,
+      ),
     );
     setState(() => _hasChanges = true);
   }
@@ -84,22 +86,28 @@ class _EditorScreenState extends State<EditorScreen> {
     try {
       String result;
       if (mode == WritingMode.continue_ || mode == WritingMode.expand) {
-        result = await provider.aiService.assistWriting(_contentController.text, mode: mode);
+        result = await provider.aiService.assistWriting(
+          _contentController.text,
+          mode: mode,
+        );
         if (mode == WritingMode.continue_) {
           _contentController.text += '\n\n$result';
         } else {
           _contentController.text = result;
         }
       } else {
-        result = await provider.aiService.assistWriting(_contentController.text, mode: mode);
+        result = await provider.aiService.assistWriting(
+          _contentController.text,
+          mode: mode,
+        );
         _contentController.text = result;
       }
       setState(() => _hasChanges = true);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.t('aiNotConfigured'))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.t('aiNotConfigured'))));
       }
     } finally {
       setState(() => _aiLoading = false);
@@ -117,33 +125,50 @@ class _EditorScreenState extends State<EditorScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text(l.t('aiWriting'),
-                    style: Theme.of(context).textTheme.titleMedium),
+                child: Text(
+                  l.t('aiWriting'),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.edit_note),
                 title: Text(l.t('continueWriting')),
-                onTap: () { Navigator.pop(ctx); _askAI(WritingMode.continue_); },
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _askAI(WritingMode.continue_);
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.auto_fix_high),
                 title: Text(l.t('improve')),
-                onTap: () { Navigator.pop(ctx); _askAI(WritingMode.improve); },
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _askAI(WritingMode.improve);
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.summarize),
                 title: Text(l.t('summarize')),
-                onTap: () { Navigator.pop(ctx); _askAI(WritingMode.summarize); },
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _askAI(WritingMode.summarize);
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.translate),
                 title: Text(l.t('translate')),
-                onTap: () { Navigator.pop(ctx); _askAI(WritingMode.translate); },
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _askAI(WritingMode.translate);
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.expand),
                 title: Text(l.t('expand')),
-                onTap: () { Navigator.pop(ctx); _askAI(WritingMode.expand); },
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _askAI(WritingMode.expand);
+                },
               ),
               const SizedBox(height: 8),
             ],
@@ -170,12 +195,19 @@ class _EditorScreenState extends State<EditorScreen> {
     final provider = context.watch<AppProvider>();
 
     // Get word count from plugin.
-    final wordCountPlugin = provider.pluginManager.plugins['builtin.wordcount']!;
-    final counts = (wordCountPlugin as dynamic).count(_contentController.text) as Map<String, int>;
+    final wordCountPlugin =
+        provider.pluginManager.plugins['builtin.wordcount']!;
+    final counts =
+        (wordCountPlugin as dynamic).count(_contentController.text)
+            as Map<String, int>;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titleController.text.isEmpty ? l10n.t('newNote') : l10n.t('editNote')),
+        title: Text(
+          _titleController.text.isEmpty
+              ? l10n.t('newNote')
+              : l10n.t('editNote'),
+        ),
         actions: [
           IconButton(
             icon: Icon(_isPreview ? Icons.edit : Icons.preview),
@@ -201,7 +233,9 @@ class _EditorScreenState extends State<EditorScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: TextField(
               controller: _titleController,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               decoration: InputDecoration(
                 hintText: l10n.t('title'),
                 border: InputBorder.none,
@@ -215,15 +249,17 @@ class _EditorScreenState extends State<EditorScreen> {
             child: Wrap(
               spacing: 4,
               children: [
-                ..._note.tags.map((tag) => Chip(
-                      label: Text(tag),
-                      onDeleted: () {
-                        setState(() {
-                          _note.tags.remove(tag);
-                          _hasChanges = true;
-                        });
-                      },
-                    )),
+                ..._note.tags.map(
+                  (tag) => Chip(
+                    label: Text(tag),
+                    onDeleted: () {
+                      setState(() {
+                        _note.tags.remove(tag);
+                        _hasChanges = true;
+                      });
+                    },
+                  ),
+                ),
                 SizedBox(
                   width: 100,
                   child: TextField(
@@ -255,20 +291,41 @@ class _EditorScreenState extends State<EditorScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
                 children: [
-                  _toolbarBtn(Icons.title, () => _insertText('## '),
-                      hint: l10n.t('insertHeading')),
-                  _toolbarBtn(Icons.format_bold, () => _insertText('**'),
-                      hint: l10n.t('insertBold')),
-                  _toolbarBtn(Icons.format_italic, () => _insertText('*'),
-                      hint: l10n.t('insertItalic')),
-                  _toolbarBtn(Icons.code, () => _insertText('`'),
-                      hint: l10n.t('insertCode')),
-                  _toolbarBtn(Icons.link, () => _insertText('[', ']()'),
-                      hint: l10n.t('insertLink')),
-                  _toolbarBtn(Icons.list, () => _insertText('- '),
-                      hint: l10n.t('insertList')),
-                  _toolbarBtn(Icons.format_quote, () => _insertText('> '),
-                      hint: l10n.t('insertQuote')),
+                  _toolbarBtn(
+                    Icons.title,
+                    () => _insertText('## '),
+                    hint: l10n.t('insertHeading'),
+                  ),
+                  _toolbarBtn(
+                    Icons.format_bold,
+                    () => _insertText('**'),
+                    hint: l10n.t('insertBold'),
+                  ),
+                  _toolbarBtn(
+                    Icons.format_italic,
+                    () => _insertText('*'),
+                    hint: l10n.t('insertItalic'),
+                  ),
+                  _toolbarBtn(
+                    Icons.code,
+                    () => _insertText('`'),
+                    hint: l10n.t('insertCode'),
+                  ),
+                  _toolbarBtn(
+                    Icons.link,
+                    () => _insertText('[', ']()'),
+                    hint: l10n.t('insertLink'),
+                  ),
+                  _toolbarBtn(
+                    Icons.list,
+                    () => _insertText('- '),
+                    hint: l10n.t('insertList'),
+                  ),
+                  _toolbarBtn(
+                    Icons.format_quote,
+                    () => _insertText('> '),
+                    hint: l10n.t('insertQuote'),
+                  ),
                 ],
               ),
             ),
@@ -303,8 +360,10 @@ class _EditorScreenState extends State<EditorScreen> {
                               children: [
                                 const CircularProgressIndicator(),
                                 const SizedBox(height: 16),
-                                Text(l10n.t('aiThinking'),
-                                    style: const TextStyle(color: Colors.white)),
+                                Text(
+                                  l10n.t('aiThinking'),
+                                  style: const TextStyle(color: Colors.white),
+                                ),
                               ],
                             ),
                           ),
@@ -321,10 +380,12 @@ class _EditorScreenState extends State<EditorScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('${l10n.t('words')}: ${counts['words']}  '
-                    '${l10n.t('characters')}: ${counts['chars']}  '
-                    '${l10n.t('lines')}: ${counts['lines']}',
-                    style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  '${l10n.t('words')}: ${counts['words']}  '
+                  '${l10n.t('characters')}: ${counts['chars']}  '
+                  '${l10n.t('lines')}: ${counts['lines']}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 Text(
                   '${_note.updatedAt.day}/${_note.updatedAt.month}/${_note.updatedAt.year}',
                   style: Theme.of(context).textTheme.bodySmall,
@@ -337,7 +398,11 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  Widget _toolbarBtn(IconData icon, VoidCallback onTap, {required String hint}) {
+  Widget _toolbarBtn(
+    IconData icon,
+    VoidCallback onTap, {
+    required String hint,
+  }) {
     return IconButton(
       icon: Icon(icon, size: 20),
       tooltip: hint,

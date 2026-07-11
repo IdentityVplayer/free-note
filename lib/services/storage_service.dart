@@ -68,9 +68,11 @@ class StorageService {
     final dir = await dataDir;
     final exportDir = Directory('${dir.path}/exports');
     if (!exportDir.existsSync()) exportDir.createSync(recursive: true);
-    final filename = '${note.title.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(RegExp(r'\s+'), '_')}.md';
+    final filename =
+        '${note.title.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(RegExp(r'\s+'), '_')}.md';
     final file = File('${exportDir.path}/$filename');
-    final content = '''# ${note.title}
+    final content =
+        '''# ${note.title}
 
 ${note.content}
 

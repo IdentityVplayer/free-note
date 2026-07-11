@@ -19,33 +19,27 @@ class PluginInfo {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'description': description,
-        'version': version,
-        'author': author,
-        'isEnabled': isEnabled,
-        'type': type.name,
-      };
+    'id': id,
+    'name': name,
+    'description': description,
+    'version': version,
+    'author': author,
+    'isEnabled': isEnabled,
+    'type': type.name,
+  };
 
   factory PluginInfo.fromJson(Map<String, dynamic> json) => PluginInfo(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        description: json['description'] as String,
-        version: json['version'] as String,
-        author: json['author'] as String,
-        isEnabled: json['isEnabled'] as bool? ?? true,
-        type: PluginType.values.firstWhere(
-          (e) => e.name == json['type'],
-          orElse: () => PluginType.utility,
-        ),
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    description: json['description'] as String,
+    version: json['version'] as String,
+    author: json['author'] as String,
+    isEnabled: json['isEnabled'] as bool? ?? true,
+    type: PluginType.values.firstWhere(
+      (e) => e.name == json['type'],
+      orElse: () => PluginType.utility,
+    ),
+  );
 }
 
-enum PluginType {
-  editor,
-  exporter,
-  importer,
-  theme,
-  utility,
-}
+enum PluginType { editor, exporter, importer, theme, utility }

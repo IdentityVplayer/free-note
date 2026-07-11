@@ -41,12 +41,12 @@ abstract class FreeNotePlugin {
 
   /// Get plugin info model.
   PluginInfo get info => PluginInfo(
-        id: id,
-        name: name,
-        description: description,
-        version: version,
-        author: author,
-        isEnabled: isEnabled,
-        type: type,
-      );
+    id: id,
+    name: name,
+    description: description,
+    version: version,
+    author: author,
+    isEnabled: isEnabled,
+    type: type,
+  );
 }

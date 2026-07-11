@@ -11,7 +11,8 @@ class WordCountPlugin extends FreeNotePlugin {
   String get name => 'Word Count';
 
   @override
-  String get description => 'Displays word and character count for the current note.';
+  String get description =>
+      'Displays word and character count for the current note.';
 
   @override
   String get version => '1.0.0';
@@ -24,7 +25,11 @@ class WordCountPlugin extends FreeNotePlugin {
 
   /// Count words in the given text.
   Map<String, int> count(String text) {
-    final words = text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+    final words = text
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .length;
     final chars = text.length;
     final lines = text.split('\n').length;
     return {'words': words, 'chars': chars, 'lines': lines};
@@ -45,7 +50,8 @@ class TextFormatterPlugin extends FreeNotePlugin {
   String get name => 'Text Formatter';
 
   @override
-  String get description => 'Quick markdown formatting tools (bold, italic, headers, etc.)';
+  String get description =>
+      'Quick markdown formatting tools (bold, italic, headers, etc.)';
 
   @override
   String get version => '1.0.0';

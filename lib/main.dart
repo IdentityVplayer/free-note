@@ -29,11 +29,7 @@ class FreeNoteApp extends StatelessWidget {
             darkTheme: _buildDarkTheme(),
             themeMode: provider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
             locale: Locale(provider.settings.languageCode),
-            supportedLocales: const [
-              Locale('en'),
-              Locale('zh'),
-              Locale('ja'),
-            ],
+            supportedLocales: const [Locale('en'), Locale('zh'), Locale('ja')],
             localizationsDelegates: const [
               AppLocalizationsDelegate(),
               // Flutter's built-in localization delegates for material widgets.

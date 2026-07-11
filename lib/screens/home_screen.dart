@@ -52,7 +52,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           IconButton(
-            icon: Icon(provider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            icon: Icon(
+              provider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+            ),
             tooltip: l10n.t('darkMode'),
             onPressed: provider.toggleDarkMode,
           ),
@@ -86,90 +88,133 @@ class _HomeScreenState extends State<HomeScreen> {
       body: provider.isLoading && provider.notes.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : filteredNotes.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.note_add, size: 64, color: Theme.of(context).colorScheme.outline),
-                      const SizedBox(height: 16),
-                      Text(l10n.t('noNotes'), style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 8),
-                      Text(l10n.t('noNotesHint'), style: Theme.of(context).textTheme.bodyMedium),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.note_add,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.outline,
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: filteredNotes.length,
-                  itemBuilder: (context, index) {
-                    final note = filteredNotes[index];
-                    return Card(
-                      child: ListTile(
-                        leading: note.isFavorite
-                            ? const Icon(Icons.star, color: Colors.amber)
-                            : const Icon(Icons.note_outlined),
-                        title: Row(
-                          children: [
-                            if (note.isPinned)
-                              const Padding(
-                                padding: EdgeInsets.only(right: 4),
-                                child: Icon(Icons.push_pin, size: 16, color: Colors.blue),
-                              ),
-                            Expanded(
-                              child: Text(
-                                note.title,
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.t('noNotes'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.t('noNotesHint'),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: filteredNotes.length,
+              itemBuilder: (context, index) {
+                final note = filteredNotes[index];
+                return Card(
+                  child: ListTile(
+                    leading: note.isFavorite
+                        ? const Icon(Icons.star, color: Colors.amber)
+                        : const Icon(Icons.note_outlined),
+                    title: Row(
+                      children: [
+                        if (note.isPinned)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 4),
+                            child: Icon(
+                              Icons.push_pin,
+                              size: 16,
+                              color: Colors.blue,
                             ),
-                          ],
+                          ),
+                        Expanded(
+                          child: Text(
+                            note.title,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(note.preview, maxLines: 2, overflow: TextOverflow.ellipsis),
-                            if (note.tags.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Wrap(
-                                spacing: 4,
-                                children: note.tags.map((tag) => Chip(
-                                  label: Text(tag, style: const TextStyle(fontSize: 10)),
-                                  padding: EdgeInsets.zero,
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                )).toList(),
-                              ),
-                            ],
-                          ],
+                      ],
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          note.preview,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) {
-                            switch (value) {
-                              case 'pin':
-                                provider.togglePin(note.id);
-                                break;
-                              case 'favorite':
-                                provider.toggleFavorite(note.id);
-                                break;
-                              case 'delete':
-                                _confirmDelete(context, provider, note.id);
-                                break;
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            PopupMenuItem(value: 'pin', child: Text(note.isPinned ? l10n.t('unpin') : l10n.t('pin'))),
-                            PopupMenuItem(value: 'favorite', child: Text(note.isFavorite ? l10n.t('unfavorite') : l10n.t('favorite'))),
-                            PopupMenuItem(value: 'delete', child: Text(l10n.t('deleteNote'))),
-                          ],
+                        if (note.tags.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 4,
+                            children: note.tags
+                                .map(
+                                  (tag) => Chip(
+                                    label: Text(
+                                      tag,
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
+                      ],
+                    ),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (value) {
+                        switch (value) {
+                          case 'pin':
+                            provider.togglePin(note.id);
+                            break;
+                          case 'favorite':
+                            provider.toggleFavorite(note.id);
+                            break;
+                          case 'delete':
+                            _confirmDelete(context, provider, note.id);
+                            break;
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'pin',
+                          child: Text(
+                            note.isPinned ? l10n.t('unpin') : l10n.t('pin'),
+                          ),
                         ),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => EditorScreen(noteId: note.id)),
+                        PopupMenuItem(
+                          value: 'favorite',
+                          child: Text(
+                            note.isFavorite
+                                ? l10n.t('unfavorite')
+                                : l10n.t('favorite'),
+                          ),
                         ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text(l10n.t('deleteNote')),
+                        ),
+                      ],
+                    ),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditorScreen(noteId: note.id),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.push(
           context,
@@ -180,7 +225,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _confirmDelete(BuildContext context, AppProvider provider, String noteId) {
+  void _confirmDelete(
+    BuildContext context,
+    AppProvider provider,
+    String noteId,
+  ) {
     final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
@@ -188,7 +237,10 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text(l10n.t('deleteNote')),
         content: Text(l10n.t('deleteConfirm')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.t('cancel'))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('cancel')),
+          ),
           TextButton(
             onPressed: () {
               provider.deleteNote(noteId);

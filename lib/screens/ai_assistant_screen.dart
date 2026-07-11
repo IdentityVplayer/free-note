@@ -65,9 +65,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.t('aiAssistant')),
-      ),
+      appBar: AppBar(title: Text(l10n.t('aiAssistant'))),
       body: Column(
         children: [
           Expanded(
@@ -76,14 +74,22 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.auto_awesome, size: 64, color: Colors.grey),
+                        const Icon(
+                          Icons.auto_awesome,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
                         const SizedBox(height: 16),
-                        Text(l10n.t('askAI'),
-                            style: Theme.of(context).textTheme.titleMedium),
+                        Text(
+                          l10n.t('askAI'),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                         const SizedBox(height: 8),
-                        Text(l10n.t('aiNotConfigured'),
-                            style: Theme.of(context).textTheme.bodySmall,
-                            textAlign: TextAlign.center),
+                        Text(
+                          l10n.t('aiNotConfigured'),
+                          style: Theme.of(context).textTheme.bodySmall,
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
                   )
@@ -109,7 +115,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
                           decoration: BoxDecoration(
                             color: msg.role == 'user'
                                 ? Theme.of(context).colorScheme.primaryContainer
-                                : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: SelectableText(msg.text),

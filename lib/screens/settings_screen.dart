@@ -45,16 +45,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _save() {
     final provider = context.read<AppProvider>();
-    provider.updateSettings(AppSettings(
-      languageCode: _language,
-      isDarkMode: _darkMode,
-      githubToken: _githubTokenController.text.trim(),
-      githubRepo: _githubRepoController.text.trim(),
-      aiApiKey: _aiApiKeyController.text.trim(),
-      aiModel: _aiModelController.text.trim(),
-      autoSync: _autoSync,
-      enableAI: true,
-    ));
+    provider.updateSettings(
+      AppSettings(
+        languageCode: _language,
+        isDarkMode: _darkMode,
+        githubToken: _githubTokenController.text.trim(),
+        githubRepo: _githubRepoController.text.trim(),
+        aiApiKey: _aiApiKeyController.text.trim(),
+        aiModel: _aiModelController.text.trim(),
+        autoSync: _autoSync,
+        enableAI: true,
+      ),
+    );
     Navigator.pop(context);
   }
 
@@ -65,9 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.t('settings')),
-        actions: [
-          IconButton(icon: const Icon(Icons.check), onPressed: _save),
-        ],
+        actions: [IconButton(icon: const Icon(Icons.check), onPressed: _save)],
       ),
       body: ListView(
         children: [
@@ -85,18 +85,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (v) => setState(() => _language = v!),
             child: const Column(
               children: [
-                RadioListTile<String>(
-                  title: Text('English'),
-                  value: 'en',
-                ),
-                RadioListTile<String>(
-                  title: Text('中文'),
-                  value: 'zh',
-                ),
-                RadioListTile<String>(
-                  title: Text('日本語'),
-                  value: 'ja',
-                ),
+                RadioListTile<String>(title: Text('English'), value: 'en'),
+                RadioListTile<String>(title: Text('中文'), value: 'zh'),
+                RadioListTile<String>(title: Text('日本語'), value: 'ja'),
               ],
             ),
           ),
@@ -176,9 +167,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

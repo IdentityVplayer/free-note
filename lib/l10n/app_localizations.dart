@@ -18,12 +18,16 @@ class AppLocalizations {
   Future<void> load() async {
     String jsonString;
     try {
-      jsonString = await rootBundle.loadString('lib/l10n/app_${locale.languageCode}.json');
+      jsonString = await rootBundle.loadString(
+        'lib/l10n/app_${locale.languageCode}.json',
+      );
     } catch (_) {
       jsonString = await rootBundle.loadString('lib/l10n/app_en.json');
     }
     final jsonMap = jsonDecode(jsonString) as Map<String, dynamic>;
-    _localizedStrings = jsonMap.map((key, value) => MapEntry(key, value.toString()));
+    _localizedStrings = jsonMap.map(
+      (key, value) => MapEntry(key, value.toString()),
+    );
   }
 
   /// Translate a key.

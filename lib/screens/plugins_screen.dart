@@ -14,9 +14,7 @@ class PluginsScreen extends StatelessWidget {
     final plugins = provider.pluginManager.pluginInfoList;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.t('plugins')),
-      ),
+      appBar: AppBar(title: Text(l10n.t('plugins'))),
       body: plugins.isEmpty
           ? Center(child: Text(l10n.t('noPlugins')))
           : ListView.builder(
@@ -32,10 +30,18 @@ class PluginsScreen extends StatelessWidget {
                 };
 
                 return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
                   child: ListTile(
-                    leading: Icon(typeIcons[plugin.type.name] ?? Icons.extension),
-                    title: Text(plugin.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    leading: Icon(
+                      typeIcons[plugin.type.name] ?? Icons.extension,
+                    ),
+                    title: Text(
+                      plugin.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

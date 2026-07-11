@@ -47,10 +47,7 @@ class AppProvider extends ChangeNotifier {
     _notes = await _storage.loadNotes();
 
     // Initialize services with loaded settings.
-    aiService = AIService(
-      apiKey: _settings.aiApiKey,
-      model: _settings.aiModel,
-    );
+    aiService = AIService(apiKey: _settings.aiApiKey, model: _settings.aiModel);
     githubService = GitHubSyncService(
       token: _settings.githubToken,
       repo: _settings.githubRepo,
