@@ -35,6 +35,21 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Decode signing keystore & write key.properties
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=app/upload-keystore.jks
+          EOF
+          echo "keystore bytes: $(wc -c < android/app/upload-keystore.jks)"
+
       - name: Analyze code
         run: flutter analyze
 
@@ -153,7 +168,7 @@ jobs:
           fi
           if [ ! -s release_notes.md ]; then
             cat > release_notes.md <<EOF
-          ## Free Note $VERSION
+          ## 无边记 $VERSION
 
           ### Downloads
           - **Android APK**: Choose the APK matching your device architecture (arm64-v8a recommended for modern devices)
@@ -176,7 +191,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: Free Note ${{ github.ref_name }}
+          name: 无边记 ${{ github.ref_name }}
           body_path: release_notes.md
           files: release/*
           draft: false
