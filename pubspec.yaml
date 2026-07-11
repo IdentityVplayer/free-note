@@ -25,17 +25,12 @@ dependencies:
   # HTTP & AI
   http: ^1.2.0
 
-  # GitHub Sync
-  git: ^2.2.0
-
   # Internationalization
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2
 
   # Utils
-  uuid: ^4.3.3
-  file_picker: ^8.0.0
   url_launcher: ^6.2.5
 
 dev_dependencies:
