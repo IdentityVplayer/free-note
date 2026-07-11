@@ -2,16 +2,15 @@ name: Auto Build (All Platforms)
 
 # Auto-build on every push to main (and manual dispatch): builds Android
 # (release-signed with the upload key from GitHub Secrets), Windows, and Web,
-# and uploads each as a downloadable artifact. This gives a full multi-platform
-# build one push away — no tag required. (Tagged releases still use
-# build_release.yml, which also publishes a GitHub Release.)
+# then publishes them as a GitHub Release (prerelease, one per push). Tagged
+# pushes (v*) still use build_release.yml for the official, versioned release.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   # ─────────────────────────────────────────────
@@ -129,3 +128,33 @@ jobs:
         with:
           name: web-build
           path: free-note-web.zip
+
+  # ─────────────────────────────────────────────
+  # Publish — collect all artifacts and create a GitHub Release (prerelease)
+  # ─────────────────────────────────────────────
+  release:
+    name: Publish Auto Release
+    needs: [build-android, build-windows, build-web]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          cp artifacts/android-apk/*.apk release/ 2>/dev/null || true
+          cp artifacts/windows-build/free-note-windows.zip release/ 2>/dev/null || true
+          cp artifacts/web-build/free-note-web.zip release/ 2>/dev/null || true
+          ls -la release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: auto-${{ github.sha }}
+          name: Auto Build ${{ github.sha }}
+          prerelease: true
+          files: release/*
