@@ -168,7 +168,7 @@ jobs:
           fi
           if [ ! -s release_notes.md ]; then
             cat > release_notes.md <<EOF
-          ## 无边记 $VERSION
+          ## Free Note $VERSION
 
           ### Downloads
           - **Android APK**: Choose the APK matching your device architecture (arm64-v8a recommended for modern devices)
@@ -191,7 +191,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: 无边记 ${{ github.ref_name }}
+          name: Free Note ${{ github.ref_name }}
           body_path: release_notes.md
           files: release/*
           draft: false
