@@ -8,7 +8,7 @@ used as the release description.
 
 ### New Features
 - **AI 对话可保存为笔记** — 在 AI 助手界面按返回键时，若已有对话，会询问「是否保存为 Markdown 笔记」。选择保存则生成 `Chat-YYYY-MM-DD-HH-MM-SS.md` 写入笔记文件夹，并在笔记列表立即出现。
-- **自动签名工作流** — 新增 `build_signed_apk.yml`：每次 push 到 `main` 都用 GitHub Secrets 中的上传密钥构建**已签名**的 APK 并上传为产物，随时可下载已签名的构建。
+- **全平台自动构建工作流** — 新增 `auto_build.yml`：每次 push 到 `main` 自动构建全平台产物——Android 用 GitHub Secrets 中的上传密钥**签名** APK，Windows / Web 也一并自动构建，全部上传为可下载产物（代码签名仅需 Android 的上传密钥，Windows 如需 Authenticode 需另备证书）。
 - **文件夹选择改为应用内浏览器（修复 Android 无法写入）** — 原先使用 `FilePicker.getDirectoryPath()`，在 Android 11+ 上返回的是 SAF tree-URI 路径，`dart:io` 无法直接读写，导致笔记从不落盘且不报错。现改为应用内文件夹浏览器，浏览**真实文件系统路径**，并申请「所有文件访问」权限（Android）+ 写入探测。所选文件夹可真正写入 `.md` 笔记，并递归识别其及子目录下的 `.md` 文件。
 - **保存失败不再静默丢失** — 笔记保存、文件夹写入探测均有错误上报；无写入权限或 SAF 路径会明确提示，而不是悄悄丢笔记。
 
