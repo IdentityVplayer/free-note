@@ -22,6 +22,10 @@ class AppSettings {
   /// User-selected notes folder (absolute path). null = not chosen yet.
   String? notesFolderPath;
 
+  /// Extra AI models the user has added (beyond [aiModel]). Combined with
+  /// [aiModel] to build the model picker shown in the AI chat screen.
+  List<String> aiModels;
+
   AppSettings({
     this.languageCode = 'en',
     this.isDarkMode = false,
@@ -35,6 +39,7 @@ class AppSettings {
     this.aiBaseUrl,
     this.themeColorHex,
     this.notesFolderPath,
+    this.aiModels = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -50,6 +55,7 @@ class AppSettings {
     'aiBaseUrl': aiBaseUrl,
     'themeColorHex': themeColorHex,
     'notesFolderPath': notesFolderPath,
+    'aiModels': aiModels,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -65,6 +71,7 @@ class AppSettings {
     aiBaseUrl: json['aiBaseUrl'] as String?,
     themeColorHex: json['themeColorHex'] as String?,
     notesFolderPath: json['notesFolderPath'] as String?,
+    aiModels: (json['aiModels'] as List<dynamic>?)?.cast<String>() ?? const [],
   );
 
   /// Resolve the effective base URL from provider preset or custom value.
@@ -73,6 +80,18 @@ class AppSettings {
       return aiBaseUrl!;
     }
     return AIProviderPresets.baseUrlFor(aiProvider);
+  }
+
+  /// All selectable models: the default model plus any the user added,
+  /// de-duplicated and with empty entries removed. Used to build the model
+  /// picker in the AI chat screen.
+  List<String> get allModels {
+    final set = <String>{};
+    if (aiModel.isNotEmpty) set.add(aiModel);
+    for (final m in aiModels) {
+      if (m.isNotEmpty) set.add(m);
+    }
+    return set.toList();
   }
 }
 
@@ -84,6 +103,7 @@ class AIProviderPresets {
     'moonshot': 'https://api.moonshot.cn/v1',
     'google': 'https://generativelanguage.googleapis.com/v1beta/openai',
     'ollama': 'http://localhost:11434/v1',
+    'sealos': 'https://aiproxy.hzh.sealos.run/v1',
     'custom': '',
   };
 
@@ -93,6 +113,7 @@ class AIProviderPresets {
     'moonshot',
     'google',
     'ollama',
+    'sealos',
     'custom',
   ];
 

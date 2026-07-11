@@ -17,6 +17,14 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<_ChatMessage> _messages = [];
   bool _loading = false;
+  String? _currentModel;
+
+  @override
+  void initState() {
+    super.initState();
+    final models = context.read<AppProvider>().settings.allModels;
+    _currentModel = models.isNotEmpty ? models.first : null;
+  }
 
   @override
   void dispose() {
@@ -30,6 +38,11 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     if (question.isEmpty) return;
 
     final provider = context.read<AppProvider>();
+    // Only override the model when one is actually selected, otherwise fall
+    // back to the service's configured default.
+    final modelOverride = (_currentModel != null && _currentModel!.isNotEmpty)
+        ? _currentModel
+        : null;
 
     setState(() {
       _messages.add(_ChatMessage(role: 'user', text: question));
@@ -40,7 +53,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
 
     final answer = await (() async {
       try {
-        return await provider.aiService.ask(question);
+        return await provider.aiService.ask(question, model: modelOverride);
       } on AIException catch (e) {
         return '⚠️ ${e.message}';
       }
@@ -70,9 +83,45 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final provider = context.watch<AppProvider>();
+    final models = provider.settings.allModels;
+    final selectedModel =
+        (_currentModel != null && models.contains(_currentModel))
+        ? _currentModel!
+        : (models.isNotEmpty ? models.first : null);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.t('aiAssistant'))),
+      appBar: AppBar(
+        title: Text(l10n.t('aiAssistant')),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Row(
+              children: [
+                const Icon(Icons.model_training, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedModel,
+                    hint: Text(l10n.t('model')),
+                    items: models
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: m,
+                            child: Text(m, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() => _currentModel = v),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
       body: Column(
         children: [
           Expanded(

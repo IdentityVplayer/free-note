@@ -4,6 +4,12 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.4.0
+
+### New Features
+- **Sealos AIProxy 服务商** — 新增 `sealos` 预设，Base URL 为 `https://aiproxy.hzh.sealos.run/v1`（如需精确地址可在「自定义」里改）。
+- **多模型 + 对话中切换** — 设置里可添加多个模型（保留一个默认模型，并可在「已添加模型」中增删）。AI 对话界面顶部新增模型下拉框，对话过程中可随时切换模型，每条消息使用所选模型。
+
 ## 1.3.1
 
 ### Fixed

@@ -34,6 +34,7 @@ class AIService {
     'moonshot': 'moonshot-v1-8k',
     'google': 'gemini-1.5-flash',
     'ollama': 'llama3',
+    'sealos': 'gpt-4o-mini',
     'custom': 'gpt-3.5-turbo',
   };
 
@@ -47,10 +48,14 @@ class AIService {
       defaultModel.values.contains(model);
 
   /// Ask AI a question and get a response.
-  Future<String> ask(String question, {String? context}) async {
+  ///
+  /// [model] optionally overrides the service's configured model for this
+  /// single call — used by the in-conversation model switcher.
+  Future<String> ask(String question, {String? context, String? model}) async {
     if (!isConfigured) {
       throw const AIException('AI 未配置：请先在「设置 → AI」中填写 API Key。');
     }
+    final effectiveModel = model ?? this.model;
     try {
       final messages = <Map<String, String>>[
         {
@@ -77,7 +82,7 @@ class AIService {
               'Authorization': 'Bearer $apiKey',
             },
             body: jsonEncode({
-              'model': model,
+              'model': effectiveModel,
               'messages': messages,
               'max_tokens': 2048,
               'temperature': 0.7,
@@ -108,6 +113,7 @@ class AIService {
   Future<String> assistWriting(
     String text, {
     WritingMode mode = WritingMode.continue_,
+    String? model,
   }) async {
     if (!isConfigured) {
       throw const AIException('AI 未配置：请先在「设置 → AI」中填写 API Key。');
@@ -125,7 +131,7 @@ class AIService {
         'Expand and elaborate on the following text with more details:\n\n$text',
     };
 
-    return ask(prompt);
+    return ask(prompt, model: model);
   }
 
   /// Pull a human-readable message out of a non-200 API response body.

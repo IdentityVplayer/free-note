@@ -24,6 +24,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _darkMode;
   late bool _autoSync;
   late String _aiProvider;
+  late List<String> _aiModels;
+  final TextEditingController _aiModelAddController = TextEditingController();
   String? _themeColorHex;
 
   static const List<Color> _themeColors = [
@@ -48,6 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _darkMode = s.isDarkMode;
     _autoSync = s.autoSync;
     _aiProvider = s.aiProvider;
+    _aiModels = List<String>.from(s.aiModels);
     _themeColorHex = s.themeColorHex;
   }
 
@@ -58,6 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _aiApiKeyController.dispose();
     _aiModelController.dispose();
     _aiBaseUrlController.dispose();
+    _aiModelAddController.dispose();
     super.dispose();
   }
 
@@ -79,6 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             : _aiBaseUrlController.text.trim(),
         themeColorHex: _themeColorHex,
         notesFolderPath: provider.settings.notesFolderPath,
+        aiModels: _aiModels.where((m) => m.trim().isNotEmpty).toList(),
       ),
     );
     Navigator.pop(context);
@@ -90,6 +95,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await context.read<AppProvider>().chooseFolder(path);
       setState(() {});
     }
+  }
+
+  void _addModel() {
+    final v = _aiModelAddController.text.trim();
+    if (v.isEmpty) return;
+    if (!_aiModels.contains(v)) {
+      setState(() => _aiModels.add(v));
+    }
+    _aiModelAddController.clear();
   }
 
   @override
@@ -193,6 +207,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       AIService.isKnownDefaultModel(current)) {
                     _aiModelController.text = AIService.defaultModelFor(v);
                   }
+                  // Seed the model list with the provider default when empty.
+                  if (_aiModels.isEmpty) {
+                    _aiModels = [AIService.defaultModelFor(v)];
+                  }
                 });
               },
             ),
@@ -230,10 +248,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: TextField(
               controller: _aiModelController,
               decoration: InputDecoration(
-                labelText: l10n.t('aiModel'),
+                labelText: l10n.t('defaultModel'),
                 border: const OutlineInputBorder(),
                 hintText: 'gpt-3.5-turbo',
               ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.t('addedModels'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: _aiModels.isEmpty
+                      ? [
+                          Text(
+                            l10n.t('noAddedModels'),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ]
+                      : _aiModels
+                            .map(
+                              (m) => Chip(
+                                label: Text(m),
+                                deleteIcon: const Icon(Icons.close, size: 18),
+                                onDeleted: () =>
+                                    setState(() => _aiModels.remove(m)),
+                              ),
+                            )
+                            .toList(),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _aiModelAddController,
+                        decoration: InputDecoration(
+                          labelText: l10n.t('addModel'),
+                          border: const OutlineInputBorder(),
+                          hintText: 'gpt-4o / deepseek-chat ...',
+                        ),
+                        onSubmitted: (_) => _addModel(),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: _addModel,
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           // GitHub
@@ -292,6 +365,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Google Gemini';
       case 'ollama':
         return 'Ollama (local)';
+      case 'sealos':
+        return 'Sealos AIProxy';
       case 'custom':
         return l10n.t('customProvider');
       default:
