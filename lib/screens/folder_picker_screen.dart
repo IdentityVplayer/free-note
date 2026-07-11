@@ -11,7 +11,7 @@ class FolderPickerScreen extends StatelessWidget {
   const FolderPickerScreen({super.key});
 
   Future<void> _pick(BuildContext context) async {
-    final path = await FilePicker.platform.getDirectoryPath();
+    final path = await FilePicker.getDirectoryPath();
     if (path != null && context.mounted) {
       await context.read<AppProvider>().chooseFolder(path);
     }

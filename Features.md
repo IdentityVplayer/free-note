@@ -4,7 +4,7 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
-## 1.1.0
+## 1.1.1
 
 ### New Features
 - **Local folder as your notes repository** — On first launch you now pick a
@@ -23,6 +23,10 @@ used as the release description.
 ### Changed
 - Package name changed to `com.note.apps`.
 - GitHub sync reworked for reliability (base64 normalization, status feedback).
+
+### Fixed
+- Android build failure caused by `file_picker` compileSdk mismatch — upgraded
+  `file_picker` to 11.x to satisfy `compileSdk = 36`.
 
 ## 1.0.0
 
