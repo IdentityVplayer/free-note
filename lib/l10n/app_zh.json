@@ -102,7 +102,7 @@
   "useTopLevel": "保存到根目录",
   "defaultSaveHint": "默认（应用私有目录）",
   "aiContext": "AI 对话上下文",
-  "aiContextDesc": "识别 Free Note 生成的 AI 对话文件，一键把对话填充到 AI 助手继续聊。",
+  "aiContextDesc": "可把任意 Markdown 文件作为 AI 上下文加载，发送时文件内容会自动补在你输入的前面。",
   "fillContext": "填充到 AI 助手",
   "saveChatTitle": "保存对话为笔记？",
   "saveChatHint": "是否将本次对话保存为一篇 Markdown 笔记？",
@@ -110,5 +110,11 @@
   "saveChatDiscard": "不保存",
   "chatSaved": "对话已保存",
   "notSet": "未设置",
-  "appearance": "外观"
+  "appearance": "外观",
+  "add": "添加",
+  "addToContext": "添加到上下文",
+  "clearContext": "清除上下文",
+  "contextActive": "上下文：{0}",
+  "selectContextFile": "选择作为上下文的 Markdown 文件",
+  "contextNeedFolder": "请先在设置中选择笔记文件夹"
 }

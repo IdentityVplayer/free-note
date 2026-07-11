@@ -102,7 +102,7 @@
   "useTopLevel": "Save at top level",
   "defaultSaveHint": "default (app private folder)",
   "aiContext": "AI Context",
-  "aiContextDesc": "Recognizes Free Note AI chat files; one tap fills the conversation into the AI assistant.",
+  "aiContextDesc": "Loads any Markdown file as AI context; its content is prepended to your input when you send.",
   "fillContext": "Fill into AI assistant",
   "saveChatTitle": "Save chat as a note?",
   "saveChatHint": "Do you want to save this conversation as a Markdown note?",
@@ -110,5 +110,11 @@
   "saveChatDiscard": "Don't save",
   "chatSaved": "Chat saved",
   "notSet": "Not set",
-  "appearance": "Appearance"
+  "appearance": "Appearance",
+  "add": "Add",
+  "addToContext": "Add to context",
+  "clearContext": "Clear context",
+  "contextActive": "Context: {0}",
+  "selectContextFile": "Select a Markdown file to use as context",
+  "contextNeedFolder": "Select a notes folder in Settings first"
 }

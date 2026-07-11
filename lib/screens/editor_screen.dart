@@ -9,7 +9,6 @@ import '../l10n/app_localizations.dart';
 import '../models/note.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
-import '../plugins/ai_context_plugin.dart';
 import 'subfolder_picker_screen.dart';
 import 'ai_assistant_screen.dart';
 
@@ -227,22 +226,18 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
-  /// Open this AI chat file's conversation in the AI assistant, pre-filled as
-  /// context (via the ai-context plugin).
+  /// Open this note's content in the AI assistant as context (prepended to
+  /// the user's input on send). Any markdown file can be used this way.
   void _openAiContext() {
-    final aicontext = context
-        .read<AppProvider>()
-        .pluginManager
-        .plugins['builtin.aicontext'];
-    if (aicontext is AiContextPlugin) {
-      final messages = aicontext.parseMessages(_note.content);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => AIAssistantScreen(initialMessages: messages),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AIAssistantScreen(
+          initialContextContent: _note.content,
+          initialContextName: _note.relativePath ?? _note.title,
         ),
-      );
-    }
+      ),
+    );
   }
 
   /// A compact, tappable row showing where this note is saved and letting the
@@ -330,11 +325,6 @@ class _EditorScreenState extends State<EditorScreen> {
         (wordCountPlugin as dynamic).count(_contentController.text)
             as Map<String, int>;
 
-    // Is this note a Free Note AI chat? (ai-context plugin recognizes it.)
-    final aicontext = provider.pluginManager.plugins['builtin.aicontext'];
-    final isAiChat =
-        aicontext is AiContextPlugin && aicontext.isAiChat(_note.content);
-
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -348,12 +338,11 @@ class _EditorScreenState extends State<EditorScreen> {
             tooltip: _isPreview ? l10n.t('edit') : l10n.t('preview'),
             onPressed: () => setState(() => _isPreview = !_isPreview),
           ),
-          if (isAiChat)
-            IconButton(
-              icon: const Icon(Icons.upload_file),
-              tooltip: l10n.t('fillContext'),
-              onPressed: _openAiContext,
-            ),
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: l10n.t('addToContext'),
+            onPressed: _openAiContext,
+          ),
           IconButton(
             icon: const Icon(Icons.auto_awesome),
             tooltip: l10n.t('aiWriting'),

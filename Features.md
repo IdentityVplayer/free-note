@@ -4,6 +4,17 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.8.0
+
+### Changed
+- **ai-context 插件改为「任意 md 作上下文」** — 不再仅限于 AI 对话文件：编辑器右上角上传图标对所有笔记开放，AI 助手顶栏也新增附件按钮（回形针），可任选一个 Markdown 文件作为上下文。
+- **上下文在发送时前置** — 选定上下文文件后，用户点击发送时，该 `.md` 的**全文内容会自动补在输入前面**一并发给模型，模型据此作答；顶栏显示上下文来源条，可一键清除。
+- **AI 对话支持 Markdown 链接与图片** — 助手消息改用 Markdown 渲染：`[文本](链接)` 变为可点击，点击调用默认浏览器打开；`![描述](图片地址)` 图片语法兼容渲染（网络图片直接显示）。
+
+### New Features
+- **按文件夹分类选择上下文文件** — 新增 `ContextFilePickerScreen`：罗列笔记文件夹下所有 `.md`，顶层文件直接显示，位于子文件夹的文件归入可展开的文件夹分组（如 `fl` 文件夹点开后才显示其中的 `1.md`），方便按目录挑选。
+- **首页加号新增「新建文件夹」** — 右下角悬浮按钮改为可展开菜单：除「新建笔记」外，新增「新建文件夹」，可直接在所选笔记目录下创建文件夹。
+
 ## 1.7.0
 
 ### Changed

@@ -1,19 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../models/chat_message.dart';
+import '../models/note.dart';
 import '../plugins/ai_context_plugin.dart';
 import '../l10n/app_localizations.dart';
+import 'context_file_picker_screen.dart';
 
 /// AI Assistant screen — standalone chat-like interface for Q&A.
+///
+/// A markdown file can be loaded as **context** (via the ai-context plugin):
+/// its content is prepended to the user's input when they send a message, so
+/// the model answers with that file in mind.
 class AIAssistantScreen extends StatefulWidget {
-  /// Optional conversation to pre-load as context (e.g. when opening a Free
-  /// Note AI chat file via the ai-context plugin).
-  final List<ChatMessage>? initialMessages;
+  /// Optional markdown file to pre-load as context (e.g. when the user taps
+  /// the upload icon on a note in the editor).
+  final String? initialContextContent;
+  final String? initialContextName;
 
-  const AIAssistantScreen({super.key, this.initialMessages});
+  const AIAssistantScreen({
+    super.key,
+    this.initialContextContent,
+    this.initialContextName,
+  });
 
   @override
   State<AIAssistantScreen> createState() => _AIAssistantScreenState();
@@ -26,13 +39,19 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
   bool _loading = false;
   String? _currentModel;
 
+  /// Loaded context file content (prepended to the user's input on send).
+  String? _contextContent;
+  String? _contextName;
+
   @override
   void initState() {
     super.initState();
     final models = context.read<AppProvider>().settings.allModels;
     _currentModel = models.isNotEmpty ? models.first : null;
-    if (widget.initialMessages != null) {
-      _messages.addAll(widget.initialMessages!);
+    if (widget.initialContextContent != null &&
+        widget.initialContextContent!.trim().isNotEmpty) {
+      _contextContent = widget.initialContextContent;
+      _contextName = widget.initialContextName;
     }
   }
 
@@ -48,11 +67,14 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     if (question.isEmpty) return;
 
     final provider = context.read<AppProvider>();
-    // Only override the model when one is actually selected, otherwise fall
-    // back to the service's configured default.
     final modelOverride = (_currentModel != null && _currentModel!.isNotEmpty)
         ? _currentModel
         : null;
+
+    // Prepend the loaded context file's content before the user's question.
+    final prompt = (_contextContent != null && _contextContent!.isNotEmpty)
+        ? '${_contextContent!}\n\n$question'
+        : question;
 
     setState(() {
       _messages.add(ChatMessage(role: 'user', text: question));
@@ -63,7 +85,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
 
     final answer = await (() async {
       try {
-        return await provider.aiService.ask(question, model: modelOverride);
+        return await provider.aiService.ask(prompt, model: modelOverride);
       } on AIException catch (e) {
         return '⚠️ ${e.message}';
       }
@@ -87,6 +109,28 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
           curve: Curves.easeOut,
         );
       }
+    });
+  }
+
+  /// Open the folder-classified markdown picker and load the chosen file as
+  /// context.
+  Future<void> _addContext() async {
+    final note = await Navigator.push<Note>(
+      context,
+      MaterialPageRoute(builder: (_) => const ContextFilePickerScreen()),
+    );
+    if (note != null && mounted) {
+      setState(() {
+        _contextContent = note.content;
+        _contextName = note.relativePath ?? note.title;
+      });
+    }
+  }
+
+  void _clearContext() {
+    setState(() {
+      _contextContent = null;
+      _contextName = null;
     });
   }
 
@@ -167,10 +211,44 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     }
   }
 
+  /// Open a URL in the default browser (used by markdown links).
+  Future<void> _launchUrl(String? url) async {
+    if (url == null) return;
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _buildMessage(ChatMessage msg, ThemeData theme) {
+    return Align(
+      alignment: msg.role == 'user'
+          ? Alignment.centerRight
+          : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.all(12),
+        constraints: const BoxConstraints(maxWidth: 560),
+        decoration: BoxDecoration(
+          color: msg.role == 'user'
+              ? theme.colorScheme.primaryContainer
+              : theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: MarkdownBody(
+          data: msg.text,
+          selectable: true,
+          onTapLink: (text, href, title) => _launchUrl(href),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final provider = context.watch<AppProvider>();
+    final theme = Theme.of(context);
     final models = provider.settings.allModels;
     final selectedModel =
         (_currentModel != null && models.contains(_currentModel))
@@ -186,6 +264,19 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(l10n.t('aiAssistant')),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.attach_file),
+              tooltip: l10n.t('addToContext'),
+              onPressed: _addContext,
+            ),
+            if (_contextContent != null)
+              IconButton(
+                icon: const Icon(Icons.clear),
+                tooltip: l10n.t('clearContext'),
+                onPressed: _clearContext,
+              ),
+          ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(52),
             child: Padding(
@@ -217,6 +308,43 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         ),
         body: Column(
           children: [
+            // Context banner
+            if (_contextContent != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                color: theme.colorScheme.secondaryContainer,
+                child: Row(
+                  children: [
+                    const Icon(Icons.source, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.tArgs('contextActive', [
+                          _contextName ?? l10n.t('context'),
+                        ]),
+                        style: theme.textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: _clearContext,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          Icons.close,
+                          size: 16,
+                          color: theme.colorScheme.onSecondaryContainer,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: _messages.isEmpty
                   ? Center(
@@ -254,26 +382,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
                           );
                         }
                         final msg = _messages[index];
-                        return Align(
-                          alignment: msg.role == 'user'
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: msg.role == 'user'
-                                  ? Theme.of(
-                                      context,
-                                    ).colorScheme.primaryContainer
-                                  : Theme.of(
-                                      context,
-                                    ).colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: SelectableText(msg.text),
-                          ),
-                        );
+                        return _buildMessage(msg, theme);
                       },
                     ),
             ),

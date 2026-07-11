@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../services/storage_service.dart';
 import '../l10n/app_localizations.dart';
 import 'editor_screen.dart';
 import 'settings_screen.dart';
@@ -17,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
+  bool _fabOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -226,14 +230,96 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const EditorScreen()),
-        ),
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (_fabOpen) ...[
+            _fabItem(Icons.note_add, l10n.t('newNote'), () {
+              setState(() => _fabOpen = false);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EditorScreen()),
+              );
+            }),
+            const SizedBox(height: 12),
+            _fabItem(Icons.create_new_folder, l10n.t('newFolder'), () {
+              setState(() => _fabOpen = false);
+              _createFolder(context);
+            }),
+            const SizedBox(height: 12),
+          ],
+          FloatingActionButton(
+            onPressed: () => setState(() => _fabOpen = !_fabOpen),
+            tooltip: l10n.t('add'),
+            child: Icon(_fabOpen ? Icons.close : Icons.add),
+          ),
+        ],
       ),
     );
+  }
+
+  /// A labelled mini action shown above the main FAB when the menu is open.
+  Widget _fabItem(IconData icon, String label, VoidCallback onTap) {
+    return FloatingActionButton.extended(
+      heroTag: label,
+      onPressed: onTap,
+      icon: Icon(icon),
+      label: Text(label),
+    );
+  }
+
+  /// Create a new folder directly under the selected notes folder.
+  Future<void> _createFolder(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t('newFolder')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(hintText: l10n.t('folderName')),
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: Text(l10n.t('create')),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    final base = StorageService.instance.currentFolder;
+    if (base == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.t('contextNeedFolder'))));
+      }
+      return;
+    }
+    final dir = Directory(p.join(base, name.replaceAll(RegExp(r'[/\\]'), '_')));
+    try {
+      await dir.create(recursive: true);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l10n.t('newFolder')}: $name')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
   }
 
   Future<void> _syncNow(BuildContext context) async {

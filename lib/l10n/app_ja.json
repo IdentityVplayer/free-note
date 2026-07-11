@@ -102,7 +102,7 @@
   "useTopLevel": "ルートに保存",
   "defaultSaveHint": "デフォルト（アプリ専用フォルダ）",
   "aiContext": "AI コンテキスト",
-  "aiContextDesc": "Free Note が生成したAI会話ファイルを認識し、ワンタップでAIアシスタントに会話を読み込みます。",
+  "aiContextDesc": "任意のMarkdownファイルをAIコンテキストとして読み込めます。送信時にその内容が入力の前に自動で付与されます。",
   "fillContext": "AIアシスタントに読み込む",
   "saveChatTitle": "会話をノートとして保存しますか？",
   "saveChatHint": "この会話をMarkdownノートとして保存しますか？",
@@ -110,5 +110,11 @@
   "saveChatDiscard": "保存しない",
   "chatSaved": "会話を保存しました",
   "notSet": "未設定",
-  "appearance": "外観"
+  "appearance": "外観",
+  "add": "追加",
+  "addToContext": "コンテキストに追加",
+  "clearContext": "コンテキストをクリア",
+  "contextActive": "コンテキスト：{0}",
+  "selectContextFile": "コンテキストとして使うMarkdownファイルを選択",
+  "contextNeedFolder": "設定でノートフォルダを選択してください"
 }
