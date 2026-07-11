@@ -38,16 +38,10 @@ jobs:
       - name: Decode signing keystore & write key.properties
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PROPERTIES: ${{ secrets.KEY_PROPERTIES }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
-          cat > android/key.properties <<EOF
-          storePassword=$KEYSTORE_PASSWORD
-          keyPassword=$KEYSTORE_PASSWORD
-          keyAlias=$KEY_ALIAS
-          storeFile=app/upload-keystore.jks
-          EOF
+          printf '%s\n' "$KEY_PROPERTIES" > android/key.properties
           echo "keystore bytes: $(wc -c < android/app/upload-keystore.jks)"
 
       - name: Analyze code
