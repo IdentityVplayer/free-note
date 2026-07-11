@@ -24,14 +24,3 @@ plugins {
 }
 
 include(":app")
-
-// file_picker 11.x ships Kotlin sources but deliberately skips applying the
-// Kotlin Gradle Plugin on AGP 9 (its build.gradle guards with `isAgp9OrAbove`),
-// so its `FilePickerPlugin.kt` is never compiled and the app fails with
-// "cannot find symbol class FilePickerPlugin". Apply Built-in Kotlin to the
-// plugin module during its configuration so it compiles and the symbol resolves.
-gradle.allprojects {
-    if (name == "file_picker" && !plugins.hasPlugin("org.jetbrains.kotlin.android")) {
-        plugins.apply("org.jetbrains.kotlin.android")
-    }
-}
