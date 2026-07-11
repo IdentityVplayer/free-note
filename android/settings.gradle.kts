@@ -17,6 +17,22 @@ pluginManagement {
     }
 }
 
+// Force Built-in Kotlin onto the file_picker plugin module.
+//
+// file_picker 11.x ships Kotlin sources but deliberately skips applying the
+// Kotlin Gradle Plugin on AGP 9 (its build.gradle guards with `isAgp9OrAbove`),
+// so its `FilePickerPlugin.kt` is never compiled and the app fails with
+// "cannot find symbol class FilePickerPlugin".
+//
+// Registered here — BEFORE the flutter-plugin-loader includes plugins — so the
+// hook fires while file_picker is being *configured* (not after it is already
+// evaluated), letting the Kotlin plugin apply in time.
+gradle.allprojects {
+    if (name == "file_picker" && !plugins.hasPlugin("org.jetbrains.kotlin.android")) {
+        plugins.apply("org.jetbrains.kotlin.android")
+    }
+}
+
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "9.0.1" apply false
@@ -24,14 +40,3 @@ plugins {
 }
 
 include(":app")
-
-// file_picker 11.x ships Kotlin sources but deliberately skips applying the
-// Kotlin Gradle Plugin on AGP 9 (its build.gradle guards with `isAgp9OrAbove`),
-// so its `FilePickerPlugin.kt` is never compiled and the app fails with
-// "cannot find symbol class FilePickerPlugin". Apply Built-in Kotlin to the
-// plugin module during its configuration so it compiles and the symbol resolves.
-gradle.allprojects {
-    if (name == "file_picker" && !plugins.hasPlugin("org.jetbrains.kotlin.android")) {
-        plugins.apply("org.jetbrains.kotlin.android")
-    }
-}

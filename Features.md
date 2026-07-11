@@ -4,6 +4,15 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.1.5
+
+### Bug Fixes
+- **Android build fixed (init script)** — file_picker 11.x skips the Kotlin
+  Gradle Plugin on AGP 9, so `FilePickerPlugin.kt` was never compiled. A
+  Gradle init script (`android/gradle/init.gradle`, copied into
+  `~/.gradle/init.d/` by CI) now forces Built-in Kotlin onto the `file_picker`
+  module during its configuration, so the Android APK/AAB build succeeds.
+
 ## 1.1.4
 
 ### Bug Fixes
