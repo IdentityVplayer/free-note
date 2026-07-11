@@ -38,15 +38,6 @@ jobs:
       - name: Analyze code
         run: flutter analyze
 
-      # file_picker 11.x skips applying the Kotlin Gradle Plugin on AGP 9, so
-      # its Kotlin sources never compile (build fails with
-      # "cannot find symbol class FilePickerPlugin"). This init script forces
-      # Built-in Kotlin onto the file_picker module. Gradle auto-loads every
-      # script under ~/.gradle/init.d/, so copying it there makes `flutter
-      # build apk` apply it without changing the build command.
-      - name: Install Gradle init script (force Kotlin on file_picker)
-        run: mkdir -p ~/.gradle/init.d && cp android/gradle/init.gradle ~/.gradle/init.d/file_picker_kotlin.gradle
-
       - name: Build APK
         run: flutter build apk --release --split-per-abi
 

@@ -4,14 +4,20 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
-## 1.1.5
+## 1.2.0
 
 ### Bug Fixes
-- **Android build fixed (init script)** — file_picker 11.x skips the Kotlin
-  Gradle Plugin on AGP 9, so `FilePickerPlugin.kt` was never compiled. A
-  Gradle init script (`android/gradle/init.gradle`, copied into
-  `~/.gradle/init.d/` by CI) now forces Built-in Kotlin onto the `file_picker`
-  module during its configuration, so the Android APK/AAB build succeeds.
+- **Android build finally green (AGP downgrade)** — The root cause was
+  `file_picker` 11.x skipping the Kotlin Gradle Plugin whenever it detects
+  AGP 9 (`isAgp9OrAbove` guard), so its `FilePickerPlugin.kt` was never
+  compiled and the APK/AAB build failed with `cannot find symbol
+  FilePickerPlugin`. External Kotlin injection (app-module plugin,
+  `afterEvaluate`, `gradle.allprojects`, Gradle init script) all failed
+  because the Flutter plugin loader evaluates plugin modules during Gradle's
+  init/settings phase, before any such hook can run. The reliable fix is to
+  drop AGP to **8.11.1** + Gradle **8.9** (within Flutter's supported range
+  8.6.0–8.11.1), which makes `file_picker` apply Kotlin itself. The
+  `android/gradle/init.gradle` hack and its CI step have been removed.
 
 ## 1.1.4
 
