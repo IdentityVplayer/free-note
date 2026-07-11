@@ -1,0 +1,165 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Build Android APK
+  # ─────────────────────────────────────────────
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze
+
+      - name: Build APK
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build App Bundle
+        run: flutter build appbundle --release
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: |
+            build/app/outputs/flutter-apk/*.apk
+
+  # ─────────────────────────────────────────────
+  # Build Windows
+  # ─────────────────────────────────────────────
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Windows
+        run: flutter build windows --release
+
+      - name: Archive Windows build
+        run: |
+          cd build/windows/x64/runner/Release
+          7z a -tzip ${{ github.workspace }}/free-note-windows.zip .
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: free-note-windows.zip
+
+  # ─────────────────────────────────────────────
+  # Build Web
+  # ─────────────────────────────────────────────
+  build-web:
+    name: Build Web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Web
+        run: flutter build web --release
+
+      - name: Archive Web build
+        run: cd build/web && zip -r ${{ github.workspace }}/free-note-web.zip .
+
+      - name: Upload Web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: free-note-web.zip
+
+  # ─────────────────────────────────────────────
+  # Release — collect all artifacts and publish to GitHub Releases
+  # ─────────────────────────────────────────────
+  release:
+    name: Publish Release
+    needs: [build-android, build-windows, build-web]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          cp artifacts/android-apk/*.apk release/
+          cp artifacts/windows-build/free-note-windows.zip release/
+          cp artifacts/web-build/free-note-web.zip release/
+          ls -la release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Free Note ${{ github.ref_name }}
+          body: |
+            ## Free Note ${{ github.ref_name }}
+
+            ### Downloads
+            - **Android APK**: Choose the APK matching your device architecture (arm64-v8a recommended for modern devices)
+            - **Windows**: Unzip and run `free_note.exe`
+            - **Web**: Unzip and serve with any static file server
+
+            ### Features
+            - ✅ Markdown editing with live preview
+            - ✅ Plugin system (extensible)
+            - ✅ AI writing & Q&A assistant
+            - ✅ GitHub notes sync
+            - ✅ Multi-language (English, Chinese, Japanese)
+            - ✅ Dark mode
+          files: release/*
+          draft: false
+          prerelease: false
