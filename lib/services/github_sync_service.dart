@@ -1,5 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../models/note.dart';
 
 /// GitHub sync service — syncs notes to a GitHub repository via the REST API.
@@ -358,5 +363,183 @@ extension GitHubSyncDeviceFlow on GitHubSyncService {
       return GitHubUser.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
     }
     throw GitHubAuthException('获取用户信息失败: ${_describeError(res.statusCode)}');
+  }
+}
+
+/// OAuth Authorization Code flow with PKCE, using a local `http://localhost`
+/// callback server so the browser can redirect back into the app automatically
+/// — no custom URL scheme / deep-link manifest changes required on Android or
+/// Windows. (Web cannot host a local server, so it falls back to the Device
+/// flow in the UI.)
+extension GitHubSyncBrowserFlow on GitHubSyncService {
+  /// Local port the callback server listens on. Must match the "Authorization
+  /// callback URL" registered in the GitHub OAuth App:
+  /// `http://localhost:8543/callback`.
+  static const int callbackPort = 8543;
+  static const String callbackPath = '/callback';
+
+  /// Build the GitHub authorize URL for the authorization-code + PKCE flow.
+  Uri buildAuthorizeUrl({
+    required String clientId,
+    required String state,
+    required String codeChallenge,
+    String redirectUri = 'http://localhost:$callbackPort$callbackPath',
+  }) =>
+      Uri.https('github.com', '/login/oauth/authorize', {
+        'client_id': clientId,
+        'redirect_uri': redirectUri,
+        'scope': 'repo',
+        'state': state,
+        'code_challenge': codeChallenge,
+        'code_challenge_method': 'S256',
+      });
+
+  String _generateCodeVerifier() {
+    final rnd = Random.secure();
+    final bytes = List<int>.generate(64, (_) => rnd.nextInt(256));
+    return base64Url.encode(bytes).split('=')[0];
+  }
+
+  String _pkceChallenge(String verifier) =>
+      base64Url.encode(crypto.sha256.convert(utf8.encode(verifier)).bytes)
+          .split('=')[0];
+
+  String _generateState() {
+    final rnd = Random.secure();
+    final bytes = List<int>.generate(32, (_) => rnd.nextInt(256));
+    return base64Url.encode(bytes).split('=')[0];
+  }
+
+  void _sendHtml(HttpRequest req, String message) {
+    req.response
+      ..statusCode = 200
+      ..headers.contentType = ContentType.html
+      ..write(
+        '<!doctype html><html><head><meta charset="utf-8">'
+        '<title>Free Note</title></head><body style="font-family:sans-serif;'
+        'display:flex;height:100vh;align-items:center;justify-content:center">'
+        '<h3>$message</h3></body></html>',
+      )
+      ..close();
+  }
+
+  /// Exchange the authorization `code` for an access token (PKCE).
+  Future<String> _exchangeCode({
+    required String clientId,
+    required String code,
+    required String redirectUri,
+    required String verifier,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('https://github.com/login/oauth/access_token'),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'client_id': clientId,
+            'code': code,
+            'redirect_uri': redirectUri,
+            'code_verifier': verifier,
+            'grant_type': 'authorization_code',
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+    final j = jsonDecode(res.body) as Map<String, dynamic>;
+    if (j.containsKey('access_token')) return j['access_token'] as String;
+    final err = j['error_description'] ?? j['error'];
+    throw GitHubAuthException('换取令牌失败: $err');
+  }
+
+  /// Run the full browser login: open GitHub in the external browser, spin up
+  /// a local callback server, wait for the redirect carrying `code`, then
+  /// exchange it for a token. Throws [GitHubAuthException] on error / cancel
+  /// ([shouldCancel] returns true) / timeout.
+  Future<String> loginWithBrowser({
+    required String clientId,
+    bool Function()? shouldCancel,
+  }) async {
+    if (clientId.isEmpty) throw GitHubClientIdMissingException();
+    final redirectUri = 'http://localhost:$callbackPort$callbackPath';
+    final verifier = _generateCodeVerifier();
+    final challenge = _pkceChallenge(verifier);
+    final state = _generateState();
+
+    late HttpServer server;
+    try {
+      server = await HttpServer.bind(
+        InternetAddress.loopbackIPv4,
+        callbackPort,
+      );
+    } catch (e) {
+      throw GitHubAuthException('无法启动本地回调服务(端口 $callbackPort 被占用): $e');
+    }
+
+    final completer = Completer<String>();
+    final timeout = Timer(const Duration(minutes: 5), () {
+      if (!completer.isCompleted) {
+        completer.completeError(GitHubAuthException('授权超时，请重试', true));
+      }
+    });
+    final cancelWatch = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (shouldCancel?.call() == true && !completer.isCompleted) {
+        completer.completeError(GitHubAuthException('已取消授权', true));
+      }
+    });
+
+    server.listen((req) async {
+      final reqUri = req.uri;
+      if (reqUri.path == callbackPath) {
+        final err = reqUri.queryParameters['error'];
+        if (err != null) {
+          _sendHtml(req, 'Authorization failed: $err');
+          if (!completer.isCompleted) {
+            completer.completeError(
+              GitHubAuthException('授权被拒绝: $err', true),
+            );
+          }
+          return;
+        }
+        final gotState = reqUri.queryParameters['state'];
+        final code = reqUri.queryParameters['code'];
+        if (gotState != state) {
+          _sendHtml(req, 'State mismatch — authorization rejected.');
+          if (!completer.isCompleted) {
+            completer.completeError(GitHubAuthException('状态校验失败'));
+          }
+          return;
+        }
+        _sendHtml(req, 'Authorization complete. You may close this tab.');
+        if (!completer.isCompleted && code != null) completer.complete(code);
+        return;
+      }
+      _sendHtml(req, 'Free Note');
+    });
+
+    try {
+      final authorizeUrl = buildAuthorizeUrl(
+        clientId: clientId,
+        state: state,
+        codeChallenge: challenge,
+        redirectUri: redirectUri,
+      );
+      if (await canLaunchUrl(authorizeUrl)) {
+        await launchUrl(authorizeUrl, mode: LaunchMode.externalApplication);
+      } else {
+        throw GitHubAuthException('无法打开浏览器进行授权');
+      }
+      final code = await completer.future;
+      return await _exchangeCode(
+        clientId: clientId,
+        code: code,
+        redirectUri: redirectUri,
+        verifier: verifier,
+      );
+    } finally {
+      timeout.cancel();
+      cancelWatch.cancel();
+      await server.close();
+    }
   }
 }

@@ -7,10 +7,12 @@ import '../services/github_sync_service.dart';
 
 /// Settings page for the GitHub Sync plugin. Opened from the plugin card.
 ///
-/// Provides:
-///  - GitHub Device login (shows the user code + verification URL, then polls).
-///  - A repository picker auto-populated from the logged-in user's repos.
-///  - Disconnect and an auto-sync preference.
+/// Uses the GitHub Device flow:
+///   1. Tap "Sign in" → app requests a [DeviceCodeResponse].
+///   2. Browser auto-opens `https://github.com/login/device`.
+///   3. The 8-digit user code is displayed inline (tappable to copy).
+///   4. User pastes the code on the web page & clicks Continue.
+///   5. Background polling detects authorization and obtains the token.
 class GitHubSyncSettingsScreen extends StatefulWidget {
   final GitHubSyncHost host;
 
@@ -29,7 +31,10 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
   bool _busy = false;
   String? _status;
 
-  /// Set true to abort an in-flight device-code poll.
+  /// The active device-code session (null when not authorizing).
+  DeviceCodeResponse? _deviceSession;
+
+  /// Set true to abort an in-flight poll.
   bool _cancelPolling = false;
 
   @override
@@ -60,6 +65,8 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
     await widget.host.updateGitHubAuth(clientId: _effectiveClientId);
   }
 
+  // ── Repo loading ──────────────────────────────────────────────────
+
   Future<void> _loadRepos(String token) async {
     if (!mounted) return;
     setState(() {
@@ -71,10 +78,9 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
       if (!mounted) return;
       setState(() {
         _repos = repos;
-        // Keep selection valid; fall back to stored value if still present.
         if (_selectedRepo != null &&
             !repos.any((r) => r.fullName == _selectedRepo)) {
-          // stored repo may not be in list (e.g. collaborator filtered) — keep.
+          // stored repo may not be in list — keep it.
         }
       });
     } on GitHubAuthException catch (e) {
@@ -86,6 +92,8 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
     }
   }
 
+  // ── Login: Device flow with auto-open ────────────────────────────
+
   Future<void> _startLogin() async {
     final l10n = AppLocalizations.of(context)!;
     await _persistClientId();
@@ -94,14 +102,29 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
       setState(() => _status = l10n.t('githubClientIdRequired'));
       return;
     }
+
     setState(() {
       _busy = true;
-      _status = null;
+      _deviceSession = null;
+      _status = l10n.t('githubWaitingAuth');
     });
+
     try {
-      final dc = await widget.host.githubService.requestDeviceCode(clientId);
+      // Step 1 — request device + user code.
+      final dc =
+          await widget.host.githubService.requestDeviceCode(clientId);
+      if (!mounted) return;
+      setState(() => _deviceSession = dc);
+
+      // Step 2 — auto-open https://github.com/login/device in the browser.
+      final uri = Uri.parse(dc.verificationUri);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      // If launch fails we still continue — user can navigate manually.
+
+      // Step 3 — poll until authorized / cancelled / expired.
       _cancelPolling = false;
-      _showDeviceCodeDialog(dc);
       final token = await widget.host.githubService.pollForToken(
         clientId: clientId,
         deviceCode: dc.deviceCode,
@@ -109,7 +132,8 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
         expiresIn: dc.expiresIn,
         shouldCancel: () => _cancelPolling,
       );
-      // Success — fetch the user and (re)load repositories.
+
+      // Step 4 — success: resolve user, persist, load repos.
       final user = await widget.host.githubService.getAuthenticatedUser(token);
       await widget.host.updateGitHubAuth(
         token: token,
@@ -118,99 +142,39 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
       );
       await _loadRepos(token);
       if (mounted) {
-        setState(() => _status = l10n.tArgs('githubLoggedInAs', [user.login]));
-        if (Navigator.canPop(context)) Navigator.pop(context);
+        setState(() {
+          _deviceSession = null;
+          _status = l10n.tArgs('githubLoggedInAs', [user.login]);
+        });
       }
     } on GitHubAuthException catch (e) {
-      if (mounted && !e.cancelled) setState(() => _status = e.message);
-      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+      if (mounted) {
+        setState(() {
+          _deviceSession = null;
+          if (!e.cancelled) _status = e.message;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() => _status = '登录失败: $e');
-      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+      if (mounted) {
+        setState(() {
+          _deviceSession = null;
+          _status = '登录失败: $e';
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  void _showDeviceCodeDialog(DeviceCodeResponse dc) {
-    final l10n = AppLocalizations.of(context)!;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.t('githubDeviceCode')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l10n.t('githubDeviceCodeHint')),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: SelectableText(
-                dc.userCode,
-                style: Theme.of(
-                  context,
-                ).textTheme.headlineSmall?.copyWith(
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '${l10n.t('githubOpenAuth')}: ${dc.verificationUri}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.t('githubWaitingAuth'),
-              style: const TextStyle(fontStyle: FontStyle.italic),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              _cancelPolling = true;
-              Navigator.pop(ctx);
-            },
-            child: Text(l10n.t('cancel')),
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.copy),
-            label: Text(l10n.t('githubCopyCode')),
-            onPressed: () async {
-              // Best-effort: copy the code to the clipboard and open the URL.
-              await _copyAndOpen(dc);
-            },
-          ),
-        ],
-      ),
-    );
+  void _cancelAuth() {
+    _cancelPolling = true;
+    setState(() {
+      _deviceSession = null;
+      _busy = false;
+    });
   }
 
-  Future<void> _copyAndOpen(DeviceCodeResponse dc) async {
-    // Clipboard copy + open the verification URL in the browser.
-    try {
-      // ignore: deprecated_member_use
-      await Clipboard.setData(ClipboardData(text: dc.userCode));
-    } catch (_) {
-      // Clipboard may be unavailable on some platforms; ignore.
-    }
-    final uri = Uri.tryParse(dc.verificationUri);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
+  // ── Disconnect / sync helpers ─────────────────────────────────────
 
   Future<void> _disconnect() async {
     await widget.host.updateGitHubAuth(
@@ -221,6 +185,7 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
     if (mounted) {
       setState(() {
         _repos = [];
+        _deviceSession = null;
         _status = null;
       });
     }
@@ -236,19 +201,22 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
     if (mounted) setState(() => _status = msg);
   }
 
+  // ── UI ────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final s = widget.host.settings;
     final connected =
         s.githubToken != null && s.githubToken!.isNotEmpty;
+    final authorizing = _deviceSession != null;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.t('githubSyncSettings'))),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 32),
         children: [
-          // Account status
+          // ── Account status ──
           ListTile(
             leading: Icon(
               connected ? Icons.check_circle : Icons.cloud_off,
@@ -262,7 +230,8 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
             subtitle: connected ? Text(s.githubRepo ?? '') : null,
           ),
           const Divider(),
-          // Client ID
+
+          // ── Client ID ──
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
@@ -281,8 +250,14 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
-          const SizedBox(height: 12),
-          // Login / Disconnect
+
+          // ── Authorizing state: big user code + cancel ──
+          if (authorizing) ...[
+            const SizedBox(height: 12),
+            _buildAuthorizingCard(l10n),
+          ],
+
+          // ── Login / Disconnect buttons ──
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -294,19 +269,23 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
                     onPressed: _busy ? null : _startLogin,
                   ),
                 ),
-                if (connected) ...[
+                if (connected || authorizing) ...[
                   const SizedBox(width: 12),
                   OutlinedButton.icon(
-                    icon: const Icon(Icons.logout),
-                    label: Text(l10n.t('githubDisconnect')),
-                    onPressed: _busy ? null : _disconnect,
+                    icon: const Icon(Icons.close),
+                    label: Text(
+                      authorizing ? l10n.t('cancel') : l10n.t('githubDisconnect'),
+                    ),
+                    onPressed: _busy ? null
+                        : (authorizing ? _cancelAuth : _disconnect),
                   ),
                 ],
               ],
             ),
           ),
           const Divider(),
-          // Repository picker
+
+          // ── Repository picker ──
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _loadingRepos
@@ -342,7 +321,7 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
                         : null,
                   ),
           ),
-          if (!connected && _repos.isEmpty)
+          if (!connected && !authorizing && _repos.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
@@ -363,7 +342,8 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
               ),
             ),
           const Divider(),
-          // Auto sync toggle
+
+          // ── Auto sync ──
           SwitchListTile(
             title: Text(l10n.t('autoSync')),
             value: s.autoSync,
@@ -372,7 +352,8 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
               if (mounted) setState(() {});
             },
           ),
-          // Manual sync actions
+
+          // ── Manual sync actions ──
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -395,7 +376,7 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
               ],
             ),
           ),
-          if (_status != null) ...[
+          if (_status != null && !authorizing) ...[
             const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -408,6 +389,91 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// Inline card shown while waiting for the user to authorize on the web.
+  Widget _buildAuthorizingCard(AppLocalizations l10n) {
+    final code = _deviceSession!.userCode;
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      color: theme.colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.t('githubWaitingAuth'),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Big tappable code block.
+            InkWell(
+              onTap: () async {
+                try {
+                  await Clipboard.setData(ClipboardData(text: code));
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.tArgs('githubCopiedCode', [code]))),
+                    );
+                  }
+                } catch (_) {}
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                    width: 1.5,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      l10n.t('githubEnterThisCode'),
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      code,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 6,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              l10n.t('githubTapCopyHint'),
+              style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
       ),
     );
   }

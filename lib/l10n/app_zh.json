@@ -141,5 +141,8 @@
   "githubSelectRepo": "仓库",
   "githubNoRepos": "没有仓库",
   "githubLoginToLoadRepos": "登录后加载你的仓库（公开 + 私有）。",
-  "githubLoadRepos": "重新加载仓库"
+  "githubLoadRepos": "重新加载仓库",
+  "githubCopiedCode": "已复制：{0}",
+  "githubEnterThisCode": "在 GitHub 页面上输入此验证码",
+  "githubTapCopyHint": "点击验证码可复制到剪贴板"
 }

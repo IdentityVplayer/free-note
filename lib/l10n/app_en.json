@@ -141,5 +141,8 @@
   "githubSelectRepo": "Repository",
   "githubNoRepos": "No repositories",
   "githubLoginToLoadRepos": "Sign in to load your repositories (public + private).",
-  "githubLoadRepos": "Reload repositories"
+  "githubLoadRepos": "Reload repositories",
+  "githubCopiedCode": "Copied: {0}",
+  "githubEnterThisCode": "Enter this code on GitHub",
+  "githubTapCopyHint": "Tap the code to copy it to clipboard"
 }

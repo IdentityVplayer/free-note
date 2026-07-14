@@ -141,5 +141,8 @@
   "githubSelectRepo": "リポジトリ",
   "githubNoRepos": "リポジトリなし",
   "githubLoginToLoadRepos": "サインインするとリポジトリ（公開＋非公開）が読み込まれます。",
-  "githubLoadRepos": "リポジトリを再読み込み"
+  "githubLoadRepos": "リポジトリを再読み込み",
+  "githubCopiedCode": "コピー済: {0}",
+  "githubEnterThisCode": "GitHub のページでこのコードを入力",
+  "githubTapCopyHint": "コードをタップするとクリップボードにコピー"
 }
