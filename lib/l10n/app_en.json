@@ -117,5 +117,11 @@
   "contextActive": "Context: {0}",
   "selectContextFile": "Select a Markdown file to use as context",
   "contextNeedFolder": "Select a notes folder in Settings first",
-  "folderEmpty": "This folder is empty"
+  "folderEmpty": "This folder is empty",
+  "math": "Formula",
+  "insertMath": "Insert",
+  "mathBlock": "Block / Inline",
+  "mathSource": "LaTeX source",
+  "mathFormulaHint": "Type a LaTeX formula to preview",
+  "mathInvalid": "Invalid formula"
 }

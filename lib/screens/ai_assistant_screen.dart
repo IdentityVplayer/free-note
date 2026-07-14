@@ -9,6 +9,7 @@ import '../models/chat_message.dart';
 import '../models/note.dart';
 import '../plugins/ai_context_plugin.dart';
 import '../l10n/app_localizations.dart';
+import '../markdown/math_markdown.dart';
 import 'context_file_picker_screen.dart';
 
 /// AI Assistant screen — standalone chat-like interface for Q&A.
@@ -238,6 +239,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         child: MarkdownBody(
           data: msg.text,
           selectable: true,
+          inlineSyntaxes: mathInlineSyntaxes,
+          blockSyntaxes: mathBlockSyntaxes,
+          builders: mathBuilders,
           onTapLink: (text, href, title) => _launchUrl(href),
         ),
       ),

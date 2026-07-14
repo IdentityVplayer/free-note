@@ -117,5 +117,11 @@
   "contextActive": "上下文：{0}",
   "selectContextFile": "选择作为上下文的 Markdown 文件",
   "contextNeedFolder": "请先在设置中选择笔记文件夹",
-  "folderEmpty": "此文件夹暂无笔记"
+  "folderEmpty": "此文件夹暂无笔记",
+  "math": "公式",
+  "insertMath": "插入",
+  "mathBlock": "独立 / 行内",
+  "mathSource": "LaTeX 源码",
+  "mathFormulaHint": "输入 LaTeX 公式以预览",
+  "mathInvalid": "公式无法解析"
 }

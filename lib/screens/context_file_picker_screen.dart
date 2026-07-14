@@ -16,7 +16,8 @@ class ContextFilePickerScreen extends StatefulWidget {
   const ContextFilePickerScreen({super.key});
 
   @override
-  State<ContextFilePickerScreen> createState() => _ContextFilePickerScreenState();
+  State<ContextFilePickerScreen> createState() =>
+      _ContextFilePickerScreenState();
 }
 
 /// A node in the notes-folder tree.
@@ -74,20 +75,21 @@ class _ContextFilePickerScreenState extends State<ContextFilePickerScreen> {
   /// Recursively build the folder tree, skipping hidden entries (e.g. the
   /// `.config` metadata directory). Dirs sort before files; both by name.
   _TreeNode _buildTree(Directory dir, String rel) {
-    final entries = dir
-        .listSync()
-        .whereType<FileSystemEntity>()
-        .where((e) => !p.basename(e.path).startsWith('.'))
-        .toList()
-      ..sort((a, b) {
-        final aDir = a is Directory;
-        final bDir = b is Directory;
-        if (aDir != bDir) return aDir ? -1 : 1;
-        return p
-            .basename(a.path)
-            .toLowerCase()
-            .compareTo(p.basename(b.path).toLowerCase());
-      });
+    final entries =
+        dir
+            .listSync()
+            .whereType<FileSystemEntity>()
+            .where((e) => !p.basename(e.path).startsWith('.'))
+            .toList()
+          ..sort((a, b) {
+            final aDir = a is Directory;
+            final bDir = b is Directory;
+            if (aDir != bDir) return aDir ? -1 : 1;
+            return p
+                .basename(a.path)
+                .toLowerCase()
+                .compareTo(p.basename(b.path).toLowerCase());
+          });
 
     final children = <_TreeNode>[];
     for (final e in entries) {
@@ -103,10 +105,17 @@ class _ContextFilePickerScreenState extends State<ContextFilePickerScreen> {
           ),
         );
       } else if (e is File && e.path.endsWith('.md')) {
-        children.add(_TreeNode(name: name, relativePath: childRel, isDir: false));
+        children.add(
+          _TreeNode(name: name, relativePath: childRel, isDir: false),
+        );
       }
     }
-    return _TreeNode(name: p.basename(dir.path), relativePath: rel, isDir: true, children: children);
+    return _TreeNode(
+      name: p.basename(dir.path),
+      relativePath: rel,
+      isDir: true,
+      children: children,
+    );
   }
 
   Future<void> _pickFile(String relativePath) async {

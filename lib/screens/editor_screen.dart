@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
@@ -9,8 +9,10 @@ import '../l10n/app_localizations.dart';
 import '../models/note.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import '../markdown/math_markdown.dart';
 import 'subfolder_picker_screen.dart';
 import 'ai_assistant_screen.dart';
+import 'math_insert_screen.dart';
 
 /// Editor screen — Markdown editing with live preview and AI tools.
 class EditorScreen extends StatefulWidget {
@@ -240,6 +242,33 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
+  /// Open the dedicated LaTeX formula page; insert the resulting (wrapped)
+  /// formula at the cursor when the user taps "Insert".
+  Future<void> _openMathPage() async {
+    final result = await Navigator.push<String?>(
+      context,
+      MaterialPageRoute(builder: (_) => const MathInsertScreen()),
+    );
+    if (result != null && result.isNotEmpty) {
+      _insertAtCursor(result);
+    }
+  }
+
+  /// Insert [text] at the current selection, moving the caret to the end.
+  void _insertAtCursor(String text) {
+    final selection = _contentController.selection;
+    final newText = _contentController.text.replaceRange(
+      selection.start,
+      selection.end,
+      text,
+    );
+    _contentController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: selection.start + text.length),
+    );
+    setState(() => _hasChanges = true);
+  }
+
   /// A compact, tappable row showing where this note is saved and letting the
   /// user pick a subfolder inside the selected notes folder.
   Widget _buildSaveLocation(BuildContext context) {
@@ -458,6 +487,11 @@ class _EditorScreenState extends State<EditorScreen> {
                     () => _insertText('> '),
                     hint: l10n.t('insertQuote'),
                   ),
+                  _toolbarBtn(
+                    Icons.functions,
+                    () => _openMathPage(),
+                    hint: l10n.t('math'),
+                  ),
                 ],
               ),
             ),
@@ -466,23 +500,17 @@ class _EditorScreenState extends State<EditorScreen> {
           // Editor / Preview
           Expanded(
             child: _isPreview
-                ? SingleChildScrollView(
+                ? Markdown(
+                    data: _contentController.text,
+                    selectable: true,
+                    extensionSet: md.ExtensionSet.gitHubFlavored,
+                    inlineSyntaxes: mathInlineSyntaxes,
+                    blockSyntaxes: mathBlockSyntaxes,
+                    builders: mathBuilders,
                     padding: const EdgeInsets.all(16),
-                    child: Html(
-                      data: md.markdownToHtml(
-                        _contentController.text,
-                        extensionSet: md.ExtensionSet.gitHubFlavored,
-                      ),
-                      onLinkTap: (url, _, _) {
-                        if (url != null) _launchUrl(url);
-                      },
-                      style: {
-                        'body': Style(fontSize: FontSize(16.0)),
-                        'a': Style(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      },
-                    ),
+                    onTapLink: (text, href, title) {
+                      if (href != null) _launchUrl(href);
+                    },
                   )
                 : Stack(
                     children: [

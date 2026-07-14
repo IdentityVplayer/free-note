@@ -117,5 +117,11 @@
   "contextActive": "コンテキスト：{0}",
   "selectContextFile": "コンテキストとして使うMarkdownファイルを選択",
   "contextNeedFolder": "設定でノートフォルダを選択してください",
-  "folderEmpty": "このフォルダは空です"
+  "folderEmpty": "このフォルダは空です",
+  "math": "数式",
+  "insertMath": "挿入",
+  "mathBlock": "独立 / インライン",
+  "mathSource": "LaTeXソース",
+  "mathFormulaHint": "LaTeX数式を入力してプレビュー",
+  "mathInvalid": "数式を解析できません"
 }

@@ -4,6 +4,15 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.9.0
+
+### New Features
+- **LaTeX 数学公式支持** — 笔记预览与 AI 对话现在可渲染 LaTeX：行内公式用 `$...$`，独立公式（居中、独占一行）用 `$$...$$`。渲染基于 `flutter_math_fork`（KaTeX 风格），解析失败的公式会以红色原文显示而不崩溃。
+- **独立公式插入页** — 编辑器工具栏新增「公式」按钮（ƒ 图标），点击切换到独立的公式编辑页：上方实时预览渲染效果，中间可手输 LaTeX 源码，底部为**分类的 LaTeX 符号工具栏**（常用 / 希腊字母 / 运算 / 关系 / 括号 / 箭头 / 修饰），点击符号即插入到光标处（空 `{}` 自动定位光标到参数内）。右上角可切换「独立 / 行内」，勾选后把整段公式（自动用 `$` 或 `$$` 包裹）插回编辑器当前光标。
+
+### Changed
+- 编辑器预览由 `flutter_html` 切换为 `flutter_markdown`，以原生支持 LaTeX 数学扩展（标准 Markdown / GFM 渲染保持不变，链接点击行为保留）。
+
 ## 1.8.3
 
 ### Fixed
