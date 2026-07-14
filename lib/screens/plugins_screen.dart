@@ -97,38 +97,20 @@ class PluginsScreen extends StatelessWidget {
                               isThreeLine: true,
                             ),
                           ),
-                          // Gear at bottom-left signals editable settings.
+                          // Custom gear at bottom-left signals editable settings.
                           if (plugin.hasSettings)
                             Positioned(
-                              left: 8,
-                              bottom: 2,
+                              left: 6,
+                              bottom: 0,
                               child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(12),
                                 onTap: () => openSettings(plugin.id),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(6),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.settings,
-                                        size: 16,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        l10n.t('pluginSettings'),
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall?.copyWith(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.primary,
-                                        ),
-                                      ),
-                                    ],
+                                  padding: const EdgeInsets.all(2),
+                                  child: Image.asset(
+                                    'lib/assets/icons/plugin_gear.png',
+                                    width: 20,
+                                    height: 20,
                                   ),
                                 ),
                               ),
