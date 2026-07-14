@@ -11,10 +11,9 @@ import '../models/note.dart';
 /// Notes are stored as a single `notes/notes.json` file (with frontmatter
 /// mirrored locally as individual `.md` files by the storage layer).
 class GitHubSyncService {
-  /// Default OAuth App client_id for the Device login flow. Replace with your
-  /// own GitHub OAuth App's client_id (Settings → Developer settings → OAuth
-  /// Apps). The device flow requires a registered OAuth App.
-  static const String defaultClientId = '';
+  /// Default GitHub OAuth App client_id for the Device login flow. Users can
+  /// override it with their own OAuth App via "使用其他的Oauth登录".
+  static const String defaultClientId = 'Ov23liBn5JuhulMcevmz';
 
   String? token;
   String? repo; // format: owner/repo

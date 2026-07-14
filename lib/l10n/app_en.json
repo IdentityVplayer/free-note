@@ -144,5 +144,7 @@
   "githubLoadRepos": "Reload repositories",
   "githubCopiedCode": "Copied: {0}",
   "githubEnterThisCode": "Enter this code on GitHub",
-  "githubTapCopyHint": "Tap the code to copy it to clipboard"
+  "githubTapCopyHint": "Tap the code to copy it to clipboard",
+  "githubLoginNow": "Sign in now",
+  "githubUseOtherOauth": "Use a different OAuth app"
 }

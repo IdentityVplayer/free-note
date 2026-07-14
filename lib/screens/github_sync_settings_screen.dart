@@ -37,13 +37,17 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
   /// Set true to abort an in-flight poll.
   bool _cancelPolling = false;
 
+  /// Whether the custom-client-id field is expanded ("使用其他的Oauth登录").
+  bool _showCustomClientId = false;
+
   @override
   void initState() {
     super.initState();
     final s = widget.host.settings;
-    _clientIdController = TextEditingController(
-      text: s.githubClientId ?? GitHubSyncService.defaultClientId,
-    );
+    // Start empty so the default OAuth is used immediately; only prefill when
+    // the user previously chose a custom OAuth App.
+    _clientIdController = TextEditingController(text: s.githubClientId ?? '');
+    _showCustomClientId = s.githubClientId != null && s.githubClientId!.isNotEmpty;
     _selectedRepo = s.githubRepo;
     if (s.githubToken != null && s.githubToken!.isNotEmpty) {
       _loadRepos(s.githubToken!);
@@ -231,25 +235,28 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
           ),
           const Divider(),
 
-          // ── Client ID ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              controller: _clientIdController,
-              decoration: InputDecoration(
-                labelText: l10n.t('githubClientId'),
-                border: const OutlineInputBorder(),
-                hintText: 'Iv1.xxxxx',
+          // ── Custom OAuth client id (collapsed by default) ──
+          if (_showCustomClientId) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _clientIdController,
+                decoration: InputDecoration(
+                  labelText: l10n.t('githubClientId'),
+                  border: const OutlineInputBorder(),
+                  hintText: 'Iv1.xxxxx',
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: Text(
-              l10n.t('githubClientIdHint'),
-              style: Theme.of(context).textTheme.bodySmall,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: Text(
+                l10n.t('githubClientIdHint'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
-          ),
+            const SizedBox(height: 12),
+          ],
 
           // ── Authorizing state: big user code + cancel ──
           if (authorizing) ...[
@@ -265,7 +272,7 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.login),
-                    label: Text(l10n.t('githubLogin')),
+                    label: Text(l10n.t('githubLoginNow')),
                     onPressed: _busy ? null : _startLogin,
                   ),
                 ),
@@ -283,6 +290,19 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
               ],
             ),
           ),
+          // Small line: use a different OAuth app.
+          if (!connected && !authorizing && !_showCustomClientId)
+            Center(
+              child: TextButton(
+                onPressed: () => setState(() => _showCustomClientId = true),
+                child: Text(
+                  l10n.t('githubUseOtherOauth'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
           const Divider(),
 
           // ── Repository picker ──

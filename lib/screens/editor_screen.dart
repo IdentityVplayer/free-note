@@ -22,8 +22,10 @@ class EditorScreen extends StatefulWidget {
   State<EditorScreen> createState() => _EditorScreenState();
 }
 
-class _EditorScreenState extends State<EditorScreen> {
+class _EditorScreenState extends State<EditorScreen>
+    with WidgetsBindingObserver {
   late Note _note;
+  late AppProvider _provider;
   late TextEditingController _titleController;
   late TextEditingController _contentController;
   late TextEditingController _tagController;
@@ -34,45 +36,58 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   void initState() {
     super.initState();
-    final provider = context.read<AppProvider>();
+    _provider = context.read<AppProvider>();
     if (widget.noteId != null) {
-      _note = provider.getNote(widget.noteId!) ?? provider.createNote();
+      _note = _provider.getNote(widget.noteId!) ?? _provider.createNote();
     } else {
-      _note = provider.createNote();
+      _note = _provider.createNote();
     }
     _titleController = TextEditingController(text: _note.title);
     _contentController = TextEditingController(text: _note.content);
     _tagController = TextEditingController();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    _saveIfChanged();
+    WidgetsBinding.instance.removeObserver(this);
+    _autoSaveIfEnabled();
     _titleController.dispose();
     _contentController.dispose();
     _tagController.dispose();
     super.dispose();
   }
 
-  void _saveIfChanged() {
-    final provider = context.read<AppProvider>();
-    // Auto Save plugin (default enabled) forces a save on exit even when the
-    // in-memory dirty flag wasn't tripped.
-    final autoSaveEnabled = provider.pluginManager.isPluginEnabled(
+  /// Save the current note when the Auto Save plugin is enabled and there are
+  /// unsaved changes. Triggered on back navigation (PopScope) and when the app
+  /// goes to the background (lifecycle observer). Idempotent — a second call
+  /// with no further edits is a no-op.
+  void _autoSaveIfEnabled() {
+    final autoSaveEnabled = _provider.pluginManager.isPluginEnabled(
       'builtin.autosave',
     );
     final contentChanged =
         _note.content != _contentController.text ||
         _note.title != _titleController.text;
-    if (!_hasChanges && !autoSaveEnabled) return;
-    // Nothing to write (and AutoSave only matters when something differs).
+    if (!autoSaveEnabled) return;
     if (!_hasChanges && !contentChanged) return;
     final updated = _note.copyWith(
       title: _titleController.text.isEmpty ? 'Untitled' : _titleController.text,
       content: _contentController.text,
       updatedAt: DateTime.now(),
     );
-    provider.updateNote(updated);
+    _provider.updateNote(updated);
+    _note = updated;
+    _hasChanges = false;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // App backgrounded / closed → auto-save the current note.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _autoSaveIfEnabled();
+    }
   }
 
   /// The note's current subfolder (relative to the base notes folder), or
@@ -225,7 +240,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _export() async {
     final l10n = AppLocalizations.of(context)!;
-    _saveIfChanged();
+    _autoSaveIfEnabled();
     final path = await StorageService.instance.exportNoteAsMarkdown(_note);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -354,15 +369,30 @@ class _EditorScreenState extends State<EditorScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final provider = context.watch<AppProvider>();
+    final wordCountEnabled = provider.pluginManager.isPluginEnabled(
+      'builtin.wordcount',
+    );
+    final exportEnabled = provider.pluginManager.isPluginEnabled(
+      'builtin.exporter',
+    );
 
-    // Get word count from plugin.
-    final wordCountPlugin =
-        provider.pluginManager.plugins['builtin.wordcount']!;
-    final counts =
-        (wordCountPlugin as dynamic).count(_contentController.text)
-            as Map<String, int>;
+    // Word count comes from the Word Count plugin — only show when enabled.
+    Map<String, int> counts = const {};
+    if (wordCountEnabled) {
+      final wordCountPlugin =
+          provider.pluginManager.plugins['builtin.wordcount']!;
+      counts =
+          (wordCountPlugin as dynamic).count(_contentController.text)
+              as Map<String, int>;
+    }
 
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      // Save when the user taps back (top-left / system gesture).
+      onPopInvokedWithResult: (didPop, result) {
+        _autoSaveIfEnabled();
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(
           _titleController.text.isEmpty
@@ -385,11 +415,12 @@ class _EditorScreenState extends State<EditorScreen> {
             tooltip: l10n.t('aiWriting'),
             onPressed: _aiLoading ? null : _showAIMenu,
           ),
-          IconButton(
-            icon: const Icon(Icons.download),
-            tooltip: l10n.t('export'),
-            onPressed: _export,
-          ),
+          if (exportEnabled)
+            IconButton(
+              icon: const Icon(Icons.download),
+              tooltip: l10n.t('export'),
+              onPressed: _export,
+            ),
         ],
       ),
       body: Column(
@@ -547,29 +578,31 @@ class _EditorScreenState extends State<EditorScreen> {
                     ],
                   ),
           ),
-          // Status bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          // Status bar (only when the Word Count plugin is enabled)
+          if (wordCountEnabled)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${l10n.t('words')}: ${counts['words']}  '
+                    '${l10n.t('characters')}: ${counts['chars']}  '
+                    '${l10n.t('lines')}: ${counts['lines']}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  Text(
+                    '${_note.updatedAt.day}/${_note.updatedAt.month}/${_note.updatedAt.year}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${l10n.t('words')}: ${counts['words']}  '
-                  '${l10n.t('characters')}: ${counts['chars']}  '
-                  '${l10n.t('lines')}: ${counts['lines']}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                Text(
-                  '${_note.updatedAt.day}/${_note.updatedAt.month}/${_note.updatedAt.year}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
         ],
+      ),
       ),
     );
   }

@@ -144,5 +144,7 @@
   "githubLoadRepos": "リポジトリを再読み込み",
   "githubCopiedCode": "コピー済: {0}",
   "githubEnterThisCode": "GitHub のページでこのコードを入力",
-  "githubTapCopyHint": "コードをタップするとクリップボードにコピー"
+  "githubTapCopyHint": "コードをタップするとクリップボードにコピー",
+  "githubLoginNow": "今すぐログイン",
+  "githubUseOtherOauth": "別のOAuthでログイン"
 }
