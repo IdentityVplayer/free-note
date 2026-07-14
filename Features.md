@@ -7,7 +7,7 @@ used as the release description.
 ## 1.9.7
 
 ### Changed
-- **OAuth 默认 Client ID** — 内置默认 GitHub OAuth App Client ID（`Ov23liBn5JuhulMcevmz`），GitHub Sync 设置页改为一个醒目的「立即登录」按钮，下方一行小字「使用其他的Oauth登录」用于切换到自定义 OAuth App（展开 Client ID 输入框）。
+- **OAuth 默认 Client ID** — 内置默认 GitHub OAuth App Client ID，GitHub Sync 设置页改为一个醒目的「立即登录」按钮，下方一行小字「使用其他的Oauth登录」用于切换到自定义 OAuth App（展开 Client ID 输入框）。
 - **Auto Save 逻辑重构** — 由「仅 dispose 时保存」改为在**返回键（左上返回 / 手机返回 / 系统手势）**与**应用切到后台（paused / detached）**时保存。编辑器接入 `WidgetsBinding` 生命周期监听与 `PopScope`，Auto Save 插件（默认启用）在以上时机自动写入当前 `.md`，且幂等（重复触发不会重复落盘）。
 
 ### Fixed
