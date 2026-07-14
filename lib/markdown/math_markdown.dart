@@ -56,6 +56,9 @@ class BlockMathSyntax extends md.BlockSyntax {
 }
 
 /// Renders a `math` / `mathBlock` element with flutter_math_fork.
+///
+/// Wraps [Math.tex] in a try-catch so that font-loading errors, parse failures,
+/// or any other internal exception never bubble up and blank the whole page.
 class MathBuilder extends MarkdownElementBuilder {
   final bool display;
   MathBuilder({this.display = false});
@@ -73,15 +76,26 @@ class MathBuilder extends MarkdownElementBuilder {
     final tex = element.textContent.trim();
     if (tex.isEmpty) return const SizedBox.shrink();
     final baseStyle = preferredStyle ?? DefaultTextStyle.of(context).style;
-    return Math.tex(
-      tex,
-      mathStyle: display ? MathStyle.display : MathStyle.text,
-      textStyle: baseStyle,
-      onErrorFallback: (error) => Text(
+    try {
+      return Math.tex(
         tex,
-        style: baseStyle.copyWith(color: Theme.of(context).colorScheme.error),
-      ),
-    );
+        mathStyle: display ? MathStyle.display : MathStyle.text,
+        textStyle: baseStyle,
+        onErrorFallback: (error) => Text(
+          tex,
+          style: baseStyle.copyWith(color: Theme.of(context).colorScheme.error),
+        ),
+      );
+    } catch (_) {
+      // Fallback for any unhandled exception (e.g. missing fonts).
+      return Text(
+        display ? '$tex\n' : tex,
+        style: baseStyle.copyWith(
+          color: Theme.of(context).colorScheme.error,
+          fontFamily: 'monospace',
+        ),
+      );
+    }
   }
 }
 
@@ -92,3 +106,23 @@ Map<String, MarkdownElementBuilder> get mathBuilders => {
   'math': MathBuilder(),
   'mathBlock': MathBuilder(display: true),
 };
+
+/// A safe [MarkdownBody] pre-configured with LaTeX support so that a note
+/// never goes blank on a parse/render fault.
+Widget safeMarkdown({
+  required String data,
+  MarkdownTapLinkCallback? onTapLink,
+}) {
+  return Padding(
+    padding: const EdgeInsets.all(16),
+    child: MarkdownBody(
+      data: data,
+      selectable: true,
+      extensionSet: md.ExtensionSet.gitHubFlavored,
+      inlineSyntaxes: mathInlineSyntaxes,
+      blockSyntaxes: mathBlockSyntaxes,
+      builders: mathBuilders,
+      onTapLink: (text, href, title) => onTapLink?.call(text, href, title),
+    ),
+  );
+}

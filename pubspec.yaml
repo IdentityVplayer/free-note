@@ -1,7 +1,7 @@
 name: free_note
 description: "Free Note - A multifunctional cross-platform note-taking app with Markdown, Plugins, AI, GitHub Sync, i18n and Dark Mode."
 publish_to: 'none'
-version: 1.9.0+19
+version: 1.9.1+20
 
 environment:
   sdk: ^3.12.2
@@ -51,3 +51,59 @@ flutter:
   generate: true
   assets:
     - lib/l10n/
+  fonts:
+    - family: KaTeX_Main
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_Main-Regular.ttf
+        - asset: lib/katex_fonts/fonts/KaTeX_Main-Italic.ttf
+          style: italic
+        - asset: lib/katex_fonts/fonts/KaTeX_Main-Bold.ttf
+          weight: 700
+        - asset: lib/katex_fonts/fonts/KaTeX_Main-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: KaTeX_Math
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_Math-Italic.ttf
+          style: italic
+        - asset: lib/katex_fonts/fonts/KaTeX_Math-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: KaTeX_AMS
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_AMS-Regular.ttf
+    - family: KaTeX_Caligraphic
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_Caligraphic-Regular.ttf
+        - asset: lib/katex_fonts/fonts/KaTeX_Caligraphic-Bold.ttf
+          weight: 700
+    - family: KaTeX_Fraktur
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_Fraktur-Regular.ttf
+        - asset: lib/katex_fonts/fonts/KaTeX_Fraktur-Bold.ttf
+          weight: 700
+    - family: KaTeX_SansSerif
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_SansSerif-Regular.ttf
+        - asset: lib/katex_fonts/fonts/KaTeX_SansSerif-Bold.ttf
+          weight: 700
+        - asset: lib/katex_fonts/fonts/KaTeX_SansSerif-Italic.ttf
+          style: italic
+    - family: KaTeX_Script
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_Script-Regular.ttf
+    - family: KaTeX_Typewriter
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_Typewriter-Regular.ttf
+    - family: KaTeX_Size1
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_Size1-Regular.ttf
+    - family: KaTeX_Size2
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_Size2-Regular.ttf
+    - family: KaTeX_Size3
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_Size3-Regular.ttf
+    - family: KaTeX_Size4
+      fonts:
+        - asset: lib/katex_fonts/fonts/KaTeX_Size4-Regular.ttf

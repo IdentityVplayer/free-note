@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:markdown/markdown.dart' as md;
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
@@ -500,14 +498,8 @@ class _EditorScreenState extends State<EditorScreen> {
           // Editor / Preview
           Expanded(
             child: _isPreview
-                ? Markdown(
+                ? safeMarkdown(
                     data: _contentController.text,
-                    selectable: true,
-                    extensionSet: md.ExtensionSet.gitHubFlavored,
-                    inlineSyntaxes: mathInlineSyntaxes,
-                    blockSyntaxes: mathBlockSyntaxes,
-                    builders: mathBuilders,
-                    padding: const EdgeInsets.all(16),
                     onTapLink: (text, href, title) {
                       if (href != null) _launchUrl(href);
                     },

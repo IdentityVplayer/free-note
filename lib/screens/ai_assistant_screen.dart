@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
@@ -236,12 +235,8 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
               : theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: MarkdownBody(
+        child: safeMarkdown(
           data: msg.text,
-          selectable: true,
-          inlineSyntaxes: mathInlineSyntaxes,
-          blockSyntaxes: mathBlockSyntaxes,
-          builders: mathBuilders,
           onTapLink: (text, href, title) => _launchUrl(href),
         ),
       ),

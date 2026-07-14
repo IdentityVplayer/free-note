@@ -4,6 +4,11 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.9.1
+
+### Fixed
+- **修复预览模式空白/崩溃** — v1.9.0 的 LaTeX 渲染因缺少 KaTeX 字体资源导致预览模式完全空白（`Math.tex` 静默失败）。现已在 `pubspec.yaml` 中显式声明全部 KaTeX 字体（20 个 `.ttf` 文件，复制到 `lib/katex_fonts/fonts/`），并给 `MathBuilder` 的 `Math.tex` 调用加了 try-catch 保护——即使字体加载或公式解析异常，也只显示红色原文而非整页崩溃。同时封装了 `safeMarkdown` 统一入口，编辑器预览与 AI 对话共用同一套 LaTeX + 容错逻辑。
+
 ## 1.9.0
 
 ### New Features
