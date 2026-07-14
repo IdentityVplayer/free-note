@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/note.dart';
 import '../models/settings.dart';
+import '../models/plugin.dart';
 import '../services/storage_service.dart';
 import '../services/ai_service.dart';
 import '../services/github_sync_service.dart';
@@ -12,6 +13,7 @@ import '../plugins/ai_context_plugin.dart';
 import '../plugins/autosave_plugin.dart';
 import '../plugins/github_sync_plugin.dart';
 import '../plugins/github_sync_host.dart';
+import '../plugins/user_plugin.dart';
 
 /// Central app state provider — manages notes, settings, AI, sync, and plugins.
 class AppProvider extends ChangeNotifier implements GitHubSyncHost {
@@ -90,6 +92,11 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
     pluginManager.register(AiContextPlugin());
     pluginManager.register(AutoSavePlugin());
     pluginManager.register(GitHubSyncPlugin());
+
+    // Restore user-added plugins (added at runtime via the Plugins "+" button).
+    for (final info in _settings.userPlugins) {
+      pluginManager.register(UserPlugin.fromInfo(info));
+    }
 
     _setLoading(false);
   }
@@ -269,6 +276,45 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
 
   void setThemeColor(String? hex) {
     _settings.themeColorHex = hex;
+    _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
+  // ---- User plugins (runtime-added via the Plugins "+" button) ----
+
+  /// Add a user-created plugin and persist it so it survives restarts.
+  /// Returns the generated plugin id, or null if [name] is empty.
+  String? addUserPlugin({
+    required String name,
+    required String description,
+    required PluginType type,
+  }) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return null;
+    final id = 'user.${trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '')}.${DateTime.now().millisecondsSinceEpoch}';
+    final plugin = UserPlugin(
+      id: id,
+      name: trimmed,
+      description: description.trim(),
+      type: type,
+    );
+    pluginManager.register(plugin);
+    final updated = List<PluginInfo>.from(_settings.userPlugins)
+      ..add(plugin.info);
+    _settings.userPlugins = updated;
+    _storage.saveSettings(_settings);
+    notifyListeners();
+    return id;
+  }
+
+  /// Remove a user-added plugin by [id] (only user plugins can be removed).
+  void removeUserPlugin(String id) {
+    if (!UserPlugin.isUserPluginId(id)) return;
+    pluginManager.unregister(id);
+    final updated = _settings.userPlugins
+        .where((p) => p.id != id)
+        .toList();
+    _settings.userPlugins = updated;
     _storage.saveSettings(_settings);
     notifyListeners();
   }

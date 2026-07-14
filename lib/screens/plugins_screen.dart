@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../models/plugin.dart';
+import '../plugins/user_plugin.dart';
 import '../l10n/app_localizations.dart';
 
-/// Plugins management screen — view, toggle, and configure plugins.
+/// Plugins management screen — view, toggle, configure, add, and remove plugins.
 class PluginsScreen extends StatelessWidget {
   const PluginsScreen({super.key});
 
@@ -24,15 +26,127 @@ class PluginsScreen extends StatelessWidget {
       final plugin = provider.pluginManager.plugins[pluginId];
       final settings = plugin?.buildSettings(context, provider);
       if (settings != null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => settings),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => settings));
       }
     }
 
+    Future<void> removePlugin(String pluginId) async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dctx) => AlertDialog(
+          title: Text(l10n.t('deletePlugin')),
+          content: Text(l10n.t('deletePluginConfirm')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: Text(l10n.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dctx, true),
+              child: Text(l10n.t('removePlugin')),
+            ),
+          ],
+        ),
+      );
+      if (ok == true) {
+        provider.removeUserPlugin(pluginId);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.t('pluginRemoved'))),
+          );
+        }
+      }
+    }
+
+    Future<void> showAddDialog() async {
+      final nameCtl = TextEditingController();
+      final descCtl = TextEditingController();
+      PluginType selected = PluginType.utility;
+
+      await showDialog<void>(
+        context: context,
+        builder: (dctx) => StatefulBuilder(
+          builder: (dctx, setDState) => AlertDialog(
+            title: Text(l10n.t('newPlugin')),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: nameCtl,
+                    decoration: InputDecoration(
+                      labelText: l10n.t('pluginName'),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: descCtl,
+                    decoration: InputDecoration(
+                      labelText: l10n.t('pluginDescription'),
+                      border: const OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<PluginType>(
+                    initialValue: selected,
+                    decoration: InputDecoration(
+                      labelText: l10n.t('pluginType'),
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: PluginType.values
+                        .map(
+                          (t) => DropdownMenuItem(
+                            value: t,
+                            child: Text(_typeLabel(t, l10n)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setDState(() => selected = v!),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dctx),
+                child: Text(l10n.t('cancel')),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final id = provider.addUserPlugin(
+                    name: nameCtl.text,
+                    description: descCtl.text,
+                    type: selected,
+                  );
+                  Navigator.pop(dctx);
+                  if (id != null && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.t('pluginAdded'))),
+                    );
+                  }
+                },
+                child: Text(l10n.t('create')),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.t('plugins'))),
+      appBar: AppBar(
+        title: Text(l10n.t('plugins')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: l10n.t('addPlugin'),
+            onPressed: showAddDialog,
+          ),
+        ],
+      ),
       // Listen to the PluginManager directly so toggles update in real time
       // (AppProvider only notifies on its own changes, not the manager's).
       body: ListenableBuilder(
@@ -46,6 +160,7 @@ class PluginsScreen extends StatelessWidget {
                   itemCount: plugins.length,
                   itemBuilder: (context, index) {
                     final plugin = plugins[index];
+                    final isUser = UserPlugin.isUserPluginId(plugin.id);
 
                     return Card(
                       margin: const EdgeInsets.symmetric(
@@ -58,6 +173,9 @@ class PluginsScreen extends StatelessWidget {
                             onTap: plugin.hasSettings
                                 ? () => openSettings(plugin.id)
                                 : null,
+                            onLongPress: isUser
+                                ? () => removePlugin(plugin.id)
+                                : null,
                             child: ListTile(
                               // Extra bottom padding leaves room for the gear.
                               contentPadding: const EdgeInsets.fromLTRB(
@@ -69,11 +187,28 @@ class PluginsScreen extends StatelessWidget {
                               leading: Icon(
                                 typeIcons[plugin.type.name] ?? Icons.extension,
                               ),
-                              title: Text(
-                                plugin.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      plugin.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isUser)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 6),
+                                      child: Icon(
+                                        Icons.person,
+                                        size: 14,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.outline,
+                                      ),
+                                    ),
+                                ],
                               ),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,5 +258,20 @@ class PluginsScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  String _typeLabel(PluginType t, dynamic l10n) {
+    switch (t) {
+      case PluginType.editor:
+        return l10n.t('typeEditor');
+      case PluginType.exporter:
+        return l10n.t('typeExporter');
+      case PluginType.importer:
+        return l10n.t('typeImporter');
+      case PluginType.theme:
+        return l10n.t('typeTheme');
+      case PluginType.utility:
+        return l10n.t('typeUtility');
+    }
   }
 }

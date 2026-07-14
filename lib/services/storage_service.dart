@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/note.dart';
@@ -254,5 +256,57 @@ class StorageService {
         : note.content;
     file.writeAsStringSync(body);
     return file.path;
+  }
+
+  // ── Folder backup (.fne = zip of the notes folder) ──
+
+  /// The base name (last path segment) of the selected notes folder, used to
+  /// name the exported archive as `{folder_name}_export.fne`.
+  String? get currentFolderName {
+    if (!hasFolder) return null;
+    final cleaned = currentFolder!.replaceAll(RegExp(r'[/\\]+$'), '');
+    return p.basename(cleaned);
+  }
+
+  /// Build the `.fne` archive (a zip) of the entire notes folder — including
+  /// the hidden `.config` metadata directory — and return its raw bytes.
+  /// Returns null when no folder is configured.
+  Future<Uint8List?> buildFolderFneBytes() async {
+    if (!hasFolder) return null;
+    final dir = Directory(currentFolder!);
+    if (!dir.existsSync()) return null;
+
+    final archive = Archive();
+    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      final relative = p.relative(entity.path, from: dir.path);
+      final bytes = entity.readAsBytesSync();
+      archive.addFile(ArchiveFile(relative, bytes.length, bytes));
+    }
+    return Uint8List.fromList(ZipEncoder().encode(archive)!);
+  }
+
+  /// Extract a `.fne` archive ([bytes]) into the current notes folder,
+  /// merging entries and overwriting same-named files. Returns the number of
+  /// files written.
+  Future<int> importFolderFromFneBytes(List<int> bytes) async {
+    if (!hasFolder) return 0;
+    final dir = Directory(currentFolder!);
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+
+    final archive = ZipDecoder().decodeBytes(bytes);
+    var written = 0;
+    for (final file in archive.files) {
+      if (file.isFile) {
+        final content = file.content;
+        if (content == null) continue;
+        final outPath = p.join(dir.path, file.name);
+        File(outPath)
+          ..parent.createSync(recursive: true)
+          ..writeAsBytesSync(content as List<int>);
+        written++;
+      }
+    }
+    return written;
   }
 }

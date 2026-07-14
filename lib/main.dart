@@ -31,7 +31,11 @@ class FreeNoteApp extends StatelessWidget {
             theme: _buildLightTheme(seed),
             darkTheme: _buildDarkTheme(seed),
             themeMode: provider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-            locale: Locale(provider.settings.languageCode),
+            // Empty languageCode means "follow system" — let Flutter use the
+            // platform dispatcher's locale instead of forcing one.
+            locale: provider.settings.languageCode.isEmpty
+                ? null
+                : Locale(provider.settings.languageCode),
             supportedLocales: const [Locale('en'), Locale('zh'), Locale('ja')],
             localizationsDelegates: const [
               AppLocalizationsDelegate(),

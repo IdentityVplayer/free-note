@@ -1,3 +1,5 @@
+import 'plugin.dart';
+
 /// App settings model.
 class AppSettings {
   String languageCode;
@@ -31,8 +33,13 @@ class AppSettings {
   /// [aiModel] to build the model picker shown in the AI chat screen.
   List<String> aiModels;
 
+  // ── New in 1.9.8 ──
+  /// Plugins the user added at runtime from the Plugins screen's "+" button.
+  /// Persisted as [PluginInfo] so they can be re-registered on next launch.
+  List<PluginInfo> userPlugins;
+
   AppSettings({
-    this.languageCode = 'en',
+    this.languageCode = '',
     this.isDarkMode = false,
     this.githubToken,
     this.githubRepo,
@@ -47,6 +54,7 @@ class AppSettings {
     this.themeColorHex,
     this.notesFolderPath,
     this.aiModels = const [],
+    this.userPlugins = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -65,10 +73,11 @@ class AppSettings {
     'themeColorHex': themeColorHex,
     'notesFolderPath': notesFolderPath,
     'aiModels': aiModels,
+    'userPlugins': userPlugins.map((p) => p.toJson()).toList(),
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
-    languageCode: json['languageCode'] as String? ?? 'en',
+    languageCode: json['languageCode'] as String? ?? '',
     isDarkMode: json['isDarkMode'] as bool? ?? false,
     githubToken: json['githubToken'] as String?,
     githubRepo: json['githubRepo'] as String?,
@@ -83,6 +92,10 @@ class AppSettings {
     themeColorHex: json['themeColorHex'] as String?,
     notesFolderPath: json['notesFolderPath'] as String?,
     aiModels: (json['aiModels'] as List<dynamic>?)?.cast<String>() ?? const [],
+    userPlugins: (json['userPlugins'] as List<dynamic>?)
+            ?.map((e) => PluginInfo.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        const [],
   );
 
   /// Resolve the effective base URL from provider preset or custom value.

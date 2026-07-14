@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
 import '../providers/app_provider.dart';
 import '../services/ai_service.dart';
+import '../services/storage_service.dart';
 import '../l10n/app_localizations.dart';
 import '../models/settings.dart';
 import '../screens/folder_picker_screen.dart';
@@ -93,6 +96,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _toast(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _exportData() async {
+    final l10n = AppLocalizations.of(context)!;
+    final storage = StorageService.instance;
+    if (!storage.hasFolder || storage.currentFolderName == null) {
+      _toast(l10n.t('noFolderForExport'));
+      return;
+    }
+    try {
+      final bytes = await storage.buildFolderFneBytes();
+      if (bytes == null) {
+        _toast(l10n.t('noFolderForExport'));
+        return;
+      }
+      final fileName = '${storage.currentFolderName}_export.fne';
+      final path = await FilePicker.saveFile(
+        dialogTitle: l10n.t('exportData'),
+        fileName: fileName,
+        bytes: bytes,
+      );
+      if (path == null) return; // user cancelled
+      _toast(l10n.tArgs('exportSuccessFne', [p.basename(path)]));
+    } catch (e) {
+      _toast(l10n.tArgs('exportFailed', [e.toString()]));
+    }
+  }
+
+  Future<void> _importData() async {
+    final l10n = AppLocalizations.of(context)!;
+    final provider = context.read<AppProvider>();
+    final storage = StorageService.instance;
+    if (!storage.hasFolder) {
+      _toast(l10n.t('noFolderForExport'));
+      return;
+    }
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: Text(l10n.t('importData')),
+        content: Text(l10n.t('importOverwriteConfirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dctx, false),
+            child: Text(l10n.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dctx, true),
+            child: Text(l10n.t('importData')),
+          ),
+        ],
+      ),
+    );
+    if (proceed != true) return;
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['fne'],
+        withData: true,
+      );
+      if (result == null) return;
+      final bytes = result.files.single.bytes;
+      if (bytes == null) {
+        _toast(l10n.tArgs('importFailed', ['no data']));
+        return;
+      }
+      final count = await storage.importFolderFromFneBytes(bytes);
+      await provider.reloadNotes();
+      _toast(l10n.tArgs('importSuccessFne', ['$count']));
+    } catch (e) {
+      _toast(l10n.tArgs('importFailed', [e.toString()]));
+    }
+  }
+
   void _addModel() {
     final v = _aiModelAddController.text.trim();
     if (v.isEmpty) return;
@@ -164,11 +247,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           RadioGroup<String>(
             groupValue: _language,
             onChanged: (v) => setState(() => _language = v!),
-            child: const Column(
+            child: Column(
               children: [
-                RadioListTile<String>(title: Text('English'), value: 'en'),
-                RadioListTile<String>(title: Text('中文'), value: 'zh'),
-                RadioListTile<String>(title: Text('日本語'), value: 'ja'),
+                RadioListTile<String>(
+                  title: Text(l10n.t('followSystem')),
+                  subtitle: Text(
+                    _systemLocaleLabel(),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  value: '',
+                ),
+                const RadioListTile<String>(title: Text('English'), value: 'en'),
+                const RadioListTile<String>(title: Text('中文'), value: 'zh'),
+                const RadioListTile<String>(title: Text('日本語'), value: 'ja'),
               ],
             ),
           ),
@@ -306,6 +397,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           // GitHub is now configured from the GitHub Sync plugin (Plugins → gear).
+          // Data backup — export/import the notes folder as a .fne archive.
+          _sectionHeader(l10n.t('dataBackup')),
+          ListTile(
+            leading: const Icon(Icons.upload_file),
+            title: Text(l10n.t('exportData')),
+            subtitle: Text(l10n.t('exportHint')),
+            onTap: _exportData,
+          ),
+          ListTile(
+            leading: const Icon(Icons.download),
+            title: Text(l10n.t('importData')),
+            subtitle: Text(l10n.t('importHint')),
+            onTap: _importData,
+          ),
           // About
           _sectionHeader(l10n.t('about')),
           ListTile(
@@ -394,5 +499,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  /// Human-readable label for the device's current locale, shown under the
+  /// "Follow system" language option.
+  String _systemLocaleLabel() {
+    final locale = WidgetsBinding.instance.platformDispatcher.locale;
+    final code = locale.languageCode;
+    const names = {'en': 'English', 'zh': '中文', 'ja': '日本語'};
+    return names[code] ?? code.toUpperCase();
   }
 }

@@ -4,6 +4,22 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.9.8
+
+### New Features
+- **插件页「+」按钮添加插件** — `PluginsScreen` 右上角新增「+」按钮，点击弹出对话框，可填写名称 / 描述 / 类型（编辑器 / 导出器 / 导入器 / 主题 / 工具）创建**用户插件**。新建的用户插件会即时注册进 `PluginManager` 并持久化（存入 `AppSettings.userPlugins`），重启后自动还原；用户插件在插件卡片标题旁带「个人」图标，**长按卡片即可移除**。
+- **`skill/Agents.md` 插件开发指南** — 项目根目录新增 `skill/Agents.md`，面向 AI / 智能体说明如何遵循 `FreeNotePlugin` / `PluginInfo` / `PluginManager` / `GitHubSyncHost` 契约开发并注册一个插件，含最小模板、类型选择、设置页、i18n、测试清单。
+- **设置页 导出 / 导入（.fne 归档）** — 设置页新增「数据备份」区块：
+  - **导出**：将当前笔记文件夹（含 `.config` 元数据）打包为 `{文件夹名}_export.fne` 文件（实际为 **zip** 归档），通过系统文件选择器保存到用户指定位置。
+  - **导入**：从 `.fne` 归档读取并合并回当前文件夹（覆盖同名文件），导入后自动重新加载笔记列表。
+
+### Changed
+- **默认语言跟随系统** — `AppSettings.languageCode` 默认值由 `en` 改为空字符串（代表「跟随系统」）。设置页语言选项新增「跟随系统」，并显示当前系统语言；`main.dart` 在语言为空时不强制 `locale`，交由 Flutter 使用设备系统语言。
+
+### Notes
+- 导出 / 导入依赖新增的 `archive` 包与已有的 `file_picker` 包（v11 静态 API）。
+- `.fne` 本质是标准 zip，可直接用任意解压工具打开查看内部笔记。
+
 ## 1.9.7
 
 ### Changed
