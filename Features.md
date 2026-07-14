@@ -4,6 +4,21 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.9.5
+
+### New Features
+- **新增插件：Auto Save（默认启用）** — 退出编辑器前自动保存当前笔记的 `.md` 文件，即使内存中的「已修改」标记未被触发也会写入。可在插件页通过开关临时关闭。
+- **GitHub Sync 重构为插件 + Device 登录** — GitHub 同步现在是一个独立插件（在「插件」页中）。登录方式改为 **GitHub Device 登录**：点击登录后弹出验证码与授权链接，复制验证码并在浏览器中授权，后台自动轮询，授权成功后自动关闭弹窗。
+- **仓库自动加载（公开 + 私有）** — 登录后仓库选择器自动加载该登录用户的所有仓库（包含 owner 与 collaborator、公开与私有），可直接点选，无需手动输入 `owner/repo`。
+- **插件设置可编辑（齿轮图标）** — 支持设置的插件（如 GitHub Sync）在插件卡片**左下角显示齿轮**，点击齿轮或卡片主体即可打开该插件的设置页进行修改。
+
+### Changed
+- GitHub 的 Token / 仓库 / Client ID 等配置从「设置」页迁移到 GitHub Sync 插件的设置页内进行，设置页「GitHub 同步」区块已移除。
+- `AppSettings` 新增 `githubClientId`、`githubUsername` 字段；`FreeNotePlugin` 新增 `hasSettings` 与 `buildSettings(host)` 钩子，`PluginInfo` 同步携带 `hasSettings`。
+
+### Notes
+- Device 登录需要一个 GitHub OAuth App 的 **Client ID**（设置页内可填写，首次使用请自行创建 OAuth App；回调地址任意即可）。未填写 Client ID 时登录会提示先填写。
+
 ## 1.9.1
 
 ### Fixed

@@ -15,14 +15,11 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late TextEditingController _githubTokenController;
-  late TextEditingController _githubRepoController;
   late TextEditingController _aiApiKeyController;
   late TextEditingController _aiModelController;
   late TextEditingController _aiBaseUrlController;
   late String _language;
   late bool _darkMode;
-  late bool _autoSync;
   late String _aiProvider;
   late List<String> _aiModels;
   final TextEditingController _aiModelAddController = TextEditingController();
@@ -41,14 +38,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     final s = context.read<AppProvider>().settings;
-    _githubTokenController = TextEditingController(text: s.githubToken ?? '');
-    _githubRepoController = TextEditingController(text: s.githubRepo ?? '');
     _aiApiKeyController = TextEditingController(text: s.aiApiKey ?? '');
     _aiModelController = TextEditingController(text: s.aiModel);
     _aiBaseUrlController = TextEditingController(text: s.aiBaseUrl ?? '');
     _language = s.languageCode;
     _darkMode = s.isDarkMode;
-    _autoSync = s.autoSync;
     _aiProvider = s.aiProvider;
     _aiModels = List<String>.from(s.aiModels);
     _themeColorHex = s.themeColorHex;
@@ -56,8 +50,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
-    _githubTokenController.dispose();
-    _githubRepoController.dispose();
     _aiApiKeyController.dispose();
     _aiModelController.dispose();
     _aiBaseUrlController.dispose();
@@ -71,11 +63,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       AppSettings(
         languageCode: _language,
         isDarkMode: _darkMode,
-        githubToken: _githubTokenController.text.trim(),
-        githubRepo: _githubRepoController.text.trim(),
+        githubToken: provider.settings.githubToken,
+        githubRepo: provider.settings.githubRepo,
+        githubClientId: provider.settings.githubClientId,
+        githubUsername: provider.settings.githubUsername,
         aiApiKey: _aiApiKeyController.text.trim(),
         aiModel: _aiModelController.text.trim(),
-        autoSync: _autoSync,
+        autoSync: provider.settings.autoSync,
         enableAI: true,
         aiProvider: _aiProvider,
         aiBaseUrl: _aiBaseUrlController.text.trim().isEmpty
@@ -311,37 +305,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
-          // GitHub
-          _sectionHeader(l10n.t('githubSync')),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              controller: _githubTokenController,
-              decoration: InputDecoration(
-                labelText: l10n.t('githubToken'),
-                border: const OutlineInputBorder(),
-                hintText: 'ghp_...',
-              ),
-              obscureText: true,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              controller: _githubRepoController,
-              decoration: InputDecoration(
-                labelText: l10n.t('githubRepo'),
-                border: const OutlineInputBorder(),
-                hintText: 'username/free-note',
-              ),
-            ),
-          ),
-          SwitchListTile(
-            title: Text(l10n.t('autoSync')),
-            value: _autoSync,
-            onChanged: (v) => setState(() => _autoSync = v),
-          ),
+          // GitHub is now configured from the GitHub Sync plugin (Plugins → gear).
           // About
           _sectionHeader(l10n.t('about')),
           ListTile(

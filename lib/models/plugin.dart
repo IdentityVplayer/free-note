@@ -7,6 +7,7 @@ class PluginInfo {
   final String author;
   final bool isEnabled;
   final PluginType type;
+  final bool hasSettings;
 
   const PluginInfo({
     required this.id,
@@ -16,6 +17,7 @@ class PluginInfo {
     required this.author,
     this.isEnabled = true,
     required this.type,
+    this.hasSettings = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -26,6 +28,7 @@ class PluginInfo {
     'author': author,
     'isEnabled': isEnabled,
     'type': type.name,
+    'hasSettings': hasSettings,
   };
 
   factory PluginInfo.fromJson(Map<String, dynamic> json) => PluginInfo(
@@ -39,6 +42,7 @@ class PluginInfo {
       (e) => e.name == json['type'],
       orElse: () => PluginType.utility,
     ),
+    hasSettings: json['hasSettings'] as bool? ?? false,
   );
 }
 

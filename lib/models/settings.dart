@@ -4,6 +4,11 @@ class AppSettings {
   bool isDarkMode;
   String? githubToken;
   String? githubRepo;
+  /// OAuth App client_id used for the GitHub Device login flow. null = use
+  /// [GitHubSyncService.defaultClientId].
+  String? githubClientId;
+  /// Login name of the authenticated GitHub user (filled after Device login).
+  String? githubUsername;
   String? aiApiKey;
   String aiModel;
   bool autoSync;
@@ -31,6 +36,8 @@ class AppSettings {
     this.isDarkMode = false,
     this.githubToken,
     this.githubRepo,
+    this.githubClientId,
+    this.githubUsername,
     this.aiApiKey,
     this.aiModel = 'gpt-3.5-turbo',
     this.autoSync = false,
@@ -47,6 +54,8 @@ class AppSettings {
     'isDarkMode': isDarkMode,
     'githubToken': githubToken,
     'githubRepo': githubRepo,
+    'githubClientId': githubClientId,
+    'githubUsername': githubUsername,
     'aiApiKey': aiApiKey,
     'aiModel': aiModel,
     'autoSync': autoSync,
@@ -63,6 +72,8 @@ class AppSettings {
     isDarkMode: json['isDarkMode'] as bool? ?? false,
     githubToken: json['githubToken'] as String?,
     githubRepo: json['githubRepo'] as String?,
+    githubClientId: json['githubClientId'] as String?,
+    githubUsername: json['githubUsername'] as String?,
     aiApiKey: json['aiApiKey'] as String?,
     aiModel: json['aiModel'] as String? ?? 'gpt-3.5-turbo',
     autoSync: json['autoSync'] as bool? ?? false,

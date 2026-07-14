@@ -63,6 +63,9 @@ class PluginManager extends ChangeNotifier {
     }
   }
 
+  /// Whether the plugin with [pluginId] is currently enabled.
+  bool isPluginEnabled(String pluginId) => _plugins[pluginId]?.isEnabled ?? false;
+
   /// Process text through all enabled plugins.
   String processText(String input) {
     var result = input;

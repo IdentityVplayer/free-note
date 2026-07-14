@@ -55,8 +55,18 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _saveIfChanged() {
-    if (!_hasChanges) return;
     final provider = context.read<AppProvider>();
+    // Auto Save plugin (default enabled) forces a save on exit even when the
+    // in-memory dirty flag wasn't tripped.
+    final autoSaveEnabled = provider.pluginManager.isPluginEnabled(
+      'builtin.autosave',
+    );
+    final contentChanged =
+        _note.content != _contentController.text ||
+        _note.title != _titleController.text;
+    if (!_hasChanges && !autoSaveEnabled) return;
+    // Nothing to write (and AutoSave only matters when something differs).
+    if (!_hasChanges && !contentChanged) return;
     final updated = _note.copyWith(
       title: _titleController.text.isEmpty ? 'Untitled' : _titleController.text,
       content: _contentController.text,

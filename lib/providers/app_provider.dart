@@ -9,9 +9,12 @@ import '../services/github_sync_service.dart';
 import '../plugins/plugin_manager.dart';
 import '../plugins/builtin_plugins.dart';
 import '../plugins/ai_context_plugin.dart';
+import '../plugins/autosave_plugin.dart';
+import '../plugins/github_sync_plugin.dart';
+import '../plugins/github_sync_host.dart';
 
 /// Central app state provider — manages notes, settings, AI, sync, and plugins.
-class AppProvider extends ChangeNotifier {
+class AppProvider extends ChangeNotifier implements GitHubSyncHost {
   final StorageService _storage = StorageService.instance;
 
   // State
@@ -22,11 +25,13 @@ class AppProvider extends ChangeNotifier {
 
   // Services
   late final AIService aiService;
+  @override
   late final GitHubSyncService githubService;
   final PluginManager pluginManager = PluginManager();
 
   // Getters
   List<Note> get notes => List.unmodifiable(_notes);
+  @override
   AppSettings get settings => _settings;
   bool get isLoading => _isLoading;
   String? get statusMessage => _statusMessage;
@@ -83,6 +88,8 @@ class AppProvider extends ChangeNotifier {
     pluginManager.register(TextFormatterPlugin());
     pluginManager.register(ExportPlugin());
     pluginManager.register(AiContextPlugin());
+    pluginManager.register(AutoSavePlugin());
+    pluginManager.register(GitHubSyncPlugin());
 
     _setLoading(false);
   }
@@ -223,6 +230,31 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Persist GitHub auth fields coming from the GitHub Sync plugin settings.
+  /// Empty [token]/[username] clear the value (disconnect).
+  @override
+  Future<void> updateGitHubAuth({
+    String? token,
+    String? username,
+    String? repo,
+    String? clientId,
+    bool? autoSync,
+  }) async {
+    if (token != null) _settings.githubToken = token.isEmpty ? null : token;
+    if (username != null) {
+      _settings.githubUsername = username.isEmpty ? null : username;
+    }
+    if (repo != null) _settings.githubRepo = repo.isEmpty ? null : repo;
+    if (clientId != null) {
+      _settings.githubClientId = clientId.isEmpty ? null : clientId;
+    }
+    if (autoSync != null) _settings.autoSync = autoSync;
+    githubService.token = _settings.githubToken;
+    githubService.repo = _settings.githubRepo;
+    await _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
   void toggleDarkMode() {
     _settings.isDarkMode = !_settings.isDarkMode;
     _storage.saveSettings(_settings);
@@ -244,6 +276,7 @@ class AppProvider extends ChangeNotifier {
   // ---- GitHub Sync ----
 
   /// Sync notes to GitHub now (immediate sync).
+  @override
   Future<String> syncToGitHub() async {
     if (!githubService.isConfigured) {
       _statusMessage = 'GitHub 未配置，请先在设置中填写 Token 和仓库';
@@ -258,6 +291,7 @@ class AppProvider extends ChangeNotifier {
     return result.message;
   }
 
+  @override
   Future<String> pullFromGitHub() async {
     if (!githubService.isConfigured) {
       _statusMessage = 'GitHub 未配置，请先在设置中填写 Token 和仓库';
