@@ -4,6 +4,18 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.9.9
+
+### Changed
+- **AI 正式成为插件（可开关）** — 原 `AiContextPlugin` 重命名为 **AI Assistant** 插件，现在它是编辑器里**所有 AI 功能的唯一开关**：AI 写作菜单（续写/润色/总结/翻译/扩写）与「AI 对话」入口都受 `builtin.aicontext` 启用状态控制。在「插件」页关闭该插件，编辑器的所有 AI 按钮即消失。
+- **AI 对话改为文件内对话框** — 编辑器顶栏的「AI 对话」按钮（ upload 图标）现在以 `showGeneralDialog` 的形式**在文件内直接唤醒 AI 对话界面**（当前笔记内容自动作为上下文），而非整页跳转。
+
+### Added
+- **AI 笔记自动续接** — 打开一个 AI 生成的笔记（内容以 `! Free note ai chat` 开头的聊天存档）时：
+  1. 自动把对话解析为上下文并**自动打开 AI 对话界面**；
+  2. 关闭对话时**对话内容自动保存**回该笔记（不再弹「是否保存」询问），并在编辑器内提示「对话已自动保存到笔记」。
+  手动从普通笔记发起的 AI 对话仍保持原行为（离开时询问是否另存为新的 Chat 笔记）。
+
 ## 1.9.8
 
 ### New Features

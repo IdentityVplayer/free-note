@@ -22,10 +22,19 @@ class AIAssistantScreen extends StatefulWidget {
   final String? initialContextContent;
   final String? initialContextName;
 
+  /// Pre-filled conversation, used when resuming an existing AI chat note.
+  final List<ChatMessage>? initialMessages;
+
+  /// When set, this screen is editing an existing AI chat note: closing it
+  /// auto-saves the conversation back into that note (no "save?" prompt).
+  final String? noteId;
+
   const AIAssistantScreen({
     super.key,
     this.initialContextContent,
     this.initialContextName,
+    this.initialMessages,
+    this.noteId,
   });
 
   @override
@@ -48,7 +57,10 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     super.initState();
     final models = context.read<AppProvider>().settings.allModels;
     _currentModel = models.isNotEmpty ? models.first : null;
-    if (widget.initialContextContent != null &&
+    if (widget.initialMessages != null && widget.initialMessages!.isNotEmpty) {
+      // Resuming an existing AI chat note — show the conversation directly.
+      _messages.addAll(widget.initialMessages!);
+    } else if (widget.initialContextContent != null &&
         widget.initialContextContent!.trim().isNotEmpty) {
       _contextContent = widget.initialContextContent;
       _contextName = widget.initialContextName;
@@ -138,6 +150,20 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
   /// save it as a standalone `.md` note before leaving.
   Future<void> _handleBack() async {
     final l10n = AppLocalizations.of(context)!;
+    // Editing an existing AI chat note → auto-save the conversation back into
+    // the note (no "save?" prompt). The conversation is always persisted.
+    if (widget.noteId != null) {
+      final provider = context.read<AppProvider>();
+      final note = provider.getNote(widget.noteId!);
+      final markdown = _buildChatMarkdown();
+      if (note != null && mounted) {
+        provider.updateNote(
+          note.copyWith(content: markdown, updatedAt: DateTime.now()),
+        );
+      }
+      if (mounted) Navigator.pop(context, markdown);
+      return;
+    }
     if (_messages.isEmpty) {
       if (mounted) Navigator.pop(context);
       return;

@@ -173,5 +173,7 @@
   "importFailed": "Import failed: {0}",
   "noFolderForExport": "Select a notes folder before exporting.",
   "importOverwriteConfirm": "Importing will merge files into the current folder and overwrite same-named files. Continue?",
-  "dataBackup": "Data backup"
+  "dataBackup": "Data backup",
+  "aiChat": "AI Chat",
+  "aiNoteAutoSaved": "Conversation auto-saved to note"
 }

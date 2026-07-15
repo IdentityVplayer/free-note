@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:free_note/models/settings.dart';
 import 'package:free_note/models/plugin.dart';
 import 'package:free_note/plugins/user_plugin.dart';
+import 'package:free_note/plugins/ai_context_plugin.dart';
+import 'package:free_note/plugins/builtin_plugins.dart';
+import 'package:free_note/plugins/plugin_manager.dart';
 import 'package:free_note/services/storage_service.dart';
 
 void main() {
@@ -82,6 +85,41 @@ void main() {
       final json = s.toJson();
       final restored = AppSettings.fromJson(json);
       expect(restored.languageCode, '');
+    });
+  });
+
+  group('v1.9.8b — AI plugin & chat resume', () {
+    test('AiContextPlugin parses a saved chat back into messages', () {
+      final chat = [
+        '! Free note ai chat',
+        '',
+        '# Chat 2026-07-15',
+        '',
+        '## User',
+        'Hello there',
+        '',
+        '## Assistant',
+        'Hi! How can I help?',
+        '',
+      ].join('\n');
+      final plugin = AiContextPlugin();
+      expect(plugin.isAiChat(chat), isTrue);
+      final msgs = plugin.parseMessages(chat);
+      expect(msgs.length, 2);
+      expect(msgs[0].role, 'user');
+      expect(msgs[0].text, 'Hello there');
+      expect(msgs[1].role, 'assistant');
+      expect(msgs[1].text, 'Hi! How can I help?');
+    });
+
+    test('AI features are gated on the builtin.aicontext plugin', () {
+      final manager = PluginManager();
+      manager.register(WordCountPlugin());
+      manager.register(AiContextPlugin());
+      expect(manager.isPluginEnabled('builtin.aicontext'), isTrue);
+      // Disabling the AI plugin flips the gate used by the editor.
+      manager.disable('builtin.aicontext');
+      expect(manager.isPluginEnabled('builtin.aicontext'), isFalse);
     });
   });
 }

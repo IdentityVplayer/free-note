@@ -6,22 +6,22 @@ import 'plugin_base.dart';
 /// Every chat saved by the AI assistant begins with this line.
 const String aiChatMagic = '! Free note ai chat';
 
-/// Built-in AI-context plugin — recognizes AI chat files produced by Free
-/// Note and turns them into resumable context for the AI assistant.
+/// Built-in AI plugin — powers the in-app AI assistant (writing assist + chat).
 ///
-/// When the editor opens a note whose content starts with [aiChatMagic], it
-/// shows an upload icon; tapping it calls [parseMessages] and opens the AI
-/// assistant pre-filled with the conversation.
+/// It is the single toggle that enables every AI feature in the editor:
+/// the AI writing menu and the in-file chat dialog. It also recognizes AI
+/// chat files (those whose content starts with [aiChatMagic]) and turns them
+/// into resumable conversations for the assistant.
 class AiContextPlugin extends FreeNotePlugin {
   @override
   String get id => 'builtin.aicontext';
 
   @override
-  String get name => 'AI Context';
+  String get name => 'AI Assistant';
 
   @override
   String get description =>
-      'Recognizes Free Note AI chat files; one tap fills the conversation into the AI assistant.';
+      'Enables in-app AI writing and chat. Recognizes AI chat notes and resumes them as conversations.';
 
   @override
   String get version => '1.0.0';

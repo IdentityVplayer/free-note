@@ -11,6 +11,7 @@ import '../markdown/math_markdown.dart';
 import 'subfolder_picker_screen.dart';
 import 'ai_assistant_screen.dart';
 import 'math_insert_screen.dart';
+import '../plugins/ai_context_plugin.dart';
 
 /// Editor screen — Markdown editing with live preview and AI tools.
 class EditorScreen extends StatefulWidget {
@@ -46,6 +47,15 @@ class _EditorScreenState extends State<EditorScreen>
     _contentController = TextEditingController(text: _note.content);
     _tagController = TextEditingController();
     WidgetsBinding.instance.addObserver(this);
+
+    // AI-generated note: auto-open the chat dialog with the conversation as
+    // context (and auto-save on close). Requires the AI plugin to be enabled.
+    if (_note.content.startsWith(aiChatMagic) &&
+        _provider.pluginManager.isPluginEnabled('builtin.aicontext')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openAiNoteDialog();
+      });
+    }
   }
 
   @override
@@ -251,18 +261,43 @@ class _EditorScreenState extends State<EditorScreen>
     }
   }
 
-  /// Open this note's content in the AI assistant as context (prepended to
-  /// the user's input on send). Any markdown file can be used this way.
-  void _openAiContext() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AIAssistantScreen(
-          initialContextContent: _note.content,
-          initialContextName: _note.relativePath ?? _note.title,
-        ),
+  /// Open the AI assistant as an in-file dialog, with this note's content as
+  /// the initial context. Powered by the AI plugin (gated in the app bar).
+  void _openAiDialog() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      pageBuilder: (ctx, _, _) => AIAssistantScreen(
+        initialContextContent: _note.content,
+        initialContextName: _note.relativePath ?? _note.title,
       ),
     );
+  }
+
+  /// Open an existing AI chat note: resume its conversation and open the chat
+  /// dialog over the editor. Closing auto-saves the conversation back into the
+  /// note (see AIAssistantScreen._handleBack).
+  void _openAiNoteDialog() {
+    final l10n = AppLocalizations.of(context)!;
+    final messages = AiContextPlugin().parseMessages(_note.content);
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      pageBuilder: (ctx, _, _) => AIAssistantScreen(
+        initialMessages: messages,
+        noteId: _note.id,
+        initialContextName: _note.relativePath ?? _note.title,
+      ),
+    ).then((result) {
+      if (result is String && result.isNotEmpty && mounted) {
+        _note = _note.copyWith(content: result, updatedAt: DateTime.now());
+        _contentController.text = result;
+        _hasChanges = false;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.t('aiNoteAutoSaved'))));
+      }
+    });
   }
 
   /// Open the dedicated LaTeX formula page; insert the resulting (wrapped)
@@ -375,6 +410,10 @@ class _EditorScreenState extends State<EditorScreen>
     final exportEnabled = provider.pluginManager.isPluginEnabled(
       'builtin.exporter',
     );
+    // AI is a plugin now — every AI entry point is gated on it.
+    final aiEnabled = provider.pluginManager.isPluginEnabled(
+      'builtin.aicontext',
+    );
 
     // Word count comes from the Word Count plugin — only show when enabled.
     Map<String, int> counts = const {};
@@ -405,16 +444,18 @@ class _EditorScreenState extends State<EditorScreen>
             tooltip: _isPreview ? l10n.t('edit') : l10n.t('preview'),
             onPressed: () => setState(() => _isPreview = !_isPreview),
           ),
-          IconButton(
-            icon: const Icon(Icons.upload_file),
-            tooltip: l10n.t('addToContext'),
-            onPressed: _openAiContext,
-          ),
-          IconButton(
-            icon: const Icon(Icons.auto_awesome),
-            tooltip: l10n.t('aiWriting'),
-            onPressed: _aiLoading ? null : _showAIMenu,
-          ),
+          if (aiEnabled)
+            IconButton(
+              icon: const Icon(Icons.upload_file),
+              tooltip: l10n.t('aiChat'),
+              onPressed: _openAiDialog,
+            ),
+          if (aiEnabled)
+            IconButton(
+              icon: const Icon(Icons.auto_awesome),
+              tooltip: l10n.t('aiWriting'),
+              onPressed: _aiLoading ? null : _showAIMenu,
+            ),
           if (exportEnabled)
             IconButton(
               icon: const Icon(Icons.download),

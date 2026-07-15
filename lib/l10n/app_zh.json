@@ -173,5 +173,7 @@
   "importFailed": "导入失败：{0}",
   "noFolderForExport": "导出前请先选择笔记文件夹。",
   "importOverwriteConfirm": "导入会将文件合并到当前文件夹，并覆盖同名文件。是否继续？",
-  "dataBackup": "数据备份"
+  "dataBackup": "数据备份",
+  "aiChat": "AI 对话",
+  "aiNoteAutoSaved": "对话已自动保存到笔记"
 }

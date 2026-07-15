@@ -173,5 +173,7 @@
   "importFailed": "読み込みに失敗しました: {0}",
   "noFolderForExport": "書き出す前にノートフォルダを選択してください。",
   "importOverwriteConfirm": "インポートすると現在のフォルダに統合され、同名ファイルは上書きされます。続行しますか？",
-  "dataBackup": "データバックアップ"
+  "dataBackup": "データバックアップ",
+  "aiChat": "AIチャット",
+  "aiNoteAutoSaved": "会話をノートに自動保存しました"
 }
