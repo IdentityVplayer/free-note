@@ -29,14 +29,37 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystorePropertiesFile = rootProject.file("key.properties")
-            if (keystorePropertiesFile.exists()) {
-                // Parse key.properties with plain Kotlin (no java.util/java.io
-                // imports, which Gradle's Kotlin DSL does not expose here).
-                val props = keystorePropertiesFile.readLines()
-                    .map { it.split("=", limit = 2) }
-                    .filter { it.size == 2 }
-                    .associate { it[0].trim() to it[1].trim() }
+            // Secret injection: prefer environment variables (CI repository
+            // secrets, or a local `export` before `flutter build`). Falls back
+            // to the untracked, gitignored `android/key.properties` for local
+            // dev. Never commit keystore passwords — see .gitignore.
+            val envAlias = System.getenv("UPLOAD_KEY_ALIAS")
+            val envKeyPass = System.getenv("UPLOAD_KEY_PASSWORD")
+            val envStorePass = System.getenv("UPLOAD_STORE_PASSWORD")
+            val envStoreFile = System.getenv("UPLOAD_STORE_FILE")
+
+            val props = if (envAlias != null && envKeyPass != null &&
+                envStorePass != null && envStoreFile != null
+            ) {
+                mapOf(
+                    "keyAlias" to envAlias,
+                    "keyPassword" to envKeyPass,
+                    "storePassword" to envStorePass,
+                    "storeFile" to envStoreFile,
+                )
+            } else {
+                val keystorePropertiesFile = rootProject.file("key.properties")
+                if (!keystorePropertiesFile.exists()) {
+                    null
+                } else {
+                    keystorePropertiesFile.readLines()
+                        .map { it.split("=", limit = 2) }
+                        .filter { it.size == 2 }
+                        .associate { it[0].trim() to it[1].trim() }
+                }
+            }
+
+            if (props != null) {
                 keyAlias = props["keyAlias"]
                 keyPassword = props["keyPassword"]
                 storeFile = file(props["storeFile"]!!)
@@ -47,7 +70,8 @@ android {
 
     buildTypes {
         release {
-            // Sign release builds with the upload key (android/key.properties).
+            // Sign release builds via injected secrets (env vars) or the
+            // untracked local key.properties fallback.
             signingConfig = signingConfigs.getByName("release")
         }
     }
