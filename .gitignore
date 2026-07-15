@@ -50,3 +50,6 @@ android/key.properties
 /android/app/key.jks
 /android/app/*.jks
 !/android/app/src/main/res/**/*.jks
+
+# Android build output
+android/build/
