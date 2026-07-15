@@ -175,5 +175,8 @@
   "importOverwriteConfirm": "导入会将文件合并到当前文件夹，并覆盖同名文件。是否继续？",
   "dataBackup": "数据备份",
   "aiChat": "AI 对话",
-  "aiNoteAutoSaved": "对话已自动保存到笔记"
+  "aiNoteAutoSaved": "对话已自动保存到笔记",
+  "pluginSnippet": "插入片段",
+  "pluginSnippetHint": "点击工具栏按钮时插入到光标处的文本",
+  "resumeChat": "继续对话"
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:free_note/models/settings.dart';
 import 'package:free_note/models/plugin.dart';
@@ -29,6 +30,34 @@ void main() {
       expect(restored.userPlugins.length, 1);
       expect(restored.userPlugins.first.id, 'user.demo_123');
       expect(restored.userPlugins.first.type, PluginType.utility);
+    });
+
+    test('PluginInfo.snippet round-trips through JSON', () {
+      final info = PluginInfo(
+        id: 'user.snip_1',
+        name: 'Snippet',
+        description: 'A snippet plugin',
+        version: '1.0.0',
+        author: 'User',
+        type: PluginType.editor,
+        snippet: '>> TODO: ',
+      );
+      final json = info.toJson();
+      expect(json['snippet'], '>> TODO: ');
+
+      final restored = PluginInfo.fromJson(json);
+      expect(restored.snippet, '>> TODO: ');
+
+      // A plugin without a snippet serializes snippet as null and restores it.
+      final plain = PluginInfo(
+        id: 'user.plain_1',
+        name: 'Plain',
+        description: 'd',
+        version: '1.0.0',
+        author: 'User',
+        type: PluginType.utility,
+      );
+      expect(PluginInfo.fromJson(plain.toJson()).snippet, isNull);
     });
 
     test('UserPlugin reconstructs from PluginInfo and id is detected', () {
@@ -120,6 +149,99 @@ void main() {
       // Disabling the AI plugin flips the gate used by the editor.
       manager.disable('builtin.aicontext');
       expect(manager.isPluginEnabled('builtin.aicontext'), isFalse);
+    });
+  });
+
+  group('v2.0.0 — UserPlugin real UI & editor toolbar', () {
+    testWidgets('editor user plugin with snippet builds a toolbar button',
+        (tester) async {
+      Widget? built;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) {
+              built = UserPlugin(
+                id: 'user.ed_1',
+                name: 'Quick Note',
+                description: 'd',
+                type: PluginType.editor,
+                snippet: 'TODO: ',
+              ).buildWidget(ctx);
+              return built!;
+            },
+          ),
+        ),
+      );
+      expect(built, isA<IconButton>());
+      expect(find.byType(IconButton), findsOneWidget);
+    });
+
+    testWidgets('non-editor / snippet-less user plugins build no widget',
+        (tester) async {
+      Widget? editorBuilt;
+      Widget? utilityBuilt;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) {
+              editorBuilt = UserPlugin(
+                id: 'user.ed_2',
+                name: 'NoSnippet',
+                description: 'd',
+                type: PluginType.editor,
+              ).buildWidget(ctx);
+              utilityBuilt = UserPlugin(
+                id: 'user.u_1',
+                name: 'Util',
+                description: 'd',
+                type: PluginType.utility,
+              ).buildWidget(ctx);
+              return Container();
+            },
+          ),
+        ),
+      );
+      expect(editorBuilt, isNull);
+      expect(utilityBuilt, isNull);
+    });
+
+    testWidgets('PluginManager.buildWidgets yields only user editor buttons',
+        (tester) async {
+      final manager = PluginManager();
+      manager.register(WordCountPlugin()); // builtin -> null, excluded
+      manager.register(
+        UserPlugin(
+          id: 'user.ed_3',
+          name: 'Snip',
+          description: 'd',
+          type: PluginType.editor,
+          snippet: 'x',
+        ),
+      );
+      List<Widget>? widgets;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) {
+              widgets = manager.buildWidgets(ctx);
+              return Container();
+            },
+          ),
+        ),
+      );
+      expect(widgets, hasLength(1));
+      expect(widgets!.first, isA<IconButton>());
+    });
+
+    test('UserPlugin.info carries the snippet', () {
+      final plugin = UserPlugin(
+        id: 'user.ed_4',
+        name: 'Snip',
+        description: 'd',
+        type: PluginType.editor,
+        snippet: 'hello',
+      );
+      expect(plugin.info.snippet, 'hello');
     });
   });
 }

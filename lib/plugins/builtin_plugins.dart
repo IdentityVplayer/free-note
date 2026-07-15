@@ -36,9 +36,7 @@ class WordCountPlugin extends FreeNotePlugin {
   }
 
   @override
-  Widget? buildWidget(BuildContext context) {
-    return const SizedBox.shrink(); // Integrated into editor screen directly.
-  }
+  Widget? buildWidget(BuildContext context) => null; // Integrated into editor screen directly.
 }
 
 /// Built-in text formatter plugin — provides quick markdown formatting.

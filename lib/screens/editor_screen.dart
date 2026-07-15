@@ -12,6 +12,7 @@ import 'subfolder_picker_screen.dart';
 import 'ai_assistant_screen.dart';
 import 'math_insert_screen.dart';
 import '../plugins/ai_context_plugin.dart';
+import '../plugins/plugin_host.dart';
 
 /// Editor screen — Markdown editing with live preview and AI tools.
 class EditorScreen extends StatefulWidget {
@@ -38,6 +39,9 @@ class _EditorScreenState extends State<EditorScreen>
   void initState() {
     super.initState();
     _provider = context.read<AppProvider>();
+    // Register the insert hook so user "editor" plugins can inject their
+    // snippet at the caret via PluginHost. Cleared in dispose().
+    PluginHost.insertHandler = _insertAtCursor;
     if (widget.noteId != null) {
       _note = _provider.getNote(widget.noteId!) ?? _provider.createNote();
     } else {
@@ -62,6 +66,8 @@ class _EditorScreenState extends State<EditorScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _autoSaveIfEnabled();
+    // Detach the insert hook so no stale closure outlives this editor.
+    PluginHost.insertHandler = null;
     _titleController.dispose();
     _contentController.dispose();
     _tagController.dispose();
@@ -572,6 +578,8 @@ class _EditorScreenState extends State<EditorScreen>
                     () => _openMathPage(),
                     hint: l10n.t('math'),
                   ),
+                  // User "editor" plugins render their insert buttons here.
+                  ...provider.pluginManager.buildWidgets(context),
                 ],
               ),
             ),

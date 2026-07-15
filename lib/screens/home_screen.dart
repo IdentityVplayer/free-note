@@ -10,6 +10,7 @@ import 'editor_screen.dart';
 import 'settings_screen.dart';
 import 'plugins_screen.dart';
 import 'ai_assistant_screen.dart';
+import '../plugins/ai_context_plugin.dart';
 
 /// Main screen — shows a list of notes with search, app bar actions.
 class HomeScreen extends StatefulWidget {
@@ -313,17 +314,39 @@ class _HomeScreenState extends State<HomeScreen> {
     AppProvider provider,
     Note note,
   ) {
+    // AI chat notes (content starts with the magic line) get a badge and a
+    // "resume chat" affordance when the AI plugin is enabled.
+    final isAiChat = AiContextPlugin().isAiChat(note.content);
+    final aiEnabled = provider.pluginManager.isPluginEnabled(
+      'builtin.aicontext',
+    );
+
     return Card(
       child: ListTile(
-        leading: note.isFavorite
-            ? const Icon(Icons.star, color: Colors.amber)
-            : const Icon(Icons.note_outlined),
+        leading: isAiChat
+            ? Icon(
+                Icons.auto_awesome,
+                color: Theme.of(context).colorScheme.primary,
+              )
+            : (note.isFavorite
+                ? const Icon(Icons.star, color: Colors.amber)
+                : const Icon(Icons.note_outlined)),
         title: Row(
           children: [
             if (note.isPinned)
               const Padding(
                 padding: EdgeInsets.only(right: 4),
                 child: Icon(Icons.push_pin, size: 16, color: Colors.blue),
+              ),
+            if (isAiChat)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Chip(
+                  label: const Text('AI', style: TextStyle(fontSize: 10)),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
             Expanded(
               child: Text(
@@ -356,32 +379,56 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ],
         ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            switch (value) {
-              case 'pin':
-                provider.togglePin(note.id);
-                break;
-              case 'favorite':
-                provider.toggleFavorite(note.id);
-                break;
-              case 'delete':
-                _confirmDelete(context, provider, note.id);
-                break;
-            }
-          },
-          itemBuilder: (_) => [
-            PopupMenuItem(
-              value: 'pin',
-              child: Text(note.isPinned ? l10n.t('unpin') : l10n.t('pin')),
-            ),
-            PopupMenuItem(
-              value: 'favorite',
-              child: Text(
-                note.isFavorite ? l10n.t('unfavorite') : l10n.t('favorite'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isAiChat && aiEnabled)
+              IconButton(
+                icon: const Icon(Icons.chat),
+                tooltip: l10n.t('resumeChat'),
+                onPressed: () => _resumeAiChat(note, l10n),
               ),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                switch (value) {
+                  case 'resume':
+                    _resumeAiChat(note, l10n);
+                    break;
+                  case 'pin':
+                    provider.togglePin(note.id);
+                    break;
+                  case 'favorite':
+                    provider.toggleFavorite(note.id);
+                    break;
+                  case 'delete':
+                    _confirmDelete(context, provider, note.id);
+                    break;
+                }
+              },
+              itemBuilder: (_) => [
+                if (isAiChat && aiEnabled)
+                  PopupMenuItem(
+                    value: 'resume',
+                    child: Text(l10n.t('resumeChat')),
+                  ),
+                PopupMenuItem(
+                  value: 'pin',
+                  child: Text(note.isPinned ? l10n.t('unpin') : l10n.t('pin')),
+                ),
+                PopupMenuItem(
+                  value: 'favorite',
+                  child: Text(
+                    note.isFavorite
+                        ? l10n.t('unfavorite')
+                        : l10n.t('favorite'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text(l10n.t('deleteNote')),
+                ),
+              ],
             ),
-            PopupMenuItem(value: 'delete', child: Text(l10n.t('deleteNote'))),
           ],
         ),
         onTap: () => Navigator.push(
@@ -390,6 +437,28 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  /// Resume an AI chat note from the home screen: open the in-file dialog with
+  /// its conversation pre-loaded. Closing auto-saves the conversation back into
+  /// the note (handled inside AIAssistantScreen when [noteId] is set).
+  void _resumeAiChat(Note note, AppLocalizations l10n) {
+    final messages = AiContextPlugin().parseMessages(note.content);
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      pageBuilder: (ctx, _, _) => AIAssistantScreen(
+        initialMessages: messages,
+        noteId: note.id,
+        initialContextName: note.relativePath ?? note.title,
+      ),
+    ).then((result) {
+      if (result is String && result.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.t('aiNoteAutoSaved'))));
+      }
+    });
   }
 
   /// A labelled mini action shown above the main FAB when the menu is open.

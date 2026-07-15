@@ -160,7 +160,7 @@ abstract class GitHubSyncHost {
 
 1. 在 `lib/l10n/app_en.json` / `app_zh.json` / `app_ja.json` 各加一个 key。
 2. 用 `AppLocalizations.of(context)!.t('yourKey')` 取文案。
-3. 三个文件必须**同步**保持 key 数量一致（当前 148 个），否则 CI 会挂。
+3. 三个文件必须**同步**保持 key 数量一致（当前 180 个），否则 CI 会挂。
 
 ---
 
@@ -187,7 +187,13 @@ flutter test         # 全绿
 
 ## 9. 用户自建插件（运行时添加）
 
-「插件」页右上角的 **+** 按钮允许用户在运行时添加**用户插件**（轻量级描述型插件）。
+「插件」页右上角的 **+** 按钮允许用户在运行时添加**用户插件**（轻量级插件）。
 它们存于 `AppSettings.userPlugins`，`AppProvider` 在 `init()` 时复原并注册，可长按卡片删除。
-这类插件是 `UserPlugin` 实例（见 `lib/plugins/user_plugin.dart`），目前仅承载元信息展示与开关——
-若要让用户插件承载真实逻辑，需扩展 `UserPlugin`（例如加载脚本/模板），本文档聚焦「代码级内置插件」。
+这类插件是 `UserPlugin` 实例（见 `lib/plugins/user_plugin.dart`）。
+
+**从 v1.10.0 起，用户插件可承载真实 UI：**
+- 添加时若类型选 **editor**，对话框会多出一个「插入片段」输入框（`pluginSnippet` / `pluginSnippetHint`）。
+- 该片段存入 `PluginInfo.snippet`（随设置持久化）。启用后，`UserPlugin.buildWidget` 会返回一个**真实的工具栏按钮**，点击经 `PluginHost.insertHandler`（编辑器在 `initState` 注册的插入回调）把片段插入光标处。
+- 这样用户插件不再是纯元信息壳，而是一个可用的「片段插入工具」；其它类型仍只作开关（暂无安全的声明式 UI）。
+
+> 设计要点：`PluginHost`（`lib/plugins/plugin_host.dart`）是一个静态回调桥，让插件在不 import `AppProvider`（避免循环依赖）的前提下把文本注入编辑器，契约上与 `GitHubSyncHost` 一致。

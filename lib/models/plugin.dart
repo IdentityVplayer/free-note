@@ -9,6 +9,11 @@ class PluginInfo {
   final PluginType type;
   final bool hasSettings;
 
+  /// Optional insert text for user ("editor"-type) plugins. When set, the
+  /// plugin renders a real toolbar button in the editor that inserts this
+  /// snippet at the caret. null for plugins that carry no snippet.
+  final String? snippet;
+
   const PluginInfo({
     required this.id,
     required this.name,
@@ -18,6 +23,7 @@ class PluginInfo {
     this.isEnabled = true,
     required this.type,
     this.hasSettings = false,
+    this.snippet,
   });
 
   Map<String, dynamic> toJson() => {
@@ -29,6 +35,7 @@ class PluginInfo {
     'isEnabled': isEnabled,
     'type': type.name,
     'hasSettings': hasSettings,
+    'snippet': snippet,
   };
 
   factory PluginInfo.fromJson(Map<String, dynamic> json) => PluginInfo(
@@ -43,6 +50,7 @@ class PluginInfo {
       orElse: () => PluginType.utility,
     ),
     hasSettings: json['hasSettings'] as bool? ?? false,
+    snippet: json['snippet'] as String?,
   );
 }
 

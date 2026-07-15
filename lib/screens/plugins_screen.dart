@@ -61,6 +61,7 @@ class PluginsScreen extends StatelessWidget {
     Future<void> showAddDialog() async {
       final nameCtl = TextEditingController();
       final descCtl = TextEditingController();
+      final snippetCtl = TextEditingController();
       PluginType selected = PluginType.utility;
 
       await showDialog<void>(
@@ -106,6 +107,19 @@ class PluginsScreen extends StatelessWidget {
                         .toList(),
                     onChanged: (v) => setDState(() => selected = v!),
                   ),
+                  if (selected == PluginType.editor) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: snippetCtl,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: l10n.t('pluginSnippet'),
+                        hintText: l10n.t('pluginSnippetHint'),
+                        border: const OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -116,10 +130,12 @@ class PluginsScreen extends StatelessWidget {
               ),
               FilledButton(
                 onPressed: () {
+                  final snippet = snippetCtl.text.trim();
                   final id = provider.addUserPlugin(
                     name: nameCtl.text,
                     description: descCtl.text,
                     type: selected,
+                    snippet: snippet.isEmpty ? null : snippet,
                   );
                   Navigator.pop(dctx);
                   if (id != null && context.mounted) {

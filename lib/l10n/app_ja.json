@@ -175,5 +175,8 @@
   "importOverwriteConfirm": "インポートすると現在のフォルダに統合され、同名ファイルは上書きされます。続行しますか？",
   "dataBackup": "データバックアップ",
   "aiChat": "AIチャット",
-  "aiNoteAutoSaved": "会話をノートに自動保存しました"
+  "aiNoteAutoSaved": "会話をノートに自動保存しました",
+  "pluginSnippet": "挿入スニペット",
+  "pluginSnippetHint": "ツールバーボタンをタップするとカーソル位置に挿入されるテキスト",
+  "resumeChat": "続きを話す"
 }

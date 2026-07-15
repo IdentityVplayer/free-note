@@ -175,5 +175,8 @@
   "importOverwriteConfirm": "Importing will merge files into the current folder and overwrite same-named files. Continue?",
   "dataBackup": "Data backup",
   "aiChat": "AI Chat",
-  "aiNoteAutoSaved": "Conversation auto-saved to note"
+  "aiNoteAutoSaved": "Conversation auto-saved to note",
+  "pluginSnippet": "Insert snippet",
+  "pluginSnippetHint": "Text inserted at the caret when the toolbar button is tapped",
+  "resumeChat": "Resume chat"
 }

@@ -4,6 +4,12 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.10.0
+
+### New Features
+- **用户插件真正挂载 UI** — 在「插件」页用「+」添加的**编辑器类（editor）**用户插件，现在可以填写一段「插入片段」文本。启用后，编辑器工具栏会渲染一个**真实按钮**，点击即把该片段插入到光标处（经由新增的 `PluginHost` 回调，插件无需依赖 `AppProvider`）。`PluginInfo` 新增 `snippet` 字段并随 `userPlugins` 持久化；`WordCountPlugin.buildWidget` 改回 `null`，让 `PluginManager.buildWidgets` 只产出用户插件按钮。
+- **首页 AI 笔记标识与续聊** — 首页笔记列表中，内容以 `! Free note ai chat` 开头的 **AI 笔记**现在显示 **AI 图标 + 「AI」徽标**；在 AI 插件（builtin.aicontext）启用时，卡片右侧出现「继续对话」按钮（并加入长按菜单），可直接打开文件内对话界面，关闭后对话自动回存该笔记。
+
 ## 1.9.9
 
 ### Changed

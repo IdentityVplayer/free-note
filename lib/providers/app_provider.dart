@@ -284,10 +284,12 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
 
   /// Add a user-created plugin and persist it so it survives restarts.
   /// Returns the generated plugin id, or null if [name] is empty.
+  /// [snippet] is an optional insert text used by "editor"-type plugins.
   String? addUserPlugin({
     required String name,
     required String description,
     required PluginType type,
+    String? snippet,
   }) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return null;
@@ -297,6 +299,7 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
       name: trimmed,
       description: description.trim(),
       type: type,
+      snippet: snippet,
     );
     pluginManager.register(plugin);
     final updated = List<PluginInfo>.from(_settings.userPlugins)
