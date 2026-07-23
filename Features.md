@@ -4,6 +4,25 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.12.0
+
+### New Features
+- **设置 → 关于：给我提 Issue & 检查更新** — 关于页新增「给我提 Issue」按钮（跳转仓库 Issues 新建页），以及「检查更新」：启动时/手动点击会比对 GitHub Releases 最新版本，若大于当前版本则弹窗展示更新内容并给出「下载 / 暂不下载」按钮（`GitHubSyncService.fetchLatestRelease` + `package_info_plus`）。
+- **配置统一进 `.config` 并自动迁移** — 所有配置文件（API KEY、GitHub Sync 等）统一存到仓库根目录 `.config` 下；老用户首次启动，`settings.json` / `tasks.json` / `pomodoro.json` 自动从应用私有目录迁入仓库 `.config/`（`StorageService.migrateFileFromPrivate` + 迁移守卫）。
+- **「选择文件夹」→「选择仓库」** — 术语统一更名；设置里改用菜单存储打开过的**所有仓库**，可一键切换，当前仓库实时显示（`Settings.repositories` + `chooseFolder` 记录 + 仓库切换对话框）。仅顶层术语改名，真实子文件夹保留原「文件夹」称呼。
+- **逐行混合编辑器** — 去除编辑/预览模式切换：文件不编辑时自动预览，编辑时**仅正在编辑的那一行为原文**，其余行均为预览（`editor_screen.dart` + `lib/utils/text_edit.dart`）。
+- **AI 写作 → AI 问答（分屏）** — 文件内容缩到上半屏，AI 窗口在下半屏；上半屏长按可选择文本，也可**拖拽到下方 AI 窗口**追加到光标后（`AiQaScreen` + `AIAssistantScreen(embedded:true)` + `LongPressDraggable`/`DragTarget`）。
+- **底部 Dock 三栏布局** — 番茄钟与计划任务移到屏幕下方，笔记单独居中一栏：**左计划任务、右番茄钟**（底部 `NavigationBar` 三标签：任务 / 笔记 / 番茄钟）。
+- **计划任务：主任务 / 子任务** — 右下角「+」创建主任务，点开主任务后「+」创建子任务；子任务全部完成时主任务自动完成（可在设置中开关 `autoCompleteMainTasks`）。
+- **任务提醒 & 重复** — 计划任务新增「提醒」（Android/iOS/macOS/Linux 真实系统通知，`flutter_local_notifications`）与「重复」（按 小时/天/周/月/年 到期后自动重生一份全子任务未完成的副本，`respawnDueRepeats` 应用启动时执行）。
+
+### Fixed
+- **主界面「AI 聊天」总显示未配置密钥** — 无论是否配置密钥，提示语都错误地显示未配置；现改为按密钥实际配置状态门控。
+
+### Notes
+- i18n 三语对齐：en / zh / ja 各新增约 33 个键（共 **243**），覆盖上述全部界面文案。
+- **Windows Toast 递延**：当前 `flutter_local_notifications` 缓存版无 Windows 初始化支持，Windows 端原生通知提醒推迟到后续版本；重复任务因 `respawnDueRepeats` 在应用启动时运行，即使无 OS 投递也能正常重生。
+
 ## 1.11.0
 
 ### Fixed
