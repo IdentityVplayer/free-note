@@ -10,6 +10,8 @@ import 'editor_screen.dart';
 import 'settings_screen.dart';
 import 'plugins_screen.dart';
 import 'ai_assistant_screen.dart';
+import 'task_plan_screen.dart';
+import 'pomodoro_screen.dart';
 import '../plugins/ai_context_plugin.dart';
 
 /// Main screen — shows a list of notes with search, app bar actions.
@@ -117,6 +119,22 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AIAssistantScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.checklist),
+            tooltip: l10n.t('taskPlan'),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TaskPlanScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.timer),
+            tooltip: l10n.t('pomodoro'),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PomodoroScreen()),
             ),
           ),
           IconButton(

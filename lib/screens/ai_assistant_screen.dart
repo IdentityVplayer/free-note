@@ -83,11 +83,6 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         ? _currentModel
         : null;
 
-    // Prepend the loaded context file's content before the user's question.
-    final prompt = (_contextContent != null && _contextContent!.isNotEmpty)
-        ? '${_contextContent!}\n\n$question'
-        : question;
-
     setState(() {
       _messages.add(ChatMessage(role: 'user', text: question));
       _loading = true;
@@ -95,9 +90,25 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     });
     _scrollToBottom();
 
+    // Prior conversation turns (resumed AI chat .md) become the model's
+    // history so it keeps the context of the note. The current user question
+    // (just appended as the last item) is sent separately as `question`,
+    // and any loaded context file is passed through `context`.
+    final history = _messages.length > 1
+        ? _messages
+            .sublist(0, _messages.length - 1)
+            .map((m) => <String, String>{'role': m.role, 'content': m.text})
+            .toList()
+        : null;
+
     final answer = await (() async {
       try {
-        return await provider.aiService.ask(prompt, model: modelOverride);
+        return await provider.aiService.ask(
+          question,
+          context: _contextContent,
+          model: modelOverride,
+          history: history,
+        );
       } on AIException catch (e) {
         return '⚠️ ${e.message}';
       }

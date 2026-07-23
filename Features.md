@@ -4,6 +4,22 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.11.0
+
+### Fixed
+- **AI 对话的 md 文件现在真正作为上下文** — 之前 `AIService.ask` 是无状态的：每次调用只把「系统提示 +（上下文 + 最新问题）」发给模型，续聊一个 AI 笔记（以 `! Free note ai chat` 开头的 `.md`）时，界面虽然展示了历史对话，但模型只收到最后一句提问，前面的多轮内容全部丢失。现 `ask` 新增 `history` 参数，把**已保存对话的前几轮**作为历史消息一并回传；`AIAssistantScreen._ask` 在续聊时会从内存里已有消息（除最后一条刚追加的当前提问外）构建 `history` 并传入，模型因此能「记住」整段 md 对话。
+
+### New Features
+- **任务计划（Task Plan）** — 首页顶栏新增清单图标入口，进入独立任务页：
+  - 新增 / 编辑任务（标题、截止日期、优先级 高/中/低），支持勾选完成、删除（带确认）。
+  - 每个任务可**关联一篇笔记**（从笔记列表里选），卡片上显示笔记标题，点击即跳转到对应笔记编辑器。
+  - 列表排序：未完成先于已完成，再按优先级（高→低），再到期日（早→晚）。
+  - 任务持久化到应用私有目录的 `tasks.json`，重启不丢；新增 `Task` 模型与 `TaskService`。
+- **番茄钟（Pomodoro）** — 首页顶栏新增计时器图标入口，进入独立计时页：
+  - 自动在「专注 → 短休息 → 专注 → … → 每 N 个专注后长休息」之间循环（默认 N=4），圆形进度环实时显示剩余时间，并统计已完成的专注次数。
+  - 时长可在「计时设置」里自定义（专注 / 短休息 / 长休息 分钟数 + 长休息间隔），配置持久化到 `pomodoro.json`；新增 `PomodoroConfig` / `PomodoroService` 与 `nextPomodoroPhase` 阶段推进逻辑。
+- **i18n 三语对齐** — en / zh / ja 各新增 30 个键（共 210），覆盖任务计划与番茄钟的全部界面文案。
+
 ## 1.10.0
 
 ### New Features

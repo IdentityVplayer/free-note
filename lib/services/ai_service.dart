@@ -51,7 +51,17 @@ class AIService {
   ///
   /// [model] optionally overrides the service's configured model for this
   /// single call — used by the in-conversation model switcher.
-  Future<String> ask(String question, {String? context, String? model}) async {
+  ///
+  /// [history] carries the prior conversation turns (each `{'role','content'}`)
+  /// so a resumed AI chat note is sent back to the model as context —
+  /// without it, only the latest question reaches the API and the model
+  /// loses the conversation stored in the .md file.
+  Future<String> ask(
+    String question, {
+    String? context,
+    String? model,
+    List<Map<String, String>>? history,
+  }) async {
     if (!isConfigured) {
       throw const AIException('AI 未配置：请先在「设置 → AI」中填写 API Key。');
     }
@@ -65,14 +75,18 @@ class AIService {
               'Provide clear, concise, and useful responses. Support markdown formatting.',
         },
       ];
+      // Prior conversation turns (resuming a saved chat). Sent back so the
+      // model keeps the context of the .md chat file.
+      if (history != null && history.isNotEmpty) {
+        messages.addAll(history);
+      }
       if (context != null && context.isNotEmpty) {
         messages.add({
           'role': 'user',
-          'content': 'Context:\n$context\n\nQuestion: $question',
+          'content': 'Context:\n$context',
         });
-      } else {
-        messages.add({'role': 'user', 'content': question});
       }
+      messages.add({'role': 'user', 'content': question});
 
       final response = await http
           .post(

@@ -1,7 +1,7 @@
 name: free_note
 description: "Free Note - A multifunctional cross-platform note-taking app with Markdown, Plugins, AI, GitHub Sync, i18n and Dark Mode."
 publish_to: 'none'
-version: 1.10.0+28
+version: 1.11.0+29
 
 environment:
   sdk: ^3.12.2
