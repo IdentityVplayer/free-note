@@ -225,5 +225,6 @@
   "repositoryNeedFolder": "設定でリポジトリを選択してください",
   "defaultRepository": "デフォルト",
   "aiQa": "AI 質問応答",
-  "aiQaDragHint": "ノートの文字を長押しで選択し、ここにドラッグするとカーソルの後ろに追加されます。"
+  "aiQaDragHint": "ノートの文字を長押しで選択し、ここにドラッグするとカーソルの後ろに追加されます。",
+  "minutesUnit": "分"
 }

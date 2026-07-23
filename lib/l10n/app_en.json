@@ -225,5 +225,6 @@
   "repositoryNeedFolder": "Select a repository in Settings first",
   "defaultRepository": "Default",
   "aiQa": "AI Q&A",
-  "aiQaDragHint": "Long-press text in the note, then drag it up here to append after the cursor."
+  "aiQaDragHint": "Long-press text in the note, then drag it up here to append after the cursor.",
+  "minutesUnit": "min"
 }

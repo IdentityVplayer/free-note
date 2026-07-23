@@ -225,5 +225,6 @@
   "repositoryNeedFolder": "请先在设置中选择仓库",
   "defaultRepository": "默认",
   "aiQa": "AI 问答",
-  "aiQaDragHint": "长按笔记中的文字并拖到此处，即可追加到光标后。"
+  "aiQaDragHint": "长按笔记中的文字并拖到此处，即可追加到光标后。",
+  "minutesUnit": "分钟"
 }

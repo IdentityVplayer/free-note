@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import '../models/note.dart';
+import '../models/task.dart';
 import '../providers/app_provider.dart';
 import '../services/storage_service.dart';
+import '../services/task_service.dart';
+import '../services/pomodoro_service.dart';
 import '../l10n/app_localizations.dart';
 import 'editor_screen.dart';
 import 'settings_screen.dart';
@@ -25,6 +28,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   bool _fabOpen = false;
+
+  /// Bottom dock tab: 0 = 计划任务 (left), 1 = 笔记 (center), 2 = 番茄钟 (right).
+  int _bottomIndex = 1;
 
   /// Folder keys that are currently expanded (collapsed by default).
   final Set<String> _expanded = {};
@@ -190,69 +196,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      body: provider.isLoading && provider.notes.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : filteredNotes.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.note_add,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    l10n.t('noNotes'),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.t('noNotesHint'),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
+      body: _bottomIndex == 1
+          ? _buildNotesList(
+              l10n,
+              provider,
+              filteredNotes,
+              rootNotes,
+              folders,
+              sortedKeys,
             )
-          : ListView(
-              padding: const EdgeInsets.all(8),
-              children: [
-                ...rootNotes.map(
-                  (note) => _buildNoteCard(context, l10n, provider, note),
-                ),
-                ...sortedKeys.expand(
-                  (key) => [
-                    _buildFolderHeader(context, key),
-                    if (_expanded.contains(key))
-                      ...(folders[key]?.isEmpty ?? true
-                          ? [
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 16,
-                                  top: 4,
-                                  bottom: 8,
-                                ),
-                                child: Text(
-                                  l10n.t('repositoryEmpty'),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
-                            ]
-                          : folders[key]!
-                                .map(
-                                  (note) => _buildNoteCard(
-                                    context,
-                                    l10n,
-                                    provider,
-                                    note,
-                                  ),
-                                )
-                                .toList()),
-                  ],
-                ),
-              ],
-            ),
+          : _bottomIndex == 0
+          ? _buildTasksDock(l10n)
+          : _buildPomodoroDock(l10n),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -279,6 +234,245 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _bottomIndex,
+        onDestinationSelected: (i) => setState(() => _bottomIndex = i),
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.checklist),
+            label: l10n.t('taskPlan'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.note),
+            label: l10n.t('notes'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.timer),
+            label: l10n.t('pomodoro'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Notes list (center dock tab) — the original home body.
+  Widget _buildNotesList(
+    AppLocalizations l10n,
+    AppProvider provider,
+    List<Note> filteredNotes,
+    List<Note> rootNotes,
+    Map<String, List<Note>> folders,
+    List<String> sortedKeys,
+  ) {
+    if (provider.isLoading && provider.notes.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (filteredNotes.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.note_add,
+              size: 64,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.t('noNotes'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.t('noNotesHint'),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(8),
+      children: [
+        ...rootNotes.map(
+          (note) => _buildNoteCard(context, l10n, provider, note),
+        ),
+        ...sortedKeys.expand(
+          (key) => [
+            _buildFolderHeader(context, key),
+            if (_expanded.contains(key))
+              ...(folders[key]?.isEmpty ?? true
+                  ? [
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: 16,
+                          top: 4,
+                          bottom: 8,
+                        ),
+                        child: Text(
+                          l10n.t('repositoryEmpty'),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ]
+                  : folders[key]!
+                      .map(
+                        (note) => _buildNoteCard(
+                          context,
+                          l10n,
+                          provider,
+                          note,
+                        ),
+                      )
+                      .toList()),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Task Planning quick view (left dock tab): list tasks, toggle done inline,
+  /// tap the header to open the full planner.
+  Widget _buildTasksDock(AppLocalizations l10n) {
+    return FutureBuilder<List<Task>>(
+      future: TaskService.instance.loadTasks(),
+      builder: (ctx, snap) {
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final tasks = snap.data!;
+        return ListView(
+          padding: const EdgeInsets.all(8),
+          children: [
+            ListTile(
+              leading: const Icon(Icons.checklist),
+              title: Text(
+                l10n.t('taskPlan'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              trailing: const Icon(Icons.open_in_full),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TaskPlanScreen()),
+              ),
+            ),
+            if (tasks.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: Text(
+                    l10n.t('taskEmpty'),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              )
+            else
+              ...tasks.map(
+                (t) => CheckboxListTile(
+                  title: Text(
+                    t.title,
+                    style: t.done
+                        ? const TextStyle(
+                            decoration: TextDecoration.lineThrough,
+                          )
+                        : null,
+                  ),
+                  value: t.done,
+                  onChanged: (v) => _toggleTaskDone(t, v ?? false),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleTaskDone(Task task, bool done) async {
+    final tasks = await TaskService.instance.loadTasks();
+    final updated = tasks
+        .map((t) => t.id == task.id ? t.copyWith(done: done) : t)
+        .toList();
+    await TaskService.instance.saveTasks(updated);
+    if (mounted) setState(() {});
+  }
+
+  /// Pomodoro quick view (right dock tab): shows the configured intervals and
+  /// opens the full timer.
+  Widget _buildPomodoroDock(AppLocalizations l10n) {
+    final cfg = PomodoroService.instance.config;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ListTile(
+          leading: const Icon(Icons.timer),
+          title: Text(
+            l10n.t('pomodoro'),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          trailing: const Icon(Icons.open_in_full),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PomodoroScreen()),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _pomoRow(l10n, Icons.work, l10n.t('pomodoroFocus'), cfg.workMinutes),
+                const Divider(),
+                _pomoRow(
+                  l10n,
+                  Icons.coffee,
+                  l10n.t('pomodoroShortBreak'),
+                  cfg.shortBreakMinutes,
+                ),
+                const Divider(),
+                _pomoRow(
+                  l10n,
+                  Icons.weekend,
+                  l10n.t('pomodoroLongBreak'),
+                  cfg.longBreakMinutes,
+                ),
+                const Divider(),
+                _pomoRow(
+                  l10n,
+                  Icons.repeat,
+                  l10n.t('pomodoroInterval'),
+                  cfg.longBreakEvery,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          icon: const Icon(Icons.play_arrow),
+          label: Text(l10n.t('pomodoroStart')),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PomodoroScreen()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _pomoRow(
+    AppLocalizations l10n,
+    IconData icon,
+    String label,
+    int value,
+  ) {
+    return Row(
+      children: [
+        Icon(icon, size: 20),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label)),
+        Text('$value ${l10n.t('minutesUnit')}'),
+      ],
     );
   }
 
