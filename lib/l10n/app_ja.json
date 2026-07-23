@@ -226,5 +226,20 @@
   "defaultRepository": "デフォルト",
   "aiQa": "AI 質問応答",
   "aiQaDragHint": "ノートの文字を長押しで選択し、ここにドラッグするとカーソルの後ろに追加されます。",
-  "minutesUnit": "分"
+  "minutesUnit": "分",
+  "addSubtask": "サブタスクを追加",
+  "mainTask": "メインタスク",
+  "subtask": "サブタスク",
+  "reminder": "リマインダー",
+  "repeat": "繰り返し",
+  "autoCompleteMain": "すべてのサブタスクが完了したらメインタスクも自動完了",
+  "every": "ごと",
+  "noReminder": "リマインダーなし",
+  "repeatNone": "繰り返さない",
+  "unitHour": "時間",
+  "unitDay": "日",
+  "unitWeek": "週",
+  "unitMonth": "ヶ月",
+  "unitYear": "年",
+  "reminderAt": "通知時刻"
 }

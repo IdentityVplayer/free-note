@@ -226,5 +226,20 @@
   "defaultRepository": "Default",
   "aiQa": "AI Q&A",
   "aiQaDragHint": "Long-press text in the note, then drag it up here to append after the cursor.",
-  "minutesUnit": "min"
+  "minutesUnit": "min",
+  "addSubtask": "Add subtask",
+  "mainTask": "Main task",
+  "subtask": "Subtask",
+  "reminder": "Reminder",
+  "repeat": "Repeat",
+  "autoCompleteMain": "Auto-complete main task when all subtasks are done",
+  "every": "Every",
+  "noReminder": "No reminder",
+  "repeatNone": "Does not repeat",
+  "unitHour": "hour(s)",
+  "unitDay": "day(s)",
+  "unitWeek": "week(s)",
+  "unitMonth": "month(s)",
+  "unitYear": "year(s)",
+  "reminderAt": "Remind at"
 }

@@ -226,5 +226,20 @@
   "defaultRepository": "默认",
   "aiQa": "AI 问答",
   "aiQaDragHint": "长按笔记中的文字并拖到此处，即可追加到光标后。",
-  "minutesUnit": "分钟"
+  "minutesUnit": "分钟",
+  "addSubtask": "添加子任务",
+  "mainTask": "主任务",
+  "subtask": "子任务",
+  "reminder": "提醒",
+  "repeat": "重复",
+  "autoCompleteMain": "子任务全部完成后自动完成主任务",
+  "every": "每",
+  "noReminder": "无提醒",
+  "repeatNone": "不重复",
+  "unitHour": "小时",
+  "unitDay": "天",
+  "unitWeek": "周",
+  "unitMonth": "个月",
+  "unitYear": "年",
+  "reminderAt": "提醒时间"
 }

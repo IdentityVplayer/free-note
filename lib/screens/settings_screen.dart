@@ -86,6 +86,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         notesFolderPath: provider.settings.notesFolderPath,
         repositories: provider.settings.repositories,
         aiModels: _aiModels.where((m) => m.trim().isNotEmpty).toList(),
+        autoCompleteMainTasks: provider.settings.autoCompleteMainTasks,
       ),
     );
     Navigator.pop(context);
@@ -520,6 +521,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: Text(l10n.t('importData')),
             subtitle: Text(l10n.t('importHint')),
             onTap: _importData,
+          ),
+          // Planning
+          _sectionHeader(l10n.t('taskPlan')),
+          SwitchListTile(
+            title: Text(l10n.t('autoCompleteMain')),
+            value: provider.settings.autoCompleteMainTasks,
+            onChanged: (v) {
+              provider.updateSettings(
+                provider.settings.copyWith(autoCompleteMainTasks: v),
+              );
+            },
           ),
           // About
           _sectionHeader(l10n.t('about')),

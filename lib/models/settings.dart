@@ -43,6 +43,11 @@ class AppSettings {
   /// Persisted as [PluginInfo] so they can be re-registered on next launch.
   List<PluginInfo> userPlugins;
 
+  // ── New in 1.12.0 ──
+  /// When true, completing every subtask of a main task automatically marks
+  /// the main task itself done.
+  bool autoCompleteMainTasks;
+
   AppSettings({
     this.languageCode = '',
     this.isDarkMode = false,
@@ -61,6 +66,7 @@ class AppSettings {
     this.repositories = const [],
     this.aiModels = const [],
     this.userPlugins = const [],
+    this.autoCompleteMainTasks = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -81,6 +87,7 @@ class AppSettings {
     'repositories': repositories,
     'aiModels': aiModels,
     'userPlugins': userPlugins.map((p) => p.toJson()).toList(),
+    'autoCompleteMainTasks': autoCompleteMainTasks,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -105,7 +112,52 @@ class AppSettings {
             ?.map((e) => PluginInfo.fromJson(e as Map<String, dynamic>))
             .toList() ??
         const [],
+    autoCompleteMainTasks:
+        json['autoCompleteMainTasks'] as bool? ?? false,
   );
+
+  /// Immutable update helper used by toggles in the settings UI.
+  AppSettings copyWith({
+    String? languageCode,
+    bool? isDarkMode,
+    String? githubToken,
+    String? githubRepo,
+    String? githubClientId,
+    String? githubUsername,
+    String? aiApiKey,
+    String? aiModel,
+    bool? autoSync,
+    bool? enableAI,
+    String? aiProvider,
+    String? aiBaseUrl,
+    String? themeColorHex,
+    String? notesFolderPath,
+    List<String>? repositories,
+    List<String>? aiModels,
+    List<PluginInfo>? userPlugins,
+    bool? autoCompleteMainTasks,
+  }) =>
+      AppSettings(
+        languageCode: languageCode ?? this.languageCode,
+        isDarkMode: isDarkMode ?? this.isDarkMode,
+        githubToken: githubToken ?? this.githubToken,
+        githubRepo: githubRepo ?? this.githubRepo,
+        githubClientId: githubClientId ?? this.githubClientId,
+        githubUsername: githubUsername ?? this.githubUsername,
+        aiApiKey: aiApiKey ?? this.aiApiKey,
+        aiModel: aiModel ?? this.aiModel,
+        autoSync: autoSync ?? this.autoSync,
+        enableAI: enableAI ?? this.enableAI,
+        aiProvider: aiProvider ?? this.aiProvider,
+        aiBaseUrl: aiBaseUrl ?? this.aiBaseUrl,
+        themeColorHex: themeColorHex ?? this.themeColorHex,
+        notesFolderPath: notesFolderPath ?? this.notesFolderPath,
+        repositories: repositories ?? this.repositories,
+        aiModels: aiModels ?? this.aiModels,
+        userPlugins: userPlugins ?? this.userPlugins,
+        autoCompleteMainTasks:
+            autoCompleteMainTasks ?? this.autoCompleteMainTasks,
+      );
 
   /// Resolve the effective base URL from provider preset or custom value.
   String get resolvedAiBaseUrl {

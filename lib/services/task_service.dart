@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../models/task.dart';
+import '../utils/task_helpers.dart';
 import 'storage_service.dart';
 
 /// Persists the user's task list as a JSON file inside the app's config
@@ -54,5 +55,39 @@ class TaskService {
     } catch (_) {
       // Best-effort persistence: a failed write must not crash the UI.
     }
+  }
+
+  /// For every *main* task that has a repeat rule and whose reminder is due
+  /// (<= now), spawn a fresh, all-undone copy (the new instance for this cycle)
+  /// and advance the original's reminder to the next occurrence. Returns the
+  /// number of fresh copies created (0 when nothing was due).
+  Future<int> respawnDueRepeats() async {
+    final tasks = await loadTasks();
+    final now = DateTime.now();
+    final updated = <Task>[];
+    final fresh = <Task>[];
+
+    for (final t in tasks) {
+      if (t.parentId != null || t.repeat == null || t.reminder == null) {
+        updated.add(t);
+        continue;
+      }
+      if (t.reminder!.isAfter(now)) {
+        updated.add(t);
+        continue;
+      }
+      // Due → create a fresh one-off instance (repeat dropped) and advance
+      // the original's reminder to the next occurrence.
+      final subs = tasks.where((s) => s.parentId == t.id).toList();
+      final (_, freshMain, freshSubs) = freshTaskCopy(t, subs);
+      fresh.add(freshMain.copyWith(repeat: null));
+      fresh.addAll(freshSubs.map((s) => s.copyWith(repeat: null)));
+      updated.add(t.copyWith(reminder: nextRepeatDue(t.reminder!, t.repeat!)));
+    }
+
+    if (fresh.isNotEmpty) {
+      await saveTasks([...updated, ...fresh]);
+    }
+    return fresh.length;
   }
 }

@@ -7,6 +7,8 @@ import '../models/plugin.dart';
 import '../services/storage_service.dart';
 import '../services/ai_service.dart';
 import '../services/github_sync_service.dart';
+import '../services/task_service.dart';
+import '../services/notification_service.dart';
 import '../plugins/plugin_manager.dart';
 import '../plugins/builtin_plugins.dart';
 import '../plugins/ai_context_plugin.dart';
@@ -99,6 +101,21 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
     }
 
     _setLoading(false);
+
+    // Notifications: initialize, respawn any due repeating tasks, and schedule
+    // upcoming reminders. Best-effort — failures must not block startup.
+    _initNotifications();
+  }
+
+  Future<void> _initNotifications() async {
+    await NotificationService.instance.init();
+    await TaskService.instance.respawnDueRepeats();
+    final tasks = await TaskService.instance.loadTasks();
+    for (final t in tasks) {
+      if (t.reminder != null) {
+        await NotificationService.instance.scheduleReminder(t, title: 'Reminder');
+      }
+    }
   }
 
   // ---- Notes CRUD ----

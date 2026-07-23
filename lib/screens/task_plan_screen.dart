@@ -5,11 +5,14 @@ import '../models/task.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../services/task_service.dart';
+import '../services/notification_service.dart';
+import '../utils/task_helpers.dart';
 import '../l10n/app_localizations.dart';
 import 'editor_screen.dart';
 
-/// Task planning screen — a lightweight to-do list with due dates, priority,
-/// and optional links back to notes. Tasks persist via [TaskService].
+/// Task planning screen — a hierarchical to-do list (main tasks + subtasks)
+/// with due dates, priority, optional note links, reminders and repetition.
+/// Tasks persist via [TaskService].
 class TaskPlanScreen extends StatefulWidget {
   const TaskPlanScreen({super.key});
 
@@ -48,32 +51,59 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
   void _addTask(Task task) {
     _tasks.add(task);
     _persist();
+    _scheduleIfNeeded(task);
   }
 
   void _updateTask(Task task) {
     final idx = _tasks.indexWhere((t) => t.id == task.id);
     if (idx >= 0) _tasks[idx] = task;
     _persist();
+    _scheduleIfNeeded(task);
   }
 
   void _removeTask(String id) {
-    _tasks.removeWhere((t) => t.id == id);
+    _tasks.removeWhere((t) => t.id == id || t.parentId == id);
     _persist();
   }
 
   Future<void> _toggleDone(Task task) async {
     _updateTask(task.copyWith(done: !task.done));
+    // Auto-complete the parent main task when all its subtasks are done.
+    if (task.parentId != null) {
+      final auto = context.read<AppProvider>().settings.autoCompleteMainTasks;
+      if (auto) {
+        final updated = recomputeMainDone(_tasks, task.parentId!, auto);
+        _tasks
+          ..clear()
+          ..addAll(updated);
+        await _persist();
+      }
+    }
+  }
+
+  void _scheduleIfNeeded(Task task) {
+    if (task.reminder != null) {
+      NotificationService.instance.scheduleReminder(
+        task,
+        title: AppLocalizations.of(context)?.t('reminder') ?? 'Reminder',
+      );
+    }
   }
 
   // ── Dialogs ──
 
-  Future<void> _showTaskDialog({Task? existing}) async {
+  Future<void> _showTaskDialog({Task? existing, String? parentId}) async {
     final l10n = AppLocalizations.of(context)!;
     final titleCtl = TextEditingController(text: existing?.title ?? '');
     DateTime? due = existing?.dueDate;
+    DateTime? reminder = existing?.reminder;
+    RepeatConfig? repeat = existing?.repeat;
     String priority = existing?.priority ?? Task.priorityNormal;
     String? noteId = existing?.noteId;
     String? noteTitle = existing?.noteTitle;
+    final everyCtl = TextEditingController(
+      text: (existing?.repeat?.every ?? 1).toString(),
+    );
 
     Future<void> pickNote() async {
       final provider = context.read<AppProvider>();
@@ -111,11 +141,41 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
       }
     }
 
+    Future<void> pickReminder(StateSetter setInner) async {
+      if (!mounted) return;
+      final date = await showDatePicker(
+        context: context,
+        initialDate: reminder ?? DateTime.now(),
+        firstDate: DateTime(2000),
+        lastDate: DateTime(2100),
+      );
+      if (date == null) return;
+      if (!mounted) return;
+      final time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(reminder ?? DateTime.now()),
+      );
+      if (time == null) return;
+      setInner(
+        () => reminder = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        ),
+      );
+    }
+
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setInner) => AlertDialog(
-          title: Text(existing != null ? l10n.t('editNote') : l10n.t('newTask')),
+          title: Text(
+            existing != null
+                ? l10n.t('editNote')
+                : (parentId != null ? l10n.t('addSubtask') : l10n.t('newTask')),
+          ),
           content: SizedBox(
             width: double.maxFinite,
             child: SingleChildScrollView(
@@ -126,9 +186,7 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
                   TextField(
                     controller: titleCtl,
                     autofocus: true,
-                    decoration: InputDecoration(
-                      hintText: l10n.t('taskTitleHint'),
-                    ),
+                    decoration: InputDecoration(hintText: l10n.t('taskTitleHint')),
                     onSubmitted: (_) => Navigator.pop(ctx, true),
                   ),
                   const SizedBox(height: 12),
@@ -183,6 +241,87 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
                     onSelectionChanged: (s) => setInner(() => priority = s.first),
                   ),
                   const SizedBox(height: 12),
+                  // Reminder
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          reminder != null
+                              ? '${l10n.t('reminderAt')}: ${DateFormat('yyyy-MM-dd HH:mm').format(reminder!)}'
+                              : l10n.t('noReminder'),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.alarm, size: 18),
+                        tooltip: l10n.t('reminder'),
+                        onPressed: () => pickReminder(setInner),
+                      ),
+                      if (reminder != null)
+                        IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () => setInner(() => reminder = null),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Repeat
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          repeat != null
+                              ? '${l10n.t('repeat')}: ${_repeatLabel(repeat!, l10n)}'
+                              : l10n.t('repeatNone'),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => setInner(
+                          () => repeat = repeat == null
+                              ? RepeatConfig(every: 1, unit: 'day')
+                              : null,
+                        ),
+                        child: Text(repeat == null ? l10n.t('repeat') : l10n.t('repeatNone')),
+                      ),
+                    ],
+                  ),
+                  if (repeat != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(l10n.t('every')),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 56,
+                          child: TextField(
+                            controller: everyCtl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SegmentedButton<String>(
+                            multiSelectionEnabled: false,
+                            segments: const [
+                              ButtonSegment(value: 'hour', label: Text('h')),
+                              ButtonSegment(value: 'day', label: Text('d')),
+                              ButtonSegment(value: 'week', label: Text('w')),
+                              ButtonSegment(value: 'month', label: Text('m')),
+                              ButtonSegment(value: 'year', label: Text('y')),
+                            ],
+                            selected: {repeat!.unit},
+                            onSelectionChanged: (s) => setInner(
+                              () => repeat = repeat!.copyWith(unit: s.first),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
@@ -234,28 +373,26 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
     final title = titleCtl.text.trim();
     if (title.isEmpty) return;
 
+    final every = int.tryParse(everyCtl.text.trim()) ?? 1;
+    final repeatCfg = repeat?.copyWith(every: every < 1 ? 1 : every);
+
+    final task = Task(
+      id: existing?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title,
+      createdAt: existing?.createdAt ?? DateTime.now(),
+      dueDate: due,
+      priority: priority,
+      noteId: noteId,
+      noteTitle: noteTitle,
+      parentId: parentId ?? existing?.parentId,
+      reminder: reminder,
+      repeat: repeatCfg,
+    );
+
     if (existing != null) {
-      _updateTask(
-        existing.copyWith(
-          title: title,
-          dueDate: due,
-          priority: priority,
-          noteId: noteId,
-          noteTitle: noteTitle,
-        ),
-      );
+      _updateTask(task);
     } else {
-      _addTask(
-        Task(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          title: title,
-          createdAt: DateTime.now(),
-          dueDate: due,
-          priority: priority,
-          noteId: noteId,
-          noteTitle: noteTitle,
-        ),
-      );
+      _addTask(task);
     }
   }
 
@@ -289,10 +426,28 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
     );
   }
 
+  String _repeatLabel(RepeatConfig r, AppLocalizations l10n) {
+    final unitKey = {
+      'hour': 'unitHour',
+      'day': 'unitDay',
+      'week': 'unitWeek',
+      'month': 'unitMonth',
+      'year': 'unitYear',
+    }[r.unit] ?? 'unitDay';
+    return '${r.every} ${l10n.t(unitKey)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+
+    final mainTasks = _tasks
+        .where((t) => t.parentId == null)
+        .toList()
+      ..sort(Task.compareForDisplay);
+    List<Task> subtasksOf(String id) =>
+        _tasks.where((t) => t.parentId == id).toList();
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.t('taskPlan'))),
@@ -313,12 +468,15 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
                     ],
                   ),
                 )
-              : ListView.separated(
+              : ListView(
                   padding: const EdgeInsets.all(8),
-                  itemCount: _tasks.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 4),
-                  itemBuilder: (_, i) => _buildTaskCard(_tasks[i], l10n, theme),
+                  children: [
+                    for (final main in mainTasks) ...[
+                      _buildMainCard(main, l10n, theme),
+                      for (final sub in subtasksOf(main.id))
+                        _buildSubCard(sub, l10n, theme),
+                    ],
+                  ],
                 ),
       floatingActionButton: FloatingActionButton(
         tooltip: l10n.t('newTask'),
@@ -328,17 +486,12 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
     );
   }
 
-  Widget _buildTaskCard(
-    Task task,
-    AppLocalizations l10n,
-    ThemeData theme,
-  ) {
+  Widget _buildMainCard(Task task, AppLocalizations l10n, ThemeData theme) {
     final priorityColor = switch (task.priority) {
       Task.priorityHigh => Colors.red,
       Task.priorityNormal => Colors.orange,
       _ => Colors.green,
     };
-
     return Card(
       child: ListTile(
         leading: Checkbox(
@@ -379,74 +532,165 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
             ),
           ],
         ),
-        subtitle: Row(
+        subtitle: _buildMetaRow(task, l10n, theme),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (task.dueDate != null)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.event, size: 14),
-                  const SizedBox(width: 4),
-                  Text(
-                    DateFormat('yyyy-MM-dd').format(task.dueDate!),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            if (task.noteTitle != null) ...[
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => _openLinkedNote(task.noteId),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.link, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      task.noteTitle!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (v) {
-            switch (v) {
-              case 'edit':
-                _showTaskDialog(existing: task);
-                break;
-              case 'open':
-                _openLinkedNote(task.noteId);
-                break;
-              case 'delete':
-                _confirmDelete(task);
-                break;
-            }
-          },
-          itemBuilder: (_) => [
-            PopupMenuItem(
-              value: 'edit',
-              child: Text(l10n.t('edit')),
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: l10n.t('addSubtask'),
+              onPressed: () => _showTaskDialog(parentId: task.id),
             ),
-            if (task.noteId != null)
-              PopupMenuItem(
-                value: 'open',
-                child: Text(l10n.t('taskOpenLinked')),
-              ),
-            PopupMenuItem(
-              value: 'delete',
-              child: Text(l10n.t('deleteNote')),
+            PopupMenuButton<String>(
+              onSelected: (v) {
+                switch (v) {
+                  case 'edit':
+                    _showTaskDialog(existing: task);
+                    break;
+                  case 'open':
+                    _openLinkedNote(task.noteId);
+                    break;
+                  case 'delete':
+                    _confirmDelete(task);
+                    break;
+                }
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(value: 'edit', child: Text(l10n.t('edit'))),
+                if (task.noteId != null)
+                  PopupMenuItem(
+                    value: 'open',
+                    child: Text(l10n.t('taskOpenLinked')),
+                  ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text(l10n.t('deleteNote')),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildSubCard(Task task, AppLocalizations l10n, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 32),
+      child: Card(
+        color: theme.colorScheme.surfaceContainerHighest,
+        child: ListTile(
+          leading: Checkbox(
+            value: task.done,
+            onChanged: (_) => _toggleDone(task),
+          ),
+          title: Text(
+            task.title,
+            style: task.done
+                ? const TextStyle(
+                    decoration: TextDecoration.lineThrough,
+                    color: Colors.grey,
+                  )
+                : null,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: _buildMetaRow(task, l10n, theme),
+          trailing: PopupMenuButton<String>(
+            onSelected: (v) {
+              switch (v) {
+                case 'edit':
+                  _showTaskDialog(existing: task);
+                  break;
+                case 'delete':
+                  _confirmDelete(task);
+                  break;
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'edit', child: Text(l10n.t('edit'))),
+              PopupMenuItem(
+                value: 'delete',
+                child: Text(l10n.t('deleteNote')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Shared subtitle: due date, reminder, repeat, linked note.
+  Widget _buildMetaRow(Task task, AppLocalizations l10n, ThemeData theme) {
+    final chips = <Widget>[];
+    if (task.dueDate != null) {
+      chips.add(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.event, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              DateFormat('yyyy-MM-dd').format(task.dueDate!),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+    if (task.reminder != null) {
+      chips.add(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.alarm, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              DateFormat('MM-dd HH:mm').format(task.reminder!),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+    if (task.repeat != null) {
+      chips.add(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.repeat, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              _repeatLabel(task.repeat!, l10n),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+    if (task.noteTitle != null) {
+      chips.add(
+        InkWell(
+          onTap: () => _openLinkedNote(task.noteId),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.link, size: 14),
+              const SizedBox(width: 4),
+              Text(
+                task.noteTitle!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Wrap(spacing: 12, runSpacing: 4, children: chips);
   }
 }
