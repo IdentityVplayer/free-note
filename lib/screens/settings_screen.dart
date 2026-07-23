@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../providers/app_provider.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import '../services/github_sync_service.dart';
+import '../markdown/math_markdown.dart';
 import '../l10n/app_localizations.dart';
 import '../models/settings.dart';
 import '../screens/folder_picker_screen.dart';
@@ -102,6 +106,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     }
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _checkUpdate() async {
+    final l10n = AppLocalizations.of(context)!;
+    final release = await fetchLatestRelease('IdentityVplayer/free-note');
+    if (!mounted) return;
+    if (release == null) {
+      _toast(l10n.t('upToDate'));
+      return;
+    }
+    final info = await PackageInfo.fromPlatform();
+    final latest = release.tagName.replaceAll(RegExp(r'^v'), '');
+    if (GitHubRelease.isNewer(latest, info.version)) {
+      _showUpdateDialog(release);
+    } else {
+      _toast(l10n.t('upToDate'));
+    }
+  }
+
+  void _showUpdateDialog(GitHubRelease release) {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${l10n.t('updateAvailable')} (${release.tagName})'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: safeMarkdown(
+              data: release.body.isEmpty ? release.tagName : release.body,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('updateLater')),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _openUrl(release.downloadUrl);
+            },
+            child: Text(l10n.t('updateDownload')),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _exportData() async {
@@ -417,6 +476,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.info_outline),
             title: Text(l10n.t('appTitle')),
             subtitle: Text(l10n.t('aboutDesc')),
+          ),
+          ListTile(
+            leading: const Icon(Icons.bug_report),
+            title: Text(l10n.t('reportIssue')),
+            onTap: () => _openUrl(
+              'https://github.com/IdentityVplayer/free-note/issues/new',
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.system_update),
+            title: Text(l10n.t('checkUpdate')),
+            onTap: _checkUpdate,
           ),
           const SizedBox(height: 32),
         ],

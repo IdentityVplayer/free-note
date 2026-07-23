@@ -210,5 +210,14 @@
   "pomodoroShortMinutes": "短休时长（分钟）",
   "pomodoroLongMinutes": "长休时长（分钟）",
   "pomodoroInterval": "长休息间隔",
-  "pomodoroSessions": "已完成番茄：{0}"
+  "pomodoroSessions": "已完成番茄：{0}",
+
+  "aiReadyHint": "直接提问，AI 会结合你的笔记作答。",
+  "reportIssue": "给我提 Issue",
+  "checkUpdate": "检查更新",
+  "updateAvailable": "发现新版本",
+  "updateDownload": "下载",
+  "updateLater": "暂时不下载",
+  "upToDate": "已是最新版本",
+  "viewRelease": "查看发布"
 }

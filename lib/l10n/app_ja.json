@@ -210,5 +210,14 @@
   "pomodoroShortMinutes": "短い休憩（分）",
   "pomodoroLongMinutes": "長い休憩（分）",
   "pomodoroInterval": "長い休憩の間隔",
-  "pomodoroSessions": "完了セッション：{0}"
+  "pomodoroSessions": "完了セッション：{0}",
+
+  "aiReadyHint": "何でも質問してください。ノートを考慮して回答します。",
+  "reportIssue": "Issue を報告",
+  "checkUpdate": "アップデートを確認",
+  "updateAvailable": "新しいバージョンがあります",
+  "updateDownload": "ダウンロード",
+  "updateLater": "後で",
+  "upToDate": "最新バージョンです",
+  "viewRelease": "リリースを見る"
 }

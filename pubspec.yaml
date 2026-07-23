@@ -31,6 +31,7 @@ dependencies:
 
   # HTTP & AI
   http: ^1.2.0
+  package_info_plus: ^8.0.0
 
   # Internationalization
   flutter_localizations:

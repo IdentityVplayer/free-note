@@ -159,6 +159,83 @@ class SyncResult {
   SyncResult({required this.success, required this.message});
 }
 
+/// A GitHub release, as returned by GET /repos/{owner}/{repo}/releases/latest.
+class GitHubRelease {
+  final String tagName;
+  final String body;
+  final String htmlUrl;
+  final List<String> assetUrls;
+
+  GitHubRelease({
+    required this.tagName,
+    required this.body,
+    required this.htmlUrl,
+    this.assetUrls = const [],
+  });
+
+  factory GitHubRelease.fromJson(Map<String, dynamic> json) {
+    final assets = (json['assets'] as List?) ?? [];
+    return GitHubRelease(
+      tagName: json['tag_name'] as String? ?? '',
+      body: json['body'] as String? ?? '',
+      htmlUrl: json['html_url'] as String? ?? '',
+      assetUrls: assets
+          .map((a) => (a as Map<String, dynamic>)['browser_download_url'] as String?)
+          .where((u) => u != null)
+          .cast<String>()
+          .toList(),
+    );
+  }
+
+  /// Where the user downloads: the first asset, or the release page itself.
+  String get downloadUrl =>
+      assetUrls.isNotEmpty ? assetUrls.first : htmlUrl;
+
+  /// Compare two version strings ("1.12.0" vs "1.9.9"). Returns true when
+  /// [latest] is strictly newer than [current].
+  static bool isNewer(String latest, String current) {
+    List<int> parse(String v) => v
+        .replaceAll(RegExp(r'[^0-9.]'), '')
+        .split('.')
+        .where((p) => p.isNotEmpty)
+        .map((p) => int.tryParse(p) ?? 0)
+        .toList();
+    final a = parse(latest);
+    final b = parse(current);
+    final n = a.length > b.length ? a.length : b.length;
+    for (var i = 0; i < n; i++) {
+      final x = i < a.length ? a[i] : 0;
+      final y = i < b.length ? b[i] : 0;
+      if (x != y) return x > y;
+    }
+    return false;
+  }
+}
+
+/// Fetch the latest published release of a public repository (no auth needed).
+/// Returns null on any failure (offline, rate-limited, 404, etc.).
+Future<GitHubRelease?> fetchLatestRelease(String repo) async {
+  try {
+    final res = await http
+        .get(
+          Uri.parse('https://api.github.com/repos/$repo/releases/latest'),
+          headers: {
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+        )
+        .timeout(const Duration(seconds: 20));
+    if (res.statusCode == 200) {
+      return GitHubRelease.fromJson(
+        jsonDecode(res.body) as Map<String, dynamic>,
+      );
+    }
+  } catch (_) {
+    // Network error or rate limit — treat as "no update info".
+  }
+  return null;
+}
+
 /// Thrown for device-flow / auth problems. [cancelled] marks user-initiated
 /// cancellations so the UI can stay quiet instead of showing an error.
 class GitHubAuthException implements Exception {

@@ -399,8 +399,14 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            l10n.t('aiNotConfigured'),
-                            style: Theme.of(context).textTheme.bodySmall,
+                            provider.aiService.isConfigured
+                                ? l10n.t('aiReadyHint')
+                                : l10n.t('aiNotConfigured'),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: provider.aiService.isConfigured
+                                  ? null
+                                  : Theme.of(context).colorScheme.error,
+                            ),
                             textAlign: TextAlign.center,
                           ),
                         ],

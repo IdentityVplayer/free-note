@@ -210,5 +210,14 @@
   "pomodoroShortMinutes": "Short break (min)",
   "pomodoroLongMinutes": "Long break (min)",
   "pomodoroInterval": "Long break every",
-  "pomodoroSessions": "Completed sessions: {0}"
+  "pomodoroSessions": "Completed sessions: {0}",
+
+  "aiReadyHint": "Ask anything — the model answers with your notes in mind.",
+  "reportIssue": "Report an Issue",
+  "checkUpdate": "Check for Updates",
+  "updateAvailable": "Update available",
+  "updateDownload": "Download",
+  "updateLater": "Not now",
+  "upToDate": "You are on the latest version",
+  "viewRelease": "View release"
 }
