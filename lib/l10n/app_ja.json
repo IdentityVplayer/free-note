@@ -29,7 +29,6 @@
   "plugins": "プラグイン",
   "aiAssistant": "AI アシスタント",
   "askAI": "AIに質問",
-  "aiWriting": "AI ライティング",
   "aiThinking": "AIが考え中...",
   "aiNotConfigured": "AIが設定されていません。設定でAPIキーを入力してください。",
   "continueWriting": "続ける",
@@ -174,7 +173,6 @@
   "pluginSnippet": "挿入スニペット",
   "pluginSnippetHint": "ツールバーボタンをタップするとカーソル位置に挿入されるテキスト",
   "resumeChat": "続きを話す",
-
   "taskPlan": "タスク計画",
   "newTask": "新規タスク",
   "taskTitleHint": "何をしますか？",
@@ -191,7 +189,6 @@
   "taskDeleteConfirm": "このタスクを削除しますか？",
   "markDone": "完了にする",
   "markUndone": "未完了にする",
-
   "pomodoro": "ポモドーロ",
   "pomodoroFocus": "集中",
   "pomodoroShortBreak": "短い休憩",
@@ -206,7 +203,6 @@
   "pomodoroLongMinutes": "長い休憩（分）",
   "pomodoroInterval": "長い休憩の間隔",
   "pomodoroSessions": "完了セッション：{0}",
-
   "aiReadyHint": "何でも質問してください。ノートを考慮して回答します。",
   "reportIssue": "Issue を報告",
   "checkUpdate": "アップデートを確認",
@@ -215,7 +211,6 @@
   "updateLater": "後で",
   "upToDate": "最新バージョンです",
   "viewRelease": "リリースを見る",
-
   "repository": "リポジトリ",
   "currentRepository": "現在のリポジトリ",
   "changeRepository": "リポジトリを変更",
@@ -228,5 +223,7 @@
   "newRepository": "新規リポジトリ",
   "repositoryEmpty": "このリポジトリは空です",
   "repositoryNeedFolder": "設定でリポジトリを選択してください",
-  "defaultRepository": "デフォルト"
+  "defaultRepository": "デフォルト",
+  "aiQa": "AI 質問応答",
+  "aiQaDragHint": "ノートの文字を長押しで選択し、ここにドラッグするとカーソルの後ろに追加されます。"
 }

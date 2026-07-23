@@ -29,7 +29,6 @@
   "plugins": "插件",
   "aiAssistant": "AI 助手",
   "askAI": "问 AI",
-  "aiWriting": "AI 写作",
   "aiThinking": "AI 思考中...",
   "aiNotConfigured": "AI 未配置，请在设置中填写 API 密钥。",
   "continueWriting": "续写",
@@ -174,7 +173,6 @@
   "pluginSnippet": "插入片段",
   "pluginSnippetHint": "点击工具栏按钮时插入到光标处的文本",
   "resumeChat": "继续对话",
-
   "taskPlan": "任务计划",
   "newTask": "新建任务",
   "taskTitleHint": "要做什么？",
@@ -191,7 +189,6 @@
   "taskDeleteConfirm": "删除该任务？",
   "markDone": "标记完成",
   "markUndone": "标为未完成",
-
   "pomodoro": "番茄钟",
   "pomodoroFocus": "专注",
   "pomodoroShortBreak": "短休息",
@@ -206,7 +203,6 @@
   "pomodoroLongMinutes": "长休时长（分钟）",
   "pomodoroInterval": "长休息间隔",
   "pomodoroSessions": "已完成番茄：{0}",
-
   "aiReadyHint": "直接提问，AI 会结合你的笔记作答。",
   "reportIssue": "给我提 Issue",
   "checkUpdate": "检查更新",
@@ -215,7 +211,6 @@
   "updateLater": "暂时不下载",
   "upToDate": "已是最新版本",
   "viewRelease": "查看发布",
-
   "repository": "仓库",
   "currentRepository": "当前仓库",
   "changeRepository": "更换仓库",
@@ -228,5 +223,7 @@
   "newRepository": "新建仓库",
   "repositoryEmpty": "此仓库暂无笔记",
   "repositoryNeedFolder": "请先在设置中选择仓库",
-  "defaultRepository": "默认"
+  "defaultRepository": "默认",
+  "aiQa": "AI 问答",
+  "aiQaDragHint": "长按笔记中的文字并拖到此处，即可追加到光标后。"
 }

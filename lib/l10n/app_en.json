@@ -29,7 +29,6 @@
   "plugins": "Plugins",
   "aiAssistant": "AI Assistant",
   "askAI": "Ask AI",
-  "aiWriting": "AI Writing",
   "aiThinking": "AI is thinking...",
   "aiNotConfigured": "AI not configured. Set API key in Settings.",
   "continueWriting": "Continue",
@@ -174,7 +173,6 @@
   "pluginSnippet": "Insert snippet",
   "pluginSnippetHint": "Text inserted at the caret when the toolbar button is tapped",
   "resumeChat": "Resume chat",
-
   "taskPlan": "Task Plan",
   "newTask": "New Task",
   "taskTitleHint": "What needs to be done?",
@@ -191,7 +189,6 @@
   "taskDeleteConfirm": "Delete this task?",
   "markDone": "Mark done",
   "markUndone": "Mark not done",
-
   "pomodoro": "Pomodoro",
   "pomodoroFocus": "Focus",
   "pomodoroShortBreak": "Short Break",
@@ -206,7 +203,6 @@
   "pomodoroLongMinutes": "Long break (min)",
   "pomodoroInterval": "Long break every",
   "pomodoroSessions": "Completed sessions: {0}",
-
   "aiReadyHint": "Ask anything — the model answers with your notes in mind.",
   "reportIssue": "Report an Issue",
   "checkUpdate": "Check for Updates",
@@ -215,7 +211,6 @@
   "updateLater": "Not now",
   "upToDate": "You are on the latest version",
   "viewRelease": "View release",
-
   "repository": "Repository",
   "currentRepository": "Current repository",
   "changeRepository": "Change repository",
@@ -228,5 +223,7 @@
   "newRepository": "New repository",
   "repositoryEmpty": "This repository is empty",
   "repositoryNeedFolder": "Select a repository in Settings first",
-  "defaultRepository": "Default"
+  "defaultRepository": "Default",
+  "aiQa": "AI Q&A",
+  "aiQaDragHint": "Long-press text in the note, then drag it up here to append after the cursor."
 }

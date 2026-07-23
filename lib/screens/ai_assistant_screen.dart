@@ -29,12 +29,17 @@ class AIAssistantScreen extends StatefulWidget {
   /// auto-saves the conversation back into that note (no "save?" prompt).
   final String? noteId;
 
+  /// When true the screen renders only its chat body (no AppBar/Scaffold) so
+  /// it can be embedded — e.g. in the split "AI 问答" view under a note.
+  final bool embedded;
+
   const AIAssistantScreen({
     super.key,
     this.initialContextContent,
     this.initialContextName,
     this.initialMessages,
     this.noteId,
+    this.embedded = false,
   });
 
   @override
@@ -291,6 +296,130 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         ? _currentModel!
         : (models.isNotEmpty ? models.first : null);
 
+    final chatBody = Column(
+      children: [
+        // Context banner
+        if (_contextContent != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            color: theme.colorScheme.secondaryContainer,
+            child: Row(
+              children: [
+                const Icon(Icons.source, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.tArgs('contextActive', [
+                      _contextName ?? l10n.t('context'),
+                    ]),
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                InkWell(
+                  onTap: _clearContext,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: theme.colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: _messages.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.auto_awesome,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        l10n.t('askAI'),
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        provider.aiService.isConfigured
+                            ? l10n.t('aiReadyHint')
+                            : l10n.t('aiNotConfigured'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: provider.aiService.isConfigured
+                              ? null
+                              : Theme.of(context).colorScheme.error,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _messages.length + (_loading ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _messages.length) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    final msg = _messages[index];
+                    return _buildMessage(msg, theme);
+                  },
+                ),
+        ),
+        // Input bar
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _questionController,
+                    decoration: InputDecoration(
+                      hintText: l10n.t('askAI'),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                    ),
+                    onSubmitted: (_) => _ask(),
+                    minLines: 1,
+                    maxLines: 4,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  icon: const Icon(Icons.send),
+                  onPressed: _loading ? null : _ask,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (widget.embedded) return chatBody;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
@@ -342,127 +471,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
             ),
           ),
         ),
-        body: Column(
-          children: [
-            // Context banner
-            if (_contextContent != null)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                color: theme.colorScheme.secondaryContainer,
-                child: Row(
-                  children: [
-                    const Icon(Icons.source, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.tArgs('contextActive', [
-                          _contextName ?? l10n.t('context'),
-                        ]),
-                        style: theme.textTheme.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    InkWell(
-                      onTap: _clearContext,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(
-                          Icons.close,
-                          size: 16,
-                          color: theme.colorScheme.onSecondaryContainer,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: _messages.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.auto_awesome,
-                            size: 64,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            l10n.t('askAI'),
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            provider.aiService.isConfigured
-                                ? l10n.t('aiReadyHint')
-                                : l10n.t('aiNotConfigured'),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: provider.aiService.isConfigured
-                                  ? null
-                                  : Theme.of(context).colorScheme.error,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _messages.length + (_loading ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (index == _messages.length) {
-                          return const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        final msg = _messages[index];
-                        return _buildMessage(msg, theme);
-                      },
-                    ),
-            ),
-            // Input bar
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _questionController,
-                        decoration: InputDecoration(
-                          hintText: l10n.t('askAI'),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                        ),
-                        onSubmitted: (_) => _ask(),
-                        minLines: 1,
-                        maxLines: 4,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      icon: const Icon(Icons.send),
-                      onPressed: _loading ? null : _ask,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+        body: chatBody,
       ),
     );
   }

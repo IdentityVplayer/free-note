@@ -5,12 +5,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/note.dart';
-import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../markdown/math_markdown.dart';
 import '../utils/text_edit.dart';
 import 'subfolder_picker_screen.dart';
 import 'ai_assistant_screen.dart';
+import 'ai_qa_screen.dart';
 import 'math_insert_screen.dart';
 import '../plugins/ai_context_plugin.dart';
 import '../plugins/plugin_host.dart';
@@ -31,7 +31,6 @@ class _EditorScreenState extends State<EditorScreen>
   late AppProvider _provider;
   late TextEditingController _titleController;
   late TextEditingController _tagController;
-  bool _aiLoading = false;
   bool _hasChanges = false;
 
   /// The note body, kept as the single source of truth. The hybrid editor
@@ -184,101 +183,11 @@ class _EditorScreenState extends State<EditorScreen>
     setState(() => _hasChanges = true);
   }
 
-  Future<void> _askAI(WritingMode mode) async {
-    final provider = context.read<AppProvider>();
-    final l10n = AppLocalizations.of(context)!;
-
-    setState(() => _aiLoading = true);
-    try {
-      final result = await provider.aiService.assistWriting(
-        _content,
-        mode: mode,
-      );
-      if (mode == WritingMode.continue_) {
-        _content += '\n\n$result';
-      } else {
-        _content = result;
-      }
-      _activeLine = null;
-      setState(() => _hasChanges = true);
-    } on AIException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.t('aiNotConfigured'))));
-      }
-    } finally {
-      setState(() => _aiLoading = false);
-    }
-  }
-
-  void _showAIMenu() {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) {
-        final l = AppLocalizations.of(context)!;
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  l.t('aiWriting'),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.edit_note),
-                title: Text(l.t('continueWriting')),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _askAI(WritingMode.continue_);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.auto_fix_high),
-                title: Text(l.t('improve')),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _askAI(WritingMode.improve);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.summarize),
-                title: Text(l.t('summarize')),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _askAI(WritingMode.summarize);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.translate),
-                title: Text(l.t('translate')),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _askAI(WritingMode.translate);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.expand),
-                title: Text(l.t('expand')),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _askAI(WritingMode.expand);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
+  /// Open the split "AI 问答" view: note on top, AI chat on the bottom.
+  void _openAiQa() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AiQaScreen(noteId: _note.id)),
     );
   }
 
@@ -440,7 +349,6 @@ class _EditorScreenState extends State<EditorScreen>
   /// The body: a scrollable list of lines. Every line is rendered as Markdown
   /// preview except [ _activeLine ], which is shown as a raw, editable field.
   Widget _buildHybridBody() {
-    final l10n = AppLocalizations.of(context)!;
     final lines = splitLines(_content);
     return Stack(
       children: [
@@ -452,23 +360,6 @@ class _EditorScreenState extends State<EditorScreen>
             return _buildPreviewLine(i, lines[i]);
           },
         ),
-        if (_aiLoading)
-          Container(
-            color: Colors.black38,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(
-                    l10n.t('aiThinking'),
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -609,8 +500,8 @@ class _EditorScreenState extends State<EditorScreen>
           if (aiEnabled)
             IconButton(
               icon: const Icon(Icons.auto_awesome),
-              tooltip: l10n.t('aiWriting'),
-              onPressed: _aiLoading ? null : _showAIMenu,
+              tooltip: l10n.t('aiQa'),
+              onPressed: _openAiQa,
             ),
           if (exportEnabled)
             IconButton(
