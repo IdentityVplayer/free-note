@@ -47,7 +47,8 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
     // Start empty so the default OAuth is used immediately; only prefill when
     // the user previously chose a custom OAuth App.
     _clientIdController = TextEditingController(text: s.githubClientId ?? '');
-    _showCustomClientId = s.githubClientId != null && s.githubClientId!.isNotEmpty;
+    _showCustomClientId =
+        s.githubClientId != null && s.githubClientId!.isNotEmpty;
     _selectedRepo = s.githubRepo;
     if (s.githubToken != null && s.githubToken!.isNotEmpty) {
       _loadRepos(s.githubToken!);
@@ -60,10 +61,9 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
     super.dispose();
   }
 
-  String get _effectiveClientId =>
-      (_clientIdController.text.trim().isEmpty
-          ? GitHubSyncService.defaultClientId
-          : _clientIdController.text.trim());
+  String get _effectiveClientId => (_clientIdController.text.trim().isEmpty
+      ? GitHubSyncService.defaultClientId
+      : _clientIdController.text.trim());
 
   Future<void> _persistClientId() async {
     await widget.host.updateGitHubAuth(clientId: _effectiveClientId);
@@ -115,8 +115,7 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
 
     try {
       // Step 1 — request device + user code.
-      final dc =
-          await widget.host.githubService.requestDeviceCode(clientId);
+      final dc = await widget.host.githubService.requestDeviceCode(clientId);
       if (!mounted) return;
       setState(() => _deviceSession = dc);
 
@@ -211,8 +210,7 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final s = widget.host.settings;
-    final connected =
-        s.githubToken != null && s.githubToken!.isNotEmpty;
+    final connected = s.githubToken != null && s.githubToken!.isNotEmpty;
     final authorizing = _deviceSession != null;
 
     return Scaffold(
@@ -281,9 +279,12 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
                   OutlinedButton.icon(
                     icon: const Icon(Icons.close),
                     label: Text(
-                      authorizing ? l10n.t('cancel') : l10n.t('githubDisconnect'),
+                      authorizing
+                          ? l10n.t('cancel')
+                          : l10n.t('githubDisconnect'),
                     ),
-                    onPressed: _busy ? null
+                    onPressed: _busy
+                        ? null
                         : (authorizing ? _cancelAuth : _disconnect),
                   ),
                 ],
@@ -430,7 +431,11 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
                 const SizedBox(width: 8),
                 Text(
                   l10n.t('githubWaitingAuth'),
@@ -449,7 +454,9 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
                   await Clipboard.setData(ClipboardData(text: code));
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.tArgs('githubCopiedCode', [code]))),
+                      SnackBar(
+                        content: Text(l10n.tArgs('githubCopiedCode', [code])),
+                      ),
                     );
                   }
                 } catch (_) {}
@@ -457,7 +464,10 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
               borderRadius: BorderRadius.circular(10),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 18,
+                  horizontal: 24,
+                ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(10),
@@ -490,7 +500,9 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
             const SizedBox(height: 10),
             Text(
               l10n.t('githubTapCopyHint'),
-              style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
         ),

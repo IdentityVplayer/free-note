@@ -6,9 +6,11 @@ class AppSettings {
   bool isDarkMode;
   String? githubToken;
   String? githubRepo;
+
   /// OAuth App client_id used for the GitHub Device login flow. null = use
   /// [GitHubSyncService.defaultClientId].
   String? githubClientId;
+
   /// Login name of the authenticated GitHub user (filled after Device login).
   String? githubUsername;
   String? aiApiKey;
@@ -108,12 +110,12 @@ class AppSettings {
     repositories:
         (json['repositories'] as List<dynamic>?)?.cast<String>() ?? const [],
     aiModels: (json['aiModels'] as List<dynamic>?)?.cast<String>() ?? const [],
-    userPlugins: (json['userPlugins'] as List<dynamic>?)
+    userPlugins:
+        (json['userPlugins'] as List<dynamic>?)
             ?.map((e) => PluginInfo.fromJson(e as Map<String, dynamic>))
             .toList() ??
         const [],
-    autoCompleteMainTasks:
-        json['autoCompleteMainTasks'] as bool? ?? false,
+    autoCompleteMainTasks: json['autoCompleteMainTasks'] as bool? ?? false,
   );
 
   /// Immutable update helper used by toggles in the settings UI.
@@ -136,28 +138,26 @@ class AppSettings {
     List<String>? aiModels,
     List<PluginInfo>? userPlugins,
     bool? autoCompleteMainTasks,
-  }) =>
-      AppSettings(
-        languageCode: languageCode ?? this.languageCode,
-        isDarkMode: isDarkMode ?? this.isDarkMode,
-        githubToken: githubToken ?? this.githubToken,
-        githubRepo: githubRepo ?? this.githubRepo,
-        githubClientId: githubClientId ?? this.githubClientId,
-        githubUsername: githubUsername ?? this.githubUsername,
-        aiApiKey: aiApiKey ?? this.aiApiKey,
-        aiModel: aiModel ?? this.aiModel,
-        autoSync: autoSync ?? this.autoSync,
-        enableAI: enableAI ?? this.enableAI,
-        aiProvider: aiProvider ?? this.aiProvider,
-        aiBaseUrl: aiBaseUrl ?? this.aiBaseUrl,
-        themeColorHex: themeColorHex ?? this.themeColorHex,
-        notesFolderPath: notesFolderPath ?? this.notesFolderPath,
-        repositories: repositories ?? this.repositories,
-        aiModels: aiModels ?? this.aiModels,
-        userPlugins: userPlugins ?? this.userPlugins,
-        autoCompleteMainTasks:
-            autoCompleteMainTasks ?? this.autoCompleteMainTasks,
-      );
+  }) => AppSettings(
+    languageCode: languageCode ?? this.languageCode,
+    isDarkMode: isDarkMode ?? this.isDarkMode,
+    githubToken: githubToken ?? this.githubToken,
+    githubRepo: githubRepo ?? this.githubRepo,
+    githubClientId: githubClientId ?? this.githubClientId,
+    githubUsername: githubUsername ?? this.githubUsername,
+    aiApiKey: aiApiKey ?? this.aiApiKey,
+    aiModel: aiModel ?? this.aiModel,
+    autoSync: autoSync ?? this.autoSync,
+    enableAI: enableAI ?? this.enableAI,
+    aiProvider: aiProvider ?? this.aiProvider,
+    aiBaseUrl: aiBaseUrl ?? this.aiBaseUrl,
+    themeColorHex: themeColorHex ?? this.themeColorHex,
+    notesFolderPath: notesFolderPath ?? this.notesFolderPath,
+    repositories: repositories ?? this.repositories,
+    aiModels: aiModels ?? this.aiModels,
+    userPlugins: userPlugins ?? this.userPlugins,
+    autoCompleteMainTasks: autoCompleteMainTasks ?? this.autoCompleteMainTasks,
+  );
 
   /// Resolve the effective base URL from provider preset or custom value.
   String get resolvedAiBaseUrl {

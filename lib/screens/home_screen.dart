@@ -316,15 +316,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ]
                   : folders[key]!
-                      .map(
-                        (note) => _buildNoteCard(
-                          context,
-                          l10n,
-                          provider,
-                          note,
-                        ),
-                      )
-                      .toList()),
+                        .map(
+                          (note) =>
+                              _buildNoteCard(context, l10n, provider, note),
+                        )
+                        .toList()),
           ],
         ),
       ],
@@ -421,7 +417,12 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _pomoRow(l10n, Icons.work, l10n.t('pomodoroFocus'), cfg.workMinutes),
+                _pomoRow(
+                  l10n,
+                  Icons.work,
+                  l10n.t('pomodoroFocus'),
+                  cfg.workMinutes,
+                ),
                 const Divider(),
                 _pomoRow(
                   l10n,
@@ -541,8 +542,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Theme.of(context).colorScheme.primary,
               )
             : (note.isFavorite
-                ? const Icon(Icons.star, color: Colors.amber)
-                : const Icon(Icons.note_outlined)),
+                  ? const Icon(Icons.star, color: Colors.amber)
+                  : const Icon(Icons.note_outlined)),
         title: Row(
           children: [
             if (note.isPinned)
@@ -630,9 +631,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 PopupMenuItem(
                   value: 'favorite',
                   child: Text(
-                    note.isFavorite
-                        ? l10n.t('unfavorite')
-                        : l10n.t('favorite'),
+                    note.isFavorite ? l10n.t('unfavorite') : l10n.t('favorite'),
                   ),
                 ),
                 PopupMenuItem(

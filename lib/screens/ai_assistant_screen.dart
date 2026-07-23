@@ -101,9 +101,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     // and any loaded context file is passed through `context`.
     final history = _messages.length > 1
         ? _messages
-            .sublist(0, _messages.length - 1)
-            .map((m) => <String, String>{'role': m.role, 'content': m.text})
-            .toList()
+              .sublist(0, _messages.length - 1)
+              .map((m) => <String, String>{'role': m.role, 'content': m.text})
+              .toList()
         : null;
 
     final answer = await (() async {
@@ -302,10 +302,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         if (_contextContent != null)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: theme.colorScheme.secondaryContainer,
             child: Row(
               children: [

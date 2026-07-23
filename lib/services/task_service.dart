@@ -36,8 +36,9 @@ class TaskService {
     if (!file.existsSync()) return [];
     try {
       final raw = jsonDecode(file.readAsStringSync()) as List<dynamic>;
-      final tasks =
-          raw.map((e) => Task.fromJson(e as Map<String, dynamic>)).toList();
+      final tasks = raw
+          .map((e) => Task.fromJson(e as Map<String, dynamic>))
+          .toList();
       tasks.sort(Task.compareForDisplay);
       return tasks;
     } catch (_) {
@@ -49,9 +50,7 @@ class TaskService {
   Future<void> saveTasks(List<Task> tasks) async {
     final file = File(p.join((await _dir).path, 'tasks.json'));
     try {
-      file.writeAsStringSync(
-        jsonEncode(tasks.map((t) => t.toJson()).toList()),
-      );
+      file.writeAsStringSync(jsonEncode(tasks.map((t) => t.toJson()).toList()));
     } catch (_) {
       // Best-effort persistence: a failed write must not crash the UI.
     }

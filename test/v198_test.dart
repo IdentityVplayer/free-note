@@ -153,8 +153,9 @@ void main() {
   });
 
   group('v2.0.0 — UserPlugin real UI & editor toolbar', () {
-    testWidgets('editor user plugin with snippet builds a toolbar button',
-        (tester) async {
+    testWidgets('editor user plugin with snippet builds a toolbar button', (
+      tester,
+    ) async {
       Widget? built;
       await tester.pumpWidget(
         MaterialApp(
@@ -176,8 +177,9 @@ void main() {
       expect(find.byType(IconButton), findsOneWidget);
     });
 
-    testWidgets('non-editor / snippet-less user plugins build no widget',
-        (tester) async {
+    testWidgets('non-editor / snippet-less user plugins build no widget', (
+      tester,
+    ) async {
       Widget? editorBuilt;
       Widget? utilityBuilt;
       await tester.pumpWidget(
@@ -205,8 +207,9 @@ void main() {
       expect(utilityBuilt, isNull);
     });
 
-    testWidgets('PluginManager.buildWidgets yields only user editor buttons',
-        (tester) async {
+    testWidgets('PluginManager.buildWidgets yields only user editor buttons', (
+      tester,
+    ) async {
       final manager = PluginManager();
       manager.register(WordCountPlugin()); // builtin -> null, excluded
       manager.register(

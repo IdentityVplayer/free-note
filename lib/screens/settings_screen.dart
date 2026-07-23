@@ -368,7 +368,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   value: '',
                 ),
-                const RadioListTile<String>(title: Text('English'), value: 'en'),
+                const RadioListTile<String>(
+                  title: Text('English'),
+                  value: 'en',
+                ),
                 const RadioListTile<String>(title: Text('中文'), value: 'zh'),
                 const RadioListTile<String>(title: Text('日本語'), value: 'ja'),
               ],

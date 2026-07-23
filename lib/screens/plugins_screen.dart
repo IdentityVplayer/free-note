@@ -51,9 +51,9 @@ class PluginsScreen extends StatelessWidget {
       if (ok == true) {
         provider.removeUserPlugin(pluginId);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.t('pluginRemoved'))),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.t('pluginRemoved'))));
         }
       }
     }

@@ -13,10 +13,8 @@ class RepeatConfig {
 
   Map<String, dynamic> toJson() => {'every': every, 'unit': unit};
 
-  RepeatConfig copyWith({int? every, String? unit}) => RepeatConfig(
-    every: every ?? this.every,
-    unit: unit ?? this.unit,
-  );
+  RepeatConfig copyWith({int? every, String? unit}) =>
+      RepeatConfig(every: every ?? this.every, unit: unit ?? this.unit);
 }
 
 /// A single task in the planning list.
@@ -125,18 +123,19 @@ class Task {
       id: json['id'] as String,
       title: json['title'] as String,
       done: json['done'] == true,
-      createdAt:
-          created != null ? DateTime.parse(created) : DateTime.fromMillisecondsSinceEpoch(0),
+      createdAt: created != null
+          ? DateTime.parse(created)
+          : DateTime.fromMillisecondsSinceEpoch(0),
       dueDate: due != null ? DateTime.parse(due) : null,
-      priority:
-          priority != null && Task.priorities.contains(priority)
+      priority: priority != null && Task.priorities.contains(priority)
           ? priority
           : Task.priorityNormal,
       noteId: json['noteId'] as String?,
       noteTitle: json['noteTitle'] as String?,
       parentId: json['parentId'] as String?,
-      reminder:
-          json['reminder'] != null ? DateTime.parse(json['reminder'] as String) : null,
+      reminder: json['reminder'] != null
+          ? DateTime.parse(json['reminder'] as String)
+          : null,
       repeat: repeat != null ? RepeatConfig.fromJson(repeat) : null,
     );
   }
@@ -179,17 +178,17 @@ class Task {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        title,
-        done,
-        dueDate,
-        priority,
-        noteId,
-        noteTitle,
-        parentId,
-        reminder,
-        repeat,
-      );
+    id,
+    title,
+    done,
+    dueDate,
+    priority,
+    noteId,
+    noteTitle,
+    parentId,
+    reminder,
+    repeat,
+  );
 
   @override
   String toString() => 'Task($id, "$title", done=$done, priority=$priority)';

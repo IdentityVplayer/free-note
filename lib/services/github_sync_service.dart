@@ -180,7 +180,10 @@ class GitHubRelease {
       body: json['body'] as String? ?? '',
       htmlUrl: json['html_url'] as String? ?? '',
       assetUrls: assets
-          .map((a) => (a as Map<String, dynamic>)['browser_download_url'] as String?)
+          .map(
+            (a) =>
+                (a as Map<String, dynamic>)['browser_download_url'] as String?,
+          )
           .where((u) => u != null)
           .cast<String>()
           .toList(),
@@ -188,8 +191,7 @@ class GitHubRelease {
   }
 
   /// Where the user downloads: the first asset, or the release page itself.
-  String get downloadUrl =>
-      assetUrls.isNotEmpty ? assetUrls.first : htmlUrl;
+  String get downloadUrl => assetUrls.isNotEmpty ? assetUrls.first : htmlUrl;
 
   /// Compare two version strings ("1.12.0" vs "1.9.9"). Returns true when
   /// [latest] is strictly newer than [current].
@@ -460,15 +462,14 @@ extension GitHubSyncBrowserFlow on GitHubSyncService {
     required String state,
     required String codeChallenge,
     String redirectUri = 'http://localhost:$callbackPort$callbackPath',
-  }) =>
-      Uri.https('github.com', '/login/oauth/authorize', {
-        'client_id': clientId,
-        'redirect_uri': redirectUri,
-        'scope': 'repo',
-        'state': state,
-        'code_challenge': codeChallenge,
-        'code_challenge_method': 'S256',
-      });
+  }) => Uri.https('github.com', '/login/oauth/authorize', {
+    'client_id': clientId,
+    'redirect_uri': redirectUri,
+    'scope': 'repo',
+    'state': state,
+    'code_challenge': codeChallenge,
+    'code_challenge_method': 'S256',
+  });
 
   String _generateCodeVerifier() {
     final rnd = Random.secure();
@@ -476,9 +477,9 @@ extension GitHubSyncBrowserFlow on GitHubSyncService {
     return base64Url.encode(bytes).split('=')[0];
   }
 
-  String _pkceChallenge(String verifier) =>
-      base64Url.encode(crypto.sha256.convert(utf8.encode(verifier)).bytes)
-          .split('=')[0];
+  String _pkceChallenge(String verifier) => base64Url
+      .encode(crypto.sha256.convert(utf8.encode(verifier)).bytes)
+      .split('=')[0];
 
   String _generateState() {
     final rnd = Random.secure();
@@ -571,9 +572,7 @@ extension GitHubSyncBrowserFlow on GitHubSyncService {
         if (err != null) {
           _sendHtml(req, 'Authorization failed: $err');
           if (!completer.isCompleted) {
-            completer.completeError(
-              GitHubAuthException('授权被拒绝: $err', true),
-            );
+            completer.completeError(GitHubAuthException('授权被拒绝: $err', true));
           }
           return;
         }

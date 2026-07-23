@@ -99,21 +99,21 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
       final msg = _phase == PomodoroConfig.phaseWork
           ? l10n.t('pomodoroFocus')
           : (_phase == PomodoroConfig.phaseLong
-              ? l10n.t('pomodoroLongBreak')
-              : l10n.t('pomodoroShortBreak'));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${l10n.t('pomodoro')}: $msg')),
-      );
+                ? l10n.t('pomodoroLongBreak')
+                : l10n.t('pomodoroShortBreak'));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${l10n.t('pomodoro')}: $msg')));
     }
   }
 
   Future<void> _editSettings() async {
     final l10n = AppLocalizations.of(context)!;
     final workCtl = TextEditingController(text: '${_config.workMinutes}');
-    final shortCtl =
-        TextEditingController(text: '${_config.shortBreakMinutes}');
-    final longCtl =
-        TextEditingController(text: '${_config.longBreakMinutes}');
+    final shortCtl = TextEditingController(
+      text: '${_config.shortBreakMinutes}',
+    );
+    final longCtl = TextEditingController(text: '${_config.longBreakMinutes}');
     final everyCtl = TextEditingController(text: '${_config.longBreakEvery}');
 
     final changed = await showDialog<bool>(
@@ -127,26 +127,30 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
               TextField(
                 controller: workCtl,
                 keyboardType: TextInputType.number,
-                decoration:
-                    InputDecoration(labelText: l10n.t('pomodoroWorkMinutes')),
+                decoration: InputDecoration(
+                  labelText: l10n.t('pomodoroWorkMinutes'),
+                ),
               ),
               TextField(
                 controller: shortCtl,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                    labelText: l10n.t('pomodoroShortMinutes')),
+                  labelText: l10n.t('pomodoroShortMinutes'),
+                ),
               ),
               TextField(
                 controller: longCtl,
                 keyboardType: TextInputType.number,
-                decoration:
-                    InputDecoration(labelText: l10n.t('pomodoroLongMinutes')),
+                decoration: InputDecoration(
+                  labelText: l10n.t('pomodoroLongMinutes'),
+                ),
               ),
               TextField(
                 controller: everyCtl,
                 keyboardType: TextInputType.number,
-                decoration:
-                    InputDecoration(labelText: l10n.t('pomodoroInterval')),
+                decoration: InputDecoration(
+                  labelText: l10n.t('pomodoroInterval'),
+                ),
               ),
             ],
           ),
@@ -169,6 +173,7 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
       final v = int.tryParse(c.text);
       return (v != null && v > 0) ? v : d;
     }
+
     final newCfg = _config.copyWith(
       workMinutes: parse(workCtl, 25),
       shortBreakMinutes: parse(shortCtl, 5),
@@ -263,7 +268,9 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
                   onPressed: _running ? _pause : _start,
                   icon: Icon(_running ? Icons.pause : Icons.play_arrow),
                   label: Text(
-                    _running ? l10n.t('pomodoroPause') : l10n.t('pomodoroStart'),
+                    _running
+                        ? l10n.t('pomodoroPause')
+                        : l10n.t('pomodoroStart'),
                   ),
                 ),
                 const SizedBox(width: 16),

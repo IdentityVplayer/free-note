@@ -81,10 +81,7 @@ class AIService {
         messages.addAll(history);
       }
       if (context != null && context.isNotEmpty) {
-        messages.add({
-          'role': 'user',
-          'content': 'Context:\n$context',
-        });
+        messages.add({'role': 'user', 'content': 'Context:\n$context'});
       }
       messages.add({'role': 'user', 'content': question});
 

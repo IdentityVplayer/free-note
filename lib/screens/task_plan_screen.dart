@@ -186,7 +186,9 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
                   TextField(
                     controller: titleCtl,
                     autofocus: true,
-                    decoration: InputDecoration(hintText: l10n.t('taskTitleHint')),
+                    decoration: InputDecoration(
+                      hintText: l10n.t('taskTitleHint'),
+                    ),
                     onSubmitted: (_) => Navigator.pop(ctx, true),
                   ),
                   const SizedBox(height: 12),
@@ -238,7 +240,8 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
                       ),
                     ],
                     selected: {priority},
-                    onSelectionChanged: (s) => setInner(() => priority = s.first),
+                    onSelectionChanged: (s) =>
+                        setInner(() => priority = s.first),
                   ),
                   const SizedBox(height: 12),
                   // Reminder
@@ -280,7 +283,11 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
                               ? RepeatConfig(every: 1, unit: 'day')
                               : null,
                         ),
-                        child: Text(repeat == null ? l10n.t('repeat') : l10n.t('repeatNone')),
+                        child: Text(
+                          repeat == null
+                              ? l10n.t('repeat')
+                              : l10n.t('repeatNone'),
+                        ),
                       ),
                     ],
                   ),
@@ -427,13 +434,15 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
   }
 
   String _repeatLabel(RepeatConfig r, AppLocalizations l10n) {
-    final unitKey = {
-      'hour': 'unitHour',
-      'day': 'unitDay',
-      'week': 'unitWeek',
-      'month': 'unitMonth',
-      'year': 'unitYear',
-    }[r.unit] ?? 'unitDay';
+    final unitKey =
+        {
+          'hour': 'unitHour',
+          'day': 'unitDay',
+          'week': 'unitWeek',
+          'month': 'unitMonth',
+          'year': 'unitYear',
+        }[r.unit] ??
+        'unitDay';
     return '${r.every} ${l10n.t(unitKey)}';
   }
 
@@ -442,9 +451,7 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    final mainTasks = _tasks
-        .where((t) => t.parentId == null)
-        .toList()
+    final mainTasks = _tasks.where((t) => t.parentId == null).toList()
       ..sort(Task.compareForDisplay);
     List<Task> subtasksOf(String id) =>
         _tasks.where((t) => t.parentId == id).toList();
@@ -454,30 +461,30 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _tasks.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.checklist, size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      Text(
-                        l10n.t('taskEmpty'),
-                        style: theme.textTheme.titleMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.checklist, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.t('taskEmpty'),
+                    style: theme.textTheme.titleMedium,
+                    textAlign: TextAlign.center,
                   ),
-                )
-              : ListView(
-                  padding: const EdgeInsets.all(8),
-                  children: [
-                    for (final main in mainTasks) ...[
-                      _buildMainCard(main, l10n, theme),
-                      for (final sub in subtasksOf(main.id))
-                        _buildSubCard(sub, l10n, theme),
-                    ],
-                  ],
-                ),
+                ],
+              ),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(8),
+              children: [
+                for (final main in mainTasks) ...[
+                  _buildMainCard(main, l10n, theme),
+                  for (final sub in subtasksOf(main.id))
+                    _buildSubCard(sub, l10n, theme),
+                ],
+              ],
+            ),
       floatingActionButton: FloatingActionButton(
         tooltip: l10n.t('newTask'),
         onPressed: () => _showTaskDialog(),
@@ -521,8 +528,8 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
                   task.priority == Task.priorityHigh
                       ? l10n.t('priorityHigh')
                       : task.priority == Task.priorityNormal
-                          ? l10n.t('priorityNormal')
-                          : l10n.t('priorityLow'),
+                      ? l10n.t('priorityNormal')
+                      : l10n.t('priorityLow'),
                   style: const TextStyle(fontSize: 10),
                 ),
                 backgroundColor: priorityColor.withValues(alpha: 0.15),
@@ -609,10 +616,7 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
             },
             itemBuilder: (_) => [
               PopupMenuItem(value: 'edit', child: Text(l10n.t('edit'))),
-              PopupMenuItem(
-                value: 'delete',
-                child: Text(l10n.t('deleteNote')),
-              ),
+              PopupMenuItem(value: 'delete', child: Text(l10n.t('deleteNote'))),
             ],
           ),
         ),

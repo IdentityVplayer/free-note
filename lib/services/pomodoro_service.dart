@@ -75,10 +75,13 @@ class PomodoroConfig {
 /// When a work session completes, [completedWork] is the count *including* the
 /// one that just finished, so a long break is taken every [longBreakEvery]
 /// completed work sessions.
-String nextPomodoroPhase(String current, int completedWork, int longBreakEvery) {
+String nextPomodoroPhase(
+  String current,
+  int completedWork,
+  int longBreakEvery,
+) {
   if (current == PomodoroConfig.phaseWork) {
-    final takeLong =
-        longBreakEvery > 0 && completedWork % longBreakEvery == 0;
+    final takeLong = longBreakEvery > 0 && completedWork % longBreakEvery == 0;
     return takeLong ? PomodoroConfig.phaseLong : PomodoroConfig.phaseShort;
   }
   return PomodoroConfig.phaseWork;

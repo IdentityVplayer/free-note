@@ -261,7 +261,11 @@ class _EditorScreenState extends State<EditorScreen>
   void _insertAtCursor(String text) {
     if (_activeLine != null) {
       final sel = _lineController.selection;
-      final newText = _lineController.text.replaceRange(sel.start, sel.end, text);
+      final newText = _lineController.text.replaceRange(
+        sel.start,
+        sel.end,
+        text,
+      );
       _lineController.value = TextEditingValue(
         text: newText,
         selection: TextSelection.collapsed(offset: sel.start + text.length),
@@ -472,9 +476,7 @@ class _EditorScreenState extends State<EditorScreen>
     if (wordCountEnabled) {
       final wordCountPlugin =
           provider.pluginManager.plugins['builtin.wordcount']!;
-          counts =
-          (wordCountPlugin as dynamic).count(_content)
-          as Map<String, int>;
+      counts = (wordCountPlugin as dynamic).count(_content) as Map<String, int>;
     }
 
     return PopScope(
@@ -484,173 +486,176 @@ class _EditorScreenState extends State<EditorScreen>
         _autoSaveIfEnabled();
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _titleController.text.isEmpty
-              ? l10n.t('newNote')
-              : l10n.t('editNote'),
-        ),
-        actions: [
-          if (aiEnabled)
-            IconButton(
-              icon: const Icon(Icons.upload_file),
-              tooltip: l10n.t('aiChat'),
-              onPressed: _openAiDialog,
-            ),
-          if (aiEnabled)
-            IconButton(
-              icon: const Icon(Icons.auto_awesome),
-              tooltip: l10n.t('aiQa'),
-              onPressed: _openAiQa,
-            ),
-          if (exportEnabled)
-            IconButton(
-              icon: const Icon(Icons.download),
-              tooltip: l10n.t('export'),
-              onPressed: _export,
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Title field
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              controller: _titleController,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              decoration: InputDecoration(
-                hintText: l10n.t('title'),
-                border: InputBorder.none,
-              ),
-              onChanged: (_) => setState(() => _hasChanges = true),
-            ),
+        appBar: AppBar(
+          title: Text(
+            _titleController.text.isEmpty
+                ? l10n.t('newNote')
+                : l10n.t('editNote'),
           ),
-          // Tags
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Wrap(
-              spacing: 4,
-              children: [
-                ..._note.tags.map(
-                  (tag) => Chip(
-                    label: Text(tag),
-                    onDeleted: () {
-                      setState(() {
-                        _note.tags.remove(tag);
-                        _hasChanges = true;
-                      });
-                    },
-                  ),
+          actions: [
+            if (aiEnabled)
+              IconButton(
+                icon: const Icon(Icons.upload_file),
+                tooltip: l10n.t('aiChat'),
+                onPressed: _openAiDialog,
+              ),
+            if (aiEnabled)
+              IconButton(
+                icon: const Icon(Icons.auto_awesome),
+                tooltip: l10n.t('aiQa'),
+                onPressed: _openAiQa,
+              ),
+            if (exportEnabled)
+              IconButton(
+                icon: const Icon(Icons.download),
+                tooltip: l10n.t('export'),
+                onPressed: _export,
+              ),
+          ],
+        ),
+        body: Column(
+          children: [
+            // Title field
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                controller: _titleController,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  hintText: l10n.t('title'),
+                  border: InputBorder.none,
                 ),
-                SizedBox(
-                  width: 100,
-                  child: TextField(
-                    controller: _tagController,
-                    decoration: InputDecoration(
-                      hintText: l10n.t('addTag'),
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onSubmitted: (value) {
-                      if (value.isNotEmpty) {
+                onChanged: (_) => setState(() => _hasChanges = true),
+              ),
+            ),
+            // Tags
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 4,
+                children: [
+                  ..._note.tags.map(
+                    (tag) => Chip(
+                      label: Text(tag),
+                      onDeleted: () {
                         setState(() {
-                          _note.tags.add(value);
-                          _tagController.clear();
+                          _note.tags.remove(tag);
                           _hasChanges = true;
                         });
-                      }
-                    },
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-          // Save location + subfolder picker
-          _buildSaveLocation(context),
-          const Divider(),
-          // Markdown toolbar — always available; formats the active line.
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                _toolbarBtn(
-                  Icons.title,
-                  () => _insertText('## '),
-                  hint: l10n.t('insertHeading'),
-                ),
-                _toolbarBtn(
-                  Icons.format_bold,
-                  () => _insertText('**'),
-                  hint: l10n.t('insertBold'),
-                ),
-                _toolbarBtn(
-                  Icons.format_italic,
-                  () => _insertText('*'),
-                  hint: l10n.t('insertItalic'),
-                ),
-                _toolbarBtn(
-                  Icons.code,
-                  () => _insertText('`'),
-                  hint: l10n.t('insertCode'),
-                ),
-                _toolbarBtn(
-                  Icons.link,
-                  () => _insertText('[', ']()'),
-                  hint: l10n.t('insertLink'),
-                ),
-                _toolbarBtn(
-                  Icons.list,
-                  () => _insertText('- '),
-                  hint: l10n.t('insertList'),
-                ),
-                _toolbarBtn(
-                  Icons.format_quote,
-                  () => _insertText('> '),
-                  hint: l10n.t('insertQuote'),
-                ),
-                _toolbarBtn(
-                  Icons.functions,
-                  () => _openMathPage(),
-                  hint: l10n.t('math'),
-                ),
-                // User "editor" plugins render their insert buttons here.
-                ...provider.pluginManager.buildWidgets(context),
-              ],
-            ),
-          ),
-          const Divider(),
-          // Hybrid editor: every line is preview; the active line is raw.
-          Expanded(child: _buildHybridBody()),
-          // Status bar (only when the Word Count plugin is enabled)
-          if (wordCountEnabled)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${l10n.t('words')}: ${counts['words']}  '
-                    '${l10n.t('characters')}: ${counts['chars']}  '
-                    '${l10n.t('lines')}: ${counts['lines']}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  Text(
-                    '${_note.updatedAt.day}/${_note.updatedAt.month}/${_note.updatedAt.year}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  SizedBox(
+                    width: 100,
+                    child: TextField(
+                      controller: _tagController,
+                      decoration: InputDecoration(
+                        hintText: l10n.t('addTag'),
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onSubmitted: (value) {
+                        if (value.isNotEmpty) {
+                          setState(() {
+                            _note.tags.add(value);
+                            _tagController.clear();
+                            _hasChanges = true;
+                          });
+                        }
+                      },
+                    ),
                   ),
                 ],
               ),
             ),
-        ],
-      ),
+            const Divider(),
+            // Save location + subfolder picker
+            _buildSaveLocation(context),
+            const Divider(),
+            // Markdown toolbar — always available; formats the active line.
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  _toolbarBtn(
+                    Icons.title,
+                    () => _insertText('## '),
+                    hint: l10n.t('insertHeading'),
+                  ),
+                  _toolbarBtn(
+                    Icons.format_bold,
+                    () => _insertText('**'),
+                    hint: l10n.t('insertBold'),
+                  ),
+                  _toolbarBtn(
+                    Icons.format_italic,
+                    () => _insertText('*'),
+                    hint: l10n.t('insertItalic'),
+                  ),
+                  _toolbarBtn(
+                    Icons.code,
+                    () => _insertText('`'),
+                    hint: l10n.t('insertCode'),
+                  ),
+                  _toolbarBtn(
+                    Icons.link,
+                    () => _insertText('[', ']()'),
+                    hint: l10n.t('insertLink'),
+                  ),
+                  _toolbarBtn(
+                    Icons.list,
+                    () => _insertText('- '),
+                    hint: l10n.t('insertList'),
+                  ),
+                  _toolbarBtn(
+                    Icons.format_quote,
+                    () => _insertText('> '),
+                    hint: l10n.t('insertQuote'),
+                  ),
+                  _toolbarBtn(
+                    Icons.functions,
+                    () => _openMathPage(),
+                    hint: l10n.t('math'),
+                  ),
+                  // User "editor" plugins render their insert buttons here.
+                  ...provider.pluginManager.buildWidgets(context),
+                ],
+              ),
+            ),
+            const Divider(),
+            // Hybrid editor: every line is preview; the active line is raw.
+            Expanded(child: _buildHybridBody()),
+            // Status bar (only when the Word Count plugin is enabled)
+            if (wordCountEnabled)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${l10n.t('words')}: ${counts['words']}  '
+                      '${l10n.t('characters')}: ${counts['chars']}  '
+                      '${l10n.t('lines')}: ${counts['lines']}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    Text(
+                      '${_note.updatedAt.day}/${_note.updatedAt.month}/${_note.updatedAt.year}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

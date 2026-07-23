@@ -113,7 +113,10 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
     final tasks = await TaskService.instance.loadTasks();
     for (final t in tasks) {
       if (t.reminder != null) {
-        await NotificationService.instance.scheduleReminder(t, title: 'Reminder');
+        await NotificationService.instance.scheduleReminder(
+          t,
+          title: 'Reminder',
+        );
       }
     }
   }
@@ -313,7 +316,8 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
   }) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return null;
-    final id = 'user.${trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '')}.${DateTime.now().millisecondsSinceEpoch}';
+    final id =
+        'user.${trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '')}.${DateTime.now().millisecondsSinceEpoch}';
     final plugin = UserPlugin(
       id: id,
       name: trimmed,
@@ -334,9 +338,7 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
   void removeUserPlugin(String id) {
     if (!UserPlugin.isUserPluginId(id)) return;
     pluginManager.unregister(id);
-    final updated = _settings.userPlugins
-        .where((p) => p.id != id)
-        .toList();
+    final updated = _settings.userPlugins.where((p) => p.id != id).toList();
     _settings.userPlugins = updated;
     _storage.saveSettings(_settings);
     notifyListeners();

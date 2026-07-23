@@ -79,9 +79,7 @@ class UserPlugin extends FreeNotePlugin {
   @override
   Widget? buildWidget(BuildContext context) {
     // "editor"-type user plugins with a snippet get a real toolbar button.
-    if (type == PluginType.editor &&
-        snippet != null &&
-        snippet!.isNotEmpty) {
+    if (type == PluginType.editor && snippet != null && snippet!.isNotEmpty) {
       return IconButton(
         icon: const Icon(Icons.extension),
         tooltip: name,

@@ -47,8 +47,7 @@ class _AiQaScreenState extends State<AiQaScreen> {
 
   void _onNoteChanged() {
     final sel = _noteController.selection;
-    final selText =
-        sel.isValid && !sel.isCollapsed
+    final selText = sel.isValid && !sel.isCollapsed
         ? sel.textInside(_noteController.text)
         : null;
     if (selText != _selectedText) {

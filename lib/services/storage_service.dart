@@ -77,8 +77,7 @@ class StorageService {
   /// Public, awaitable config directory — used for settings.json, tasks.json,
   /// pomodoro.json, etc. So all app config travels with the selected
   /// repository (resides in `<repo>/.config`) and is portable.
-  Future<Directory> get configDir async =>
-      Directory(await _configDirPath);
+  Future<Directory> get configDir async => Directory(await _configDirPath);
 
   /// One-time migration: move [fileName] from the legacy private app dir
   /// (`free_note/`) into the current config dir. No-op when already present

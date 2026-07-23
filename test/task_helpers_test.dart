@@ -9,16 +9,15 @@ Task _t(
   DateTime? reminder,
   RepeatConfig? repeat,
   String title = 't',
-}) =>
-    Task(
-      id: id,
-      title: title,
-      createdAt: DateTime(2026),
-      done: done,
-      parentId: parentId,
-      reminder: reminder,
-      repeat: repeat,
-    );
+}) => Task(
+  id: id,
+  title: title,
+  createdAt: DateTime(2026),
+  done: done,
+  parentId: parentId,
+  reminder: reminder,
+  repeat: repeat,
+);
 
 void main() {
   group('recomputeMainDone', () {
@@ -94,7 +93,10 @@ void main() {
   group('freshTaskCopy', () {
     test('copies main + subtasks with new ids, all undone', () {
       final main = _t('m', done: true);
-      final subs = [_t('s1', parentId: 'm', done: true), _t('s2', parentId: 'm')];
+      final subs = [
+        _t('s1', parentId: 'm', done: true),
+        _t('s2', parentId: 'm'),
+      ];
       final (newId, freshMain, freshSubs) = freshTaskCopy(main, subs);
       expect(newId, isNot('m'));
       expect(freshMain.id, newId);
