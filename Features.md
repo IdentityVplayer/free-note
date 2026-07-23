@@ -4,6 +4,12 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.12.1
+
+### Fixed
+- **Android 发布构建（Build & Release / Auto Build）`checkReleaseAarMetadata` 失败** — `flutter_local_notifications` 要求启用 core library desugaring；在 `android/app/build.gradle.kts` 的 `compileOptions` 开启 `isCoreLibraryDesugaringEnabled = true` 并引入 `com.android.tools:desugar_jdk_libs:2.1.0` 依赖，APK/AAB 重新通过元数据检查。
+- **CI `dart format --set-exit-if-changed` 失败** — 重新格式化 `lib/services/windows_notifications.dart`（参数列表换行），与 Flutter 3.44 (Dart 3.12) 格式化规则对齐。
+
 ## 1.12.0
 
 ### New Features

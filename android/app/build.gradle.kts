@@ -12,6 +12,10 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // Required by flutter_local_notifications (and other plugins using
+        // Java 8+ APIs): enable core library desugaring so the release AAR
+        // metadata check passes.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -75,6 +79,13 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
     }
+}
+
+dependencies {
+    // Core library desugaring (Java 8+ APIs) required by
+    // flutter_local_notifications and other modern plugins. Must match the
+    // version expected by the installed AGP.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.0")
 }
 
 kotlin {

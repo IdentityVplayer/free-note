@@ -20,11 +20,13 @@ class WindowsNotifications {
   Future<void> show(String title, String body) async {
     if (!Platform.isWindows) return;
     try {
-      await Process.run(
-        'powershell.exe',
-        ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', _toastScript(title, body)],
-        runInShell: false,
-      );
+      await Process.run('powershell.exe', [
+        '-NoProfile',
+        '-WindowStyle',
+        'Hidden',
+        '-Command',
+        _toastScript(title, body),
+      ], runInShell: false);
     } catch (_) {
       // Best-effort: ignore (PowerShell/WinRT unavailable).
     }
@@ -37,20 +39,25 @@ class WindowsNotifications {
   Future<void> schedule(DateTime due, String title, String body, int id) async {
     if (!Platform.isWindows) return;
     try {
-      final ps1 = File('${Directory.systemTemp.path}/freennote_reminder_$id.ps1');
+      final ps1 = File(
+        '${Directory.systemTemp.path}/freennote_reminder_$id.ps1',
+      );
       await ps1.writeAsString(_toastScript(title, body));
       final taskName = 'FreeNote-Reminder-$id';
-      final register = '''
+      final register =
+          '''
 \$a = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -WindowStyle Hidden -File \\"${ps1.path}\\""
 \$t = New-ScheduledTaskTrigger -Once -At (Get-Date "${_iso(due)}")
 Unregister-ScheduledTask -TaskName "$taskName" -Confirm:\$false -ErrorAction SilentlyContinue
 Register-ScheduledTask -TaskName "$taskName" -Action \$a -Trigger \$t -Force
 ''';
-      await Process.run(
-        'powershell.exe',
-        ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', register],
-        runInShell: false,
-      );
+      await Process.run('powershell.exe', [
+        '-NoProfile',
+        '-WindowStyle',
+        'Hidden',
+        '-Command',
+        register,
+      ], runInShell: false);
     } catch (_) {
       // Best-effort: ignore scheduling failures.
     }
