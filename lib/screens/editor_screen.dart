@@ -8,6 +8,7 @@ import '../models/note.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../markdown/math_markdown.dart';
+import '../utils/text_edit.dart';
 import 'subfolder_picker_screen.dart';
 import 'ai_assistant_screen.dart';
 import 'math_insert_screen.dart';
@@ -29,11 +30,22 @@ class _EditorScreenState extends State<EditorScreen>
   late Note _note;
   late AppProvider _provider;
   late TextEditingController _titleController;
-  late TextEditingController _contentController;
   late TextEditingController _tagController;
-  bool _isPreview = false;
   bool _aiLoading = false;
   bool _hasChanges = false;
+
+  /// The note body, kept as the single source of truth. The hybrid editor
+  /// renders it line-by-line; only [ _activeLine ] is shown raw/editable.
+  String _content = '';
+
+  /// Index of the line currently being edited (raw TextField). When null the
+  /// whole document is rendered as preview.
+  int? _activeLine;
+
+  /// Controller + focus for the single active line. Identity is stable so
+  /// focus/caret survive ListView rebuilds while typing.
+  final TextEditingController _lineController = TextEditingController();
+  final FocusNode _lineFocus = FocusNode();
 
   @override
   void initState() {
@@ -48,8 +60,9 @@ class _EditorScreenState extends State<EditorScreen>
       _note = _provider.createNote();
     }
     _titleController = TextEditingController(text: _note.title);
-    _contentController = TextEditingController(text: _note.content);
+    _content = _note.content;
     _tagController = TextEditingController();
+    _lineFocus.addListener(_onLineFocusLost);
     WidgetsBinding.instance.addObserver(this);
 
     // AI-generated note: auto-open the chat dialog with the conversation as
@@ -69,9 +82,19 @@ class _EditorScreenState extends State<EditorScreen>
     // Detach the insert hook so no stale closure outlives this editor.
     PluginHost.insertHandler = null;
     _titleController.dispose();
-    _contentController.dispose();
+    _lineController.dispose();
+    _lineFocus.dispose();
     _tagController.dispose();
     super.dispose();
+  }
+
+  /// When the active line's focus leaves (e.g. the user taps the title or a
+  /// toolbar control), drop back to all-preview. Switching between lines does
+  /// NOT trigger this because both fields share the same focus node.
+  void _onLineFocusLost() {
+    if (!_lineFocus.hasFocus && _activeLine != null) {
+      setState(() => _activeLine = null);
+    }
   }
 
   /// Save the current note when the Auto Save plugin is enabled and there are
@@ -83,13 +106,12 @@ class _EditorScreenState extends State<EditorScreen>
       'builtin.autosave',
     );
     final contentChanged =
-        _note.content != _contentController.text ||
-        _note.title != _titleController.text;
+        _note.content != _content || _note.title != _titleController.text;
     if (!autoSaveEnabled) return;
     if (!_hasChanges && !contentChanged) return;
     final updated = _note.copyWith(
       title: _titleController.text.isEmpty ? 'Untitled' : _titleController.text,
-      content: _contentController.text,
+      content: _content,
       updatedAt: DateTime.now(),
     );
     _provider.updateNote(updated);
@@ -140,20 +162,25 @@ class _EditorScreenState extends State<EditorScreen>
   }
 
   void _insertText(String before, [String? after]) {
-    final text = _contentController.text;
-    final selection = _contentController.selection;
-    final selectedText = selection.textInside(text);
-    final newText = text.replaceRange(
-      selection.start,
-      selection.end,
-      '$before$selectedText${after ?? before}',
-    );
-    _contentController.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(
-        offset: selection.start + before.length + selectedText.length,
-      ),
-    );
+    final afterStr = after ?? before;
+    if (_activeLine != null) {
+      final sel = _lineController.selection;
+      final selectedText = sel.textInside(_lineController.text);
+      final newText = _lineController.text.replaceRange(
+        sel.start,
+        sel.end,
+        '$before$selectedText$afterStr',
+      );
+      _lineController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(
+          offset: sel.start + before.length + selectedText.length,
+        ),
+      );
+      _content = applyLineEdit(_content, _activeLine!, newText);
+    } else {
+      _content = '$_content$before$afterStr';
+    }
     setState(() => _hasChanges = true);
   }
 
@@ -164,14 +191,15 @@ class _EditorScreenState extends State<EditorScreen>
     setState(() => _aiLoading = true);
     try {
       final result = await provider.aiService.assistWriting(
-        _contentController.text,
+        _content,
         mode: mode,
       );
       if (mode == WritingMode.continue_) {
-        _contentController.text += '\n\n$result';
+        _content += '\n\n$result';
       } else {
-        _contentController.text = result;
+        _content = result;
       }
+      _activeLine = null;
       setState(() => _hasChanges = true);
     } on AIException catch (e) {
       if (mounted) {
@@ -297,7 +325,8 @@ class _EditorScreenState extends State<EditorScreen>
     ).then((result) {
       if (result is String && result.isNotEmpty && mounted) {
         _note = _note.copyWith(content: result, updatedAt: DateTime.now());
-        _contentController.text = result;
+        _content = result;
+        _activeLine = null;
         _hasChanges = false;
         ScaffoldMessenger.of(
           context,
@@ -318,18 +347,20 @@ class _EditorScreenState extends State<EditorScreen>
     }
   }
 
-  /// Insert [text] at the current selection, moving the caret to the end.
+  /// Insert [text] at the current caret (active line, else end of document),
+  /// moving the caret to the end of the inserted text.
   void _insertAtCursor(String text) {
-    final selection = _contentController.selection;
-    final newText = _contentController.text.replaceRange(
-      selection.start,
-      selection.end,
-      text,
-    );
-    _contentController.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(offset: selection.start + text.length),
-    );
+    if (_activeLine != null) {
+      final sel = _lineController.selection;
+      final newText = _lineController.text.replaceRange(sel.start, sel.end, text);
+      _lineController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: sel.start + text.length),
+      );
+      _content = applyLineEdit(_content, _activeLine!, newText);
+    } else {
+      _content = '$_content$text';
+    }
     setState(() => _hasChanges = true);
   }
 
@@ -406,6 +437,130 @@ class _EditorScreenState extends State<EditorScreen>
     ),
   );
 
+  /// The body: a scrollable list of lines. Every line is rendered as Markdown
+  /// preview except [ _activeLine ], which is shown as a raw, editable field.
+  Widget _buildHybridBody() {
+    final l10n = AppLocalizations.of(context)!;
+    final lines = splitLines(_content);
+    return Stack(
+      children: [
+        ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: lines.length,
+          itemBuilder: (ctx, i) {
+            if (_activeLine == i) return _buildActiveLineField(i);
+            return _buildPreviewLine(i, lines[i]);
+          },
+        ),
+        if (_aiLoading)
+          Container(
+            color: Colors.black38,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.t('aiThinking'),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// The currently-edited line: a raw TextField with a highlighted left edge.
+  Widget _buildActiveLineField(int i) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        border: Border(
+          left: BorderSide(color: theme.colorScheme.primary, width: 3),
+        ),
+      ),
+      child: TextField(
+        controller: _lineController,
+        focusNode: _lineFocus,
+        maxLines: null,
+        textAlignVertical: TextAlignVertical.top,
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          isCollapsed: true,
+          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        ),
+        style: theme.textTheme.bodyMedium,
+        onChanged: (v) {
+          if (v.contains('\n')) {
+            // Enter inserted a newline — split this line there.
+            _splitActiveLineAtText(v);
+            return;
+          }
+          _content = applyLineEdit(_content, i, v);
+          _hasChanges = true;
+        },
+      ),
+    );
+  }
+
+  /// A preview line; tapping it makes that line the active (raw) one.
+  Widget _buildPreviewLine(int i, String line) {
+    if (line.isEmpty) return const SizedBox(height: 22);
+    return GestureDetector(
+      onTap: () => _setActiveLine(i),
+      child: safeMarkdown(
+        data: line,
+        onTapLink: (text, href, title) {
+          if (href != null) _launchUrl(href);
+        },
+      ),
+    );
+  }
+
+  /// Activate line [i] for editing, seeding the raw field with its text and
+  /// moving the caret to the end. Tapping the already-active line just refocuses.
+  void _setActiveLine(int i) {
+    if (_activeLine == i) {
+      _lineFocus.requestFocus();
+      return;
+    }
+    setState(() {
+      _activeLine = i;
+      final lines = splitLines(_content);
+      _lineController.text = lines[i];
+      _lineController.selection = TextSelection.collapsed(
+        offset: _lineController.text.length,
+      );
+    });
+    _lineFocus.requestFocus();
+  }
+
+  /// Split the active line at the inserted newline (entered via keyboard).
+  void _splitActiveLineAtText(String v) {
+    final i = _activeLine!;
+    final local = v.indexOf('\n');
+    int global = 0;
+    final lines = splitLines(_content);
+    for (var k = 0; k < i; k++) {
+      global += lines[k].length + 1;
+    }
+    global += local;
+    final (newContent, _) = insertLineBreak(_content, global);
+    _content = newContent;
+    final newLines = splitLines(_content);
+    setState(() {
+      _activeLine = i + 1;
+      _lineController.text = newLines[i + 1];
+      _lineController.selection = const TextSelection.collapsed(offset: 0);
+    });
+    _lineFocus.requestFocus();
+    _hasChanges = true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -426,9 +581,9 @@ class _EditorScreenState extends State<EditorScreen>
     if (wordCountEnabled) {
       final wordCountPlugin =
           provider.pluginManager.plugins['builtin.wordcount']!;
-      counts =
-          (wordCountPlugin as dynamic).count(_contentController.text)
-              as Map<String, int>;
+          counts =
+          (wordCountPlugin as dynamic).count(_content)
+          as Map<String, int>;
     }
 
     return PopScope(
@@ -445,11 +600,6 @@ class _EditorScreenState extends State<EditorScreen>
               : l10n.t('editNote'),
         ),
         actions: [
-          IconButton(
-            icon: Icon(_isPreview ? Icons.edit : Icons.preview),
-            tooltip: _isPreview ? l10n.t('edit') : l10n.t('preview'),
-            onPressed: () => setState(() => _isPreview = !_isPreview),
-          ),
           if (aiEnabled)
             IconButton(
               icon: const Icon(Icons.upload_file),
@@ -531,102 +681,60 @@ class _EditorScreenState extends State<EditorScreen>
           // Save location + subfolder picker
           _buildSaveLocation(context),
           const Divider(),
-          // Markdown toolbar (edit mode only)
-          if (!_isPreview) ...[
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                children: [
-                  _toolbarBtn(
-                    Icons.title,
-                    () => _insertText('## '),
-                    hint: l10n.t('insertHeading'),
-                  ),
-                  _toolbarBtn(
-                    Icons.format_bold,
-                    () => _insertText('**'),
-                    hint: l10n.t('insertBold'),
-                  ),
-                  _toolbarBtn(
-                    Icons.format_italic,
-                    () => _insertText('*'),
-                    hint: l10n.t('insertItalic'),
-                  ),
-                  _toolbarBtn(
-                    Icons.code,
-                    () => _insertText('`'),
-                    hint: l10n.t('insertCode'),
-                  ),
-                  _toolbarBtn(
-                    Icons.link,
-                    () => _insertText('[', ']()'),
-                    hint: l10n.t('insertLink'),
-                  ),
-                  _toolbarBtn(
-                    Icons.list,
-                    () => _insertText('- '),
-                    hint: l10n.t('insertList'),
-                  ),
-                  _toolbarBtn(
-                    Icons.format_quote,
-                    () => _insertText('> '),
-                    hint: l10n.t('insertQuote'),
-                  ),
-                  _toolbarBtn(
-                    Icons.functions,
-                    () => _openMathPage(),
-                    hint: l10n.t('math'),
-                  ),
-                  // User "editor" plugins render their insert buttons here.
-                  ...provider.pluginManager.buildWidgets(context),
-                ],
-              ),
+          // Markdown toolbar — always available; formats the active line.
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                _toolbarBtn(
+                  Icons.title,
+                  () => _insertText('## '),
+                  hint: l10n.t('insertHeading'),
+                ),
+                _toolbarBtn(
+                  Icons.format_bold,
+                  () => _insertText('**'),
+                  hint: l10n.t('insertBold'),
+                ),
+                _toolbarBtn(
+                  Icons.format_italic,
+                  () => _insertText('*'),
+                  hint: l10n.t('insertItalic'),
+                ),
+                _toolbarBtn(
+                  Icons.code,
+                  () => _insertText('`'),
+                  hint: l10n.t('insertCode'),
+                ),
+                _toolbarBtn(
+                  Icons.link,
+                  () => _insertText('[', ']()'),
+                  hint: l10n.t('insertLink'),
+                ),
+                _toolbarBtn(
+                  Icons.list,
+                  () => _insertText('- '),
+                  hint: l10n.t('insertList'),
+                ),
+                _toolbarBtn(
+                  Icons.format_quote,
+                  () => _insertText('> '),
+                  hint: l10n.t('insertQuote'),
+                ),
+                _toolbarBtn(
+                  Icons.functions,
+                  () => _openMathPage(),
+                  hint: l10n.t('math'),
+                ),
+                // User "editor" plugins render their insert buttons here.
+                ...provider.pluginManager.buildWidgets(context),
+              ],
             ),
-            const Divider(),
-          ],
-          // Editor / Preview
-          Expanded(
-            child: _isPreview
-                ? safeMarkdown(
-                    data: _contentController.text,
-                    onTapLink: (text, href, title) {
-                      if (href != null) _launchUrl(href);
-                    },
-                  )
-                : Stack(
-                    children: [
-                      TextField(
-                        controller: _contentController,
-                        maxLines: null,
-                        expands: true,
-                        textAlignVertical: TextAlignVertical.top,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.all(16),
-                        ),
-                        onChanged: (_) => setState(() => _hasChanges = true),
-                      ),
-                      if (_aiLoading)
-                        Container(
-                          color: Colors.black38,
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const CircularProgressIndicator(),
-                                const SizedBox(height: 16),
-                                Text(
-                                  l10n.t('aiThinking'),
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
           ),
+          const Divider(),
+          // Hybrid editor: every line is preview; the active line is raw.
+          Expanded(child: _buildHybridBody()),
           // Status bar (only when the Word Count plugin is enabled)
           if (wordCountEnabled)
             Container(
