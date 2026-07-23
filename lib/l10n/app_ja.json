@@ -241,5 +241,21 @@
   "unitWeek": "週",
   "unitMonth": "ヶ月",
   "unitYear": "年",
-  "reminderAt": "通知時刻"
+  "reminderAt": "通知時刻",
+  "openFull": "全画面で開く",
+  "newPomodoro": "新規ポモドーロ",
+  "pomodoroProfiles": "ポモドーロ設定",
+  "pomodoroProfileName": "プリセット名",
+  "pomodoroNewProfile": "新規ポモドーロ",
+  "pomodoroRenameProfile": "プリセット名変更",
+  "pomodoroDeleteProfile": "プリセット削除",
+  "pomodoroDeleteProfileConfirm": "このプリセットを削除しますか？",
+  "pomodoroKeepOne": "最低1つのプリセットが必要です",
+  "pomodoroBackground": "背景",
+  "pomodoroBackgroundFromAlbum": "ギャラリーから選択",
+  "pomodoroBackgroundSet": "背景を設定しました",
+  "pomodoroBackgroundCleared": "背景を解除しました",
+  "pomodoroClearBackground": "背景を解除",
+  "pomodoroDefault": "デフォルト",
+  "close": "閉じる"
 }

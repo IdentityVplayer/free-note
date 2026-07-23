@@ -14,7 +14,11 @@ import 'editor_screen.dart';
 /// with due dates, priority, optional note links, reminders and repetition.
 /// Tasks persist via [TaskService].
 class TaskPlanScreen extends StatefulWidget {
-  const TaskPlanScreen({super.key});
+  /// When true, opens the "new task" dialog on first load (used by the
+  /// home-screen FAB so a single tap on the tasks tab creates a task).
+  final bool autoAdd;
+
+  const TaskPlanScreen({super.key, this.autoAdd = false});
 
   @override
   State<TaskPlanScreen> createState() => _TaskPlanScreenState();
@@ -40,6 +44,7 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
         _loading = false;
       });
     }
+    if (widget.autoAdd && mounted) _showTaskDialog();
   }
 
   Future<void> _persist() async {

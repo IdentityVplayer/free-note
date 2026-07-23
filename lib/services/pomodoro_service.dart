@@ -1,138 +1,169 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import '../models/pomodoro_profile.dart';
 import 'storage_service.dart';
-
-/// Tunable durations for the Pomodoro timer.
-class PomodoroConfig {
-  final int workMinutes;
-  final int shortBreakMinutes;
-  final int longBreakMinutes;
-
-  /// After this many completed work sessions, take a long break instead of a
-  /// short one (the classic "4 pomodoros → long break" rhythm).
-  final int longBreakEvery;
-
-  const PomodoroConfig({
-    this.workMinutes = 25,
-    this.shortBreakMinutes = 5,
-    this.longBreakMinutes = 15,
-    this.longBreakEvery = 4,
-  });
-
-  static const String phaseWork = 'work';
-  static const String phaseShort = 'short';
-  static const String phaseLong = 'long';
-
-  /// Duration (in seconds) for [phase].
-  int secondsForPhase(String phase) {
-    switch (phase) {
-      case phaseWork:
-        return workMinutes * 60;
-      case phaseShort:
-        return shortBreakMinutes * 60;
-      case phaseLong:
-        return longBreakMinutes * 60;
-      default:
-        return workMinutes * 60;
-    }
-  }
-
-  PomodoroConfig copyWith({
-    int? workMinutes,
-    int? shortBreakMinutes,
-    int? longBreakMinutes,
-    int? longBreakEvery,
-  }) {
-    return PomodoroConfig(
-      workMinutes: workMinutes ?? this.workMinutes,
-      shortBreakMinutes: shortBreakMinutes ?? this.shortBreakMinutes,
-      longBreakMinutes: longBreakMinutes ?? this.longBreakMinutes,
-      longBreakEvery: longBreakEvery ?? this.longBreakEvery,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'workMinutes': workMinutes,
-    'shortBreakMinutes': shortBreakMinutes,
-    'longBreakMinutes': longBreakMinutes,
-    'longBreakEvery': longBreakEvery,
-  };
-
-  factory PomodoroConfig.fromJson(Map<String, dynamic> json) {
-    int clamp(v, int d) => (v is int && v > 0) ? v : d;
-    return PomodoroConfig(
-      workMinutes: clamp(json['workMinutes'], 25),
-      shortBreakMinutes: clamp(json['shortBreakMinutes'], 5),
-      longBreakMinutes: clamp(json['longBreakMinutes'], 15),
-      longBreakEvery: clamp(json['longBreakEvery'], 4),
-    );
-  }
-}
 
 /// Determine the next phase after [current] finishes.
 ///
 /// When a work session completes, [completedWork] is the count *including* the
-/// one that just finished, so a long break is taken every [longBreakEvery]
-/// completed work sessions.
+/// one that just finished, so a long break is taken every [profile.longBreakEvery]
+/// completed work sessions — but only if [profile.longBreakEnabled] is true.
 String nextPomodoroPhase(
+  PomodoroProfile profile,
   String current,
   int completedWork,
-  int longBreakEvery,
 ) {
-  if (current == PomodoroConfig.phaseWork) {
-    final takeLong = longBreakEvery > 0 && completedWork % longBreakEvery == 0;
-    return takeLong ? PomodoroConfig.phaseLong : PomodoroConfig.phaseShort;
+  if (current == PomodoroProfile.phaseWork) {
+    final takeLong =
+        profile.longBreakEnabled &&
+        profile.longBreakEvery > 0 &&
+        completedWork % profile.longBreakEvery == 0;
+    return takeLong ? PomodoroProfile.phaseLong : PomodoroProfile.phaseShort;
   }
-  return PomodoroConfig.phaseWork;
+  return PomodoroProfile.phaseWork;
 }
 
-/// Persists the Pomodoro configuration (durations / rhythm).
+/// Persists the list of Pomodoro profiles (presets) and which one is active.
 class PomodoroService {
   static final PomodoroService instance = PomodoroService._();
   PomodoroService._();
 
-  PomodoroConfig _config = const PomodoroConfig();
+  List<PomodoroProfile> _profiles = [];
+  String? _activeId;
 
   /// Test hook for an alternate storage directory.
   Directory? _overrideDir;
   void debugSetDir(Directory dir) => _overrideDir = dir;
 
-  PomodoroConfig get config => _config;
+  List<PomodoroProfile> get profiles =>
+      List<PomodoroProfile>.from(_profiles, growable: false);
+
+  PomodoroProfile get active {
+    if (_profiles.isEmpty) _profiles = [_defaultProfile()];
+    return _profiles.firstWhere(
+      (p) => p.id == _activeId,
+      orElse: () => _profiles.first,
+    );
+  }
+
+  /// The reserved id of the auto-seeded default profile (whose name is shown
+  /// localized in the UI).
+  static const String defaultId = 'default';
 
   Future<Directory> get _dir async {
     if (_overrideDir != null) return _overrideDir!;
     return StorageService.instance.configDir;
   }
 
-  /// Load the saved config (falls back to defaults when none / corrupt).
-  Future<PomodoroConfig> load() async {
-    // Migration only applies to the real config location, not an isolated
-    // (test) override dir — which has no legacy private-dir files to move.
+  /// Load the saved profiles (falls back to a single default when none /
+  /// corrupt). Migrates the legacy single `pomodoro.json` config into a
+  /// default profile on first run.
+  Future<List<PomodoroProfile>> load() async {
     if (_overrideDir == null) {
       await StorageService.instance.migrateFileFromPrivate('pomodoro.json');
     }
-    final file = File(p.join((await _dir).path, 'pomodoro.json'));
+    final dir = await _dir;
+    final file = File(p.join(dir.path, 'pomodoro_profiles.json'));
     if (!file.existsSync()) {
-      _config = const PomodoroConfig();
-      return _config;
+      final legacy = File(p.join(dir.path, 'pomodoro.json'));
+      PomodoroProfile initial;
+      if (legacy.existsSync()) {
+        try {
+          final json =
+              jsonDecode(legacy.readAsStringSync()) as Map<String, dynamic>;
+          int clamp(v, int d) => (v is int && v > 0) ? v : d;
+          initial = PomodoroProfile(
+            id: defaultId,
+            name: defaultId,
+            workMinutes: clamp(json['workMinutes'], 25),
+            shortBreakMinutes: clamp(json['shortBreakMinutes'], 5),
+            longBreakMinutes: clamp(json['longBreakMinutes'], 15),
+            longBreakEvery: clamp(json['longBreakEvery'], 4),
+          );
+        } catch (_) {
+          initial = _defaultProfile();
+        }
+      } else {
+        initial = _defaultProfile();
+      }
+      _profiles = [initial];
+      _activeId = initial.id;
+      await _persist();
+      return _profiles;
     }
     try {
-      final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-      _config = PomodoroConfig.fromJson(json);
+      final map = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      final list = (map['profiles'] as List? ?? [])
+          .map((e) => PomodoroProfile.fromJson(e))
+          .toList();
+      _profiles = list.isNotEmpty ? list : [_defaultProfile()];
+      _activeId = map['activeId'] as String? ?? _profiles.first.id;
     } catch (_) {
-      _config = const PomodoroConfig();
+      _profiles = [_defaultProfile()];
+      _activeId = _profiles.first.id;
     }
-    return _config;
+    return _profiles;
   }
 
-  Future<void> save(PomodoroConfig config) async {
-    _config = config;
-    final file = File(p.join((await _dir).path, 'pomodoro.json'));
+  Future<void> _persist() async {
+    final dir = await _dir;
+    final file = File(p.join(dir.path, 'pomodoro_profiles.json'));
     try {
-      file.writeAsStringSync(jsonEncode(config.toJson()));
+      file.writeAsStringSync(
+        jsonEncode({
+          'activeId': _activeId,
+          'profiles': _profiles.map((p) => p.toJson()).toList(),
+        }),
+      );
     } catch (_) {
       // best-effort
     }
   }
+
+  /// Replace the whole list and the active id (used by the profile manager).
+  Future<void> saveProfiles(
+    List<PomodoroProfile> profiles,
+    String activeId,
+  ) async {
+    _profiles = List<PomodoroProfile>.from(profiles, growable: false);
+    _activeId = activeId;
+    await _persist();
+  }
+
+  Future<void> addProfile(PomodoroProfile profile) async {
+    _profiles = [..._profiles, profile];
+    await _persist();
+  }
+
+  Future<void> updateProfile(PomodoroProfile profile) async {
+    _profiles = _profiles.map((p) => p.id == profile.id ? profile : p).toList();
+    await _persist();
+  }
+
+  /// Remove a profile, keeping at least one. If the active one is removed the
+  /// first remaining profile becomes active.
+  Future<void> removeProfile(String id) async {
+    if (_profiles.length <= 1) return;
+    _profiles = _profiles.where((p) => p.id != id).toList();
+    if (_activeId == id) _activeId = _profiles.first.id;
+    await _persist();
+  }
+
+  Future<void> setActive(String id) async {
+    if (_profiles.any((p) => p.id == id)) {
+      _activeId = id;
+      await _persist();
+    }
+  }
+
+  PomodoroProfile _defaultProfile() => const PomodoroProfile(
+    id: defaultId,
+    name: defaultId,
+    workMinutes: 25,
+    shortBreakMinutes: 5,
+    longBreakMinutes: 15,
+    longBreakEvery: 4,
+    longBreakEnabled: true,
+  );
 }

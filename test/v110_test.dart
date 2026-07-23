@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:free_note/models/pomodoro_profile.dart';
 import 'package:free_note/models/task.dart';
-import 'package:free_note/services/task_service.dart';
 import 'package:free_note/services/pomodoro_service.dart';
+import 'package:free_note/services/task_service.dart';
+import 'package:path/path.dart' as p;
 
 void main() {
   group('v1.11.0 — Task Planning', () {
@@ -107,19 +110,22 @@ void main() {
   });
 
   group('v1.11.0 — Pomodoro Timer', () {
-    test('PomodoroConfig defaults and secondsForPhase', () {
-      const cfg = PomodoroConfig();
+    test('PomodoroProfile defaults and secondsForPhase', () {
+      const cfg = PomodoroProfile(id: 'x', name: 'x');
       expect(cfg.workMinutes, 25);
       expect(cfg.shortBreakMinutes, 5);
       expect(cfg.longBreakMinutes, 15);
       expect(cfg.longBreakEvery, 4);
-      expect(cfg.secondsForPhase(PomodoroConfig.phaseWork), 25 * 60);
-      expect(cfg.secondsForPhase(PomodoroConfig.phaseShort), 5 * 60);
-      expect(cfg.secondsForPhase(PomodoroConfig.phaseLong), 15 * 60);
+      expect(cfg.longBreakEnabled, isTrue);
+      expect(cfg.secondsForPhase(PomodoroProfile.phaseWork), 25 * 60);
+      expect(cfg.secondsForPhase(PomodoroProfile.phaseShort), 5 * 60);
+      expect(cfg.secondsForPhase(PomodoroProfile.phaseLong), 15 * 60);
     });
 
-    test('PomodoroConfig.fromJson clamps invalid values', () {
-      final cfg = PomodoroConfig.fromJson({
+    test('PomodoroProfile.fromJson clamps invalid values', () {
+      final cfg = PomodoroProfile.fromJson({
+        'id': 'x',
+        'name': 'x',
         'workMinutes': -5,
         'shortBreakMinutes': 0,
         'longBreakMinutes': 'bad',
@@ -129,40 +135,88 @@ void main() {
       expect(cfg.shortBreakMinutes, 5);
       expect(cfg.longBreakMinutes, 15);
       expect(cfg.longBreakEvery, 3);
+      expect(cfg.longBreakEnabled, isTrue);
     });
 
-    test('PomodoroService save+load round-trips in an isolated dir', () async {
-      final dir = Directory.systemTemp.createTempSync('pomo_test');
-      PomodoroService.instance.debugSetDir(dir);
-      final cfg = PomodoroConfig(
-        workMinutes: 30,
-        shortBreakMinutes: 7,
-        longBreakMinutes: 20,
-        longBreakEvery: 3,
+    test(
+      'PomodoroService save+load round-trips profiles in an isolated dir',
+      () async {
+        final dir = Directory.systemTemp.createTempSync('pomo_test');
+        PomodoroService.instance.debugSetDir(dir);
+        final a = PomodoroProfile(
+          id: 'a',
+          name: 'Work',
+          workMinutes: 30,
+          shortBreakMinutes: 7,
+          longBreakMinutes: 20,
+          longBreakEvery: 3,
+        );
+        final b = PomodoroProfile(
+          id: 'b',
+          name: 'Deep',
+          longBreakEnabled: false,
+        );
+        await PomodoroService.instance.saveProfiles([a, b], 'b');
+        final loaded = await PomodoroService.instance.load();
+        expect(loaded.length, 2);
+        expect(PomodoroService.instance.active.id, 'b');
+        final aLoaded = loaded.firstWhere((p) => p.id == 'a');
+        expect(aLoaded.workMinutes, 30);
+        expect(aLoaded.shortBreakMinutes, 7);
+        expect(aLoaded.longBreakMinutes, 20);
+        expect(aLoaded.longBreakEvery, 3);
+        expect(loaded.firstWhere((p) => p.id == 'b').longBreakEnabled, isFalse);
+      },
+    );
+
+    test(
+      'PomodoroService migrates legacy pomodoro.json to a default profile',
+      () async {
+        final dir = Directory.systemTemp.createTempSync('pomo_mig');
+        PomodoroService.instance.debugSetDir(dir);
+        final legacy = File(p.join(dir.path, 'pomodoro.json'));
+        legacy.writeAsStringSync(
+          jsonEncode({
+            'workMinutes': 40,
+            'shortBreakMinutes': 8,
+            'longBreakMinutes': 25,
+            'longBreakEvery': 2,
+          }),
+        );
+        final loaded = await PomodoroService.instance.load();
+        expect(loaded.length, 1);
+        expect(loaded.first.workMinutes, 40);
+        expect(loaded.first.id, PomodoroService.defaultId);
+      },
+    );
+
+    test('nextPomodoroPhase respects longBreakEnabled', () {
+      final profile = PomodoroProfile(
+        id: 'p',
+        name: 'p',
+        longBreakEvery: 4,
+        longBreakEnabled: true,
       );
-      await PomodoroService.instance.save(cfg);
-      final loaded = await PomodoroService.instance.load();
-      expect(loaded.workMinutes, 30);
-      expect(loaded.shortBreakMinutes, 7);
-      expect(loaded.longBreakMinutes, 20);
-      expect(loaded.longBreakEvery, 3);
-    });
-
-    test('nextPomodoroPhase: long break every N, breaks -> work', () {
-      // Work #4 (longBreakEvery=4) -> long break.
+      // Work #4 (longBreakEvery=4, enabled) -> long break.
       expect(
-        nextPomodoroPhase(PomodoroConfig.phaseWork, 4, 4),
-        PomodoroConfig.phaseLong,
+        nextPomodoroPhase(profile, PomodoroProfile.phaseWork, 4),
+        PomodoroProfile.phaseLong,
+      );
+      // Disabled -> always short break.
+      final disabled = profile.copyWith(longBreakEnabled: false);
+      expect(
+        nextPomodoroPhase(disabled, PomodoroProfile.phaseWork, 4),
+        PomodoroProfile.phaseShort,
       );
       // Work #3 -> short break.
       expect(
-        nextPomodoroPhase(PomodoroConfig.phaseWork, 3, 4),
-        PomodoroConfig.phaseShort,
+        nextPomodoroPhase(profile, PomodoroProfile.phaseWork, 3),
+        PomodoroProfile.phaseShort,
       );
       // Any break -> work.
       expect(
-        nextPomodoroPhase(PomodoroConfig.phaseShort, 1, 4),
-        PomodoroConfig.phaseWork,
+        nextPomodoroPhase(profile, PomodoroProfile.phaseShort, 1),
+        PomodoroProfile.phaseWork,
       );
     });
   });

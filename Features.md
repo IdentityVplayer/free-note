@@ -10,6 +10,31 @@ used as the release description.
 - **Android 发布构建（Build & Release / Auto Build）`checkReleaseAarMetadata` 失败** — `flutter_local_notifications` 要求启用 core library desugaring；在 `android/app/build.gradle.kts` 的 `compileOptions` 开启 `isCoreLibraryDesugaringEnabled = true` 并引入 `com.android.tools:desugar_jdk_libs:2.1.0` 依赖，APK/AAB 重新通过元数据检查。
 - **CI `dart format --set-exit-if-changed` 失败** — 重新格式化 `lib/services/windows_notifications.dart`（参数列表换行），与 Flutter 3.44 (Dart 3.12) 格式化规则对齐。
 
+## 1.13.0
+
+### New Features
+- **多番茄钟（预设 Profile）** — 番茄钟支持多个预设：每个 Profile 独立保存
+  工作/短休息/长休息时长与名称，可一键切换；首个 Profile 为默认预设，老用户
+  的 `pomodoro.json` 首次启动自动迁移为默认 Profile（`PomodoroProfile` +
+  `PomodoroService` 管理 `List<PomodoroProfile>` + `activeId`）。
+- **番茄钟背景可从相册选择** — 番茄钟设置里「从相册选择背景」调用系统相册
+  （`image_picker`），图片复制到 `configDir/pomodoro_bg/{id}.jpg`，计时页面以
+  半透明遮罩叠加显示；可随时清除换回纯色背景（`_pickBackground` / `_clearBackground`）。
+- **长休息开关** — 每个 Profile 独立的长休息开关（`longBreakEnabled`）；关闭后
+  永远走短休息。`nextPomodoroPhase` 仅在「长休息开启 && 已完成工作数 % 间隔 == 0」
+  时进入长休息，否则短休息（任意休息结束后回到工作）。
+
+### Fixed
+- **主页面计划任务/番茄钟 Dock 直接展示内容** — 去掉了 Dock 顶部冗余的
+  「计划任务 / 番茄钟」标题条目，现在直接展示用户真实的任务列表与当前番茄钟
+  预设（`_buildTasksDock` / `_buildPomodoroDock` 使用 `PomodoroService.instance.active`）。
+- **右下角「+」随当前页切换** — 底部 FAB 改为按当前 Tab 上下文添加：笔记页保持
+  展开菜单（新建笔记 / 新建仓库）；计划任务页 → 新建计划任务；番茄钟页 → 新建
+  番茄钟预设（均通过 `autoAdd` 参数直达对应编辑页）。
+
+### Dependencies
+- 新增 `image_picker: ^1.1.2`（相册选背景；Android 已含存储权限，iOS 无构建配置）。
+
 ## 1.12.0
 
 ### New Features

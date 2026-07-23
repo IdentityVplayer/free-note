@@ -1,28 +1,50 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import '../models/pomodoro_profile.dart';
 import '../services/pomodoro_service.dart';
+import '../services/storage_service.dart';
 import '../l10n/app_localizations.dart';
 
 /// Pomodoro timer screen.
 ///
-/// Cycles through focus / short-break / long-break phases. A long break is
-/// taken every [PomodoroConfig.longBreakEvery] completed focus sessions. The
-/// durations are persisted via [PomodoroService].
+/// Supports multiple named profiles (presets). The active profile drives the
+/// timer; each profile may carry its own background image and an independent
+/// long-break toggle. The durations are persisted via [PomodoroService].
 class PomodoroScreen extends StatefulWidget {
-  const PomodoroScreen({super.key});
+  /// When true, opens the "new profile" dialog on first load (used by the
+  /// home-screen FAB so a single tap creates a pomodoro).
+  final bool autoAdd;
+
+  const PomodoroScreen({super.key, this.autoAdd = false});
 
   @override
   State<PomodoroScreen> createState() => _PomodoroScreenState();
 }
 
 class _PomodoroScreenState extends State<PomodoroScreen> {
-  PomodoroConfig _config = const PomodoroConfig();
-  String _phase = PomodoroConfig.phaseWork;
+  List<PomodoroProfile> _profiles = const [
+    PomodoroProfile(
+      id: PomodoroService.defaultId,
+      name: PomodoroService.defaultId,
+    ),
+  ];
+  String _activeId = PomodoroService.defaultId;
+
+  String _phase = PomodoroProfile.phaseWork;
   int _remaining = 25 * 60;
   int _total = 25 * 60;
   int _completed = 0;
   bool _running = false;
   Timer? _timer;
+  File? _bgFile;
+
+  PomodoroProfile get _active => _profiles.firstWhere(
+    (p) => p.id == _activeId,
+    orElse: () => _profiles.first,
+  );
 
   @override
   void initState() {
@@ -37,14 +59,32 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
   }
 
   Future<void> _load() async {
-    final cfg = await PomodoroService.instance.load();
-    if (mounted) {
-      setState(() {
-        _config = cfg;
-        _total = cfg.secondsForPhase(_phase);
-        _remaining = _total;
-      });
+    final profiles = await PomodoroService.instance.load();
+    if (!mounted) return;
+    setState(() {
+      _profiles = profiles;
+      _activeId = PomodoroService.instance.active.id;
+      _applyProfile(reset: true);
+      _refreshBg();
+    });
+    if (widget.autoAdd) _showProfileDialog();
+  }
+
+  /// Recompute the active profile and (when [reset]) restart the timer at the
+  /// work phase with the new durations.
+  void _applyProfile({bool reset = false}) {
+    if (reset) {
+      _pause();
+      _phase = PomodoroProfile.phaseWork;
+      _completed = 0;
+      _total = _active.secondsForPhase(_phase);
+      _remaining = _total;
     }
+  }
+
+  void _refreshBg() {
+    final path = _active.backgroundPath;
+    _bgFile = (path != null && File(path).existsSync()) ? File(path) : null;
   }
 
   void _tick() {
@@ -71,9 +111,9 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
     _pause();
     if (mounted) {
       setState(() {
-        _phase = PomodoroConfig.phaseWork;
+        _phase = PomodoroProfile.phaseWork;
         _completed = 0;
-        _total = _config.secondsForPhase(_phase);
+        _total = _active.secondsForPhase(_phase);
         _remaining = _total;
       });
     }
@@ -81,14 +121,12 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
 
   void _onPhaseComplete() {
     final l10n = AppLocalizations.of(context);
-    if (_phase == PomodoroConfig.phaseWork) {
-      _completed++;
-    }
-    final next = nextPomodoroPhase(_phase, _completed, _config.longBreakEvery);
+    if (_phase == PomodoroProfile.phaseWork) _completed++;
+    final next = nextPomodoroPhase(_active, _phase, _completed);
     if (mounted) {
       setState(() {
         _phase = next;
-        _total = _config.secondsForPhase(next);
+        _total = _active.secondsForPhase(next);
         _remaining = _total;
         _running = false;
       });
@@ -96,9 +134,9 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
     _timer?.cancel();
     _timer = null;
     if (l10n != null && mounted) {
-      final msg = _phase == PomodoroConfig.phaseWork
+      final msg = _phase == PomodoroProfile.phaseWork
           ? l10n.t('pomodoroFocus')
-          : (_phase == PomodoroConfig.phaseLong
+          : (_phase == PomodoroProfile.phaseLong
                 ? l10n.t('pomodoroLongBreak')
                 : l10n.t('pomodoroShortBreak'));
       ScaffoldMessenger.of(
@@ -107,64 +145,163 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
     }
   }
 
+  Future<void> _switchProfile(String id) async {
+    await PomodoroService.instance.setActive(id);
+    if (!mounted) return;
+    setState(() {
+      _activeId = id;
+      _applyProfile(reset: true);
+      _refreshBg();
+    });
+  }
+
+  Future<void> _pickBackground() async {
+    final l10n = AppLocalizations.of(context)!;
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+    final dir = await StorageService.instance.configDir;
+    final bgDir = Directory(p.join(dir.path, 'pomodoro_bg'));
+    await bgDir.create(recursive: true);
+    final dest = File(p.join(bgDir.path, '${_active.id}.jpg'));
+    await File(picked.path).copy(dest.path);
+    final updated = _active.copyWith(backgroundPath: dest.path);
+    await PomodoroService.instance.updateProfile(updated);
+    if (mounted) {
+      setState(() {
+        _profiles = _profiles
+            .map((p) => p.id == updated.id ? updated : p)
+            .toList();
+        _refreshBg();
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.t('pomodoroBackgroundSet'))));
+    }
+  }
+
+  Future<void> _clearBackground() async {
+    final l10n = AppLocalizations.of(context)!;
+    final path = _active.backgroundPath;
+    if (path != null) {
+      try {
+        File(path).deleteSync();
+      } catch (_) {
+        // best-effort
+      }
+    }
+    final updated = _active.copyWith(clearBackground: true);
+    await PomodoroService.instance.updateProfile(updated);
+    if (mounted) {
+      setState(() {
+        _profiles = _profiles
+            .map((p) => p.id == updated.id ? updated : p)
+            .toList();
+        _bgFile = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('pomodoroBackgroundCleared'))),
+      );
+    }
+  }
+
   Future<void> _editSettings() async {
     final l10n = AppLocalizations.of(context)!;
-    final workCtl = TextEditingController(text: '${_config.workMinutes}');
-    final shortCtl = TextEditingController(
-      text: '${_config.shortBreakMinutes}',
-    );
-    final longCtl = TextEditingController(text: '${_config.longBreakMinutes}');
-    final everyCtl = TextEditingController(text: '${_config.longBreakEvery}');
+    final cfg = _active;
+    final workCtl = TextEditingController(text: '${cfg.workMinutes}');
+    final shortCtl = TextEditingController(text: '${cfg.shortBreakMinutes}');
+    final longCtl = TextEditingController(text: '${cfg.longBreakMinutes}');
+    final everyCtl = TextEditingController(text: '${cfg.longBreakEvery}');
+    var longBreak = cfg.longBreakEnabled;
 
     final changed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.t('pomodoroSettings')),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: workCtl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: l10n.t('pomodoroWorkMinutes'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: Text(l10n.t('pomodoroSettings')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: workCtl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('pomodoroWorkMinutes'),
+                  ),
                 ),
-              ),
-              TextField(
-                controller: shortCtl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: l10n.t('pomodoroShortMinutes'),
+                TextField(
+                  controller: shortCtl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('pomodoroShortMinutes'),
+                  ),
                 ),
-              ),
-              TextField(
-                controller: longCtl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: l10n.t('pomodoroLongMinutes'),
+                TextField(
+                  controller: longCtl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('pomodoroLongMinutes'),
+                  ),
                 ),
-              ),
-              TextField(
-                controller: everyCtl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: l10n.t('pomodoroInterval'),
+                TextField(
+                  controller: everyCtl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('pomodoroInterval'),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l10n.t('pomodoroLongBreak')),
+                  value: longBreak,
+                  onChanged: (v) => setInner(() => longBreak = v),
+                ),
+                const SizedBox(height: 8),
+                Text(l10n.t('pomodoroBackground')),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.photo_library),
+                        label: Text(l10n.t('pomodoroBackgroundFromAlbum')),
+                        onPressed: () async {
+                          Navigator.pop(ctx, true);
+                          await _pickBackground();
+                          if (mounted) _editSettings();
+                        },
+                      ),
+                    ),
+                    if (cfg.backgroundPath != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        tooltip: l10n.t('pomodoroClearBackground'),
+                        onPressed: () {
+                          Navigator.pop(ctx, true);
+                          _clearBackground();
+                          if (mounted) _editSettings();
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.t('save')),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.t('cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.t('save')),
-          ),
-        ],
       ),
     );
     if (changed != true) return;
@@ -174,17 +311,19 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
       return (v != null && v > 0) ? v : d;
     }
 
-    final newCfg = _config.copyWith(
+    final newCfg = cfg.copyWith(
       workMinutes: parse(workCtl, 25),
       shortBreakMinutes: parse(shortCtl, 5),
       longBreakMinutes: parse(longCtl, 15),
       longBreakEvery: parse(everyCtl, 4),
+      longBreakEnabled: longBreak,
     );
-    await PomodoroService.instance.save(newCfg);
+    await PomodoroService.instance.updateProfile(newCfg);
     if (mounted) {
       setState(() {
-        _config = newCfg;
-        // If idle at the start of a phase, reflect the new duration now.
+        _profiles = _profiles
+            .map((p) => p.id == newCfg.id ? newCfg : p)
+            .toList();
         if (!_running) {
           _total = newCfg.secondsForPhase(_phase);
           _remaining = _total;
@@ -192,6 +331,281 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
       });
     }
   }
+
+  Future<void> _showProfileDialog({PomodoroProfile? existing}) async {
+    final l10n = AppLocalizations.of(context)!;
+    final isEdit = existing != null;
+    final nameCtl = TextEditingController(
+      text: isEdit ? _profileName(existing) : '',
+    );
+    final workCtl = TextEditingController(
+      text: '${isEdit ? existing.workMinutes : _active.workMinutes}',
+    );
+    final shortCtl = TextEditingController(
+      text:
+          '${isEdit ? existing.shortBreakMinutes : _active.shortBreakMinutes}',
+    );
+    final longCtl = TextEditingController(
+      text: '${isEdit ? existing.longBreakMinutes : _active.longBreakMinutes}',
+    );
+    final everyCtl = TextEditingController(
+      text: '${isEdit ? existing.longBreakEvery : _active.longBreakEvery}',
+    );
+    var longBreak = isEdit
+        ? existing.longBreakEnabled
+        : _active.longBreakEnabled;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: Text(
+            isEdit
+                ? l10n.t('pomodoroRenameProfile')
+                : l10n.t('pomodoroNewProfile'),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtl,
+                  autofocus: !isEdit,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('pomodoroProfileName'),
+                  ),
+                  onSubmitted: (_) => Navigator.pop(ctx, true),
+                ),
+                TextField(
+                  controller: workCtl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('pomodoroWorkMinutes'),
+                  ),
+                ),
+                TextField(
+                  controller: shortCtl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('pomodoroShortMinutes'),
+                  ),
+                ),
+                TextField(
+                  controller: longCtl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('pomodoroLongMinutes'),
+                  ),
+                ),
+                TextField(
+                  controller: everyCtl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('pomodoroInterval'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l10n.t('pomodoroLongBreak')),
+                  value: longBreak,
+                  onChanged: (v) => setInner(() => longBreak = v),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.t('save')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    final name = nameCtl.text.trim();
+    if (name.isEmpty) return;
+
+    int parse(TextEditingController c, int d) {
+      final v = int.tryParse(c.text);
+      return (v != null && v > 0) ? v : d;
+    }
+
+    if (isEdit) {
+      final updated = existing.copyWith(
+        name: name,
+        workMinutes: parse(workCtl, 25),
+        shortBreakMinutes: parse(shortCtl, 5),
+        longBreakMinutes: parse(longCtl, 15),
+        longBreakEvery: parse(everyCtl, 4),
+        longBreakEnabled: longBreak,
+      );
+      await PomodoroService.instance.updateProfile(updated);
+      if (mounted) {
+        setState(() {
+          _profiles = _profiles
+              .map((p) => p.id == updated.id ? updated : p)
+              .toList();
+        });
+      }
+    } else {
+      final profile = PomodoroProfile(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: name,
+        workMinutes: parse(workCtl, 25),
+        shortBreakMinutes: parse(shortCtl, 5),
+        longBreakMinutes: parse(longCtl, 15),
+        longBreakEvery: parse(everyCtl, 4),
+        longBreakEnabled: longBreak,
+      );
+      await PomodoroService.instance.addProfile(profile);
+      await PomodoroService.instance.setActive(profile.id);
+      if (mounted) {
+        setState(() {
+          _profiles = [..._profiles, profile];
+          _activeId = profile.id;
+          _applyProfile(reset: true);
+          _refreshBg();
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteProfile(PomodoroProfile profile) async {
+    final l10n = AppLocalizations.of(context)!;
+    if (_profiles.length <= 1) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.t('pomodoroKeepOne'))));
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t('pomodoroDeleteProfile')),
+        content: Text(
+          '${l10n.t('pomodoroDeleteProfileConfirm')} "${_profileName(profile)}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.t('delete')),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      // remove background file if any
+      if (profile.backgroundPath != null) {
+        try {
+          File(profile.backgroundPath!).deleteSync();
+        } catch (_) {
+          // ignore
+        }
+      }
+      await PomodoroService.instance.removeProfile(profile.id);
+      if (mounted) {
+        setState(() {
+          _profiles = _profiles.where((p) => p.id != profile.id).toList();
+          if (_activeId == profile.id) {
+            _activeId = _profiles.first.id;
+            _applyProfile(reset: true);
+            _refreshBg();
+          }
+        });
+      }
+    }
+  }
+
+  /// Dialog to manage (switch / rename / delete) all profiles.
+  Future<void> _showProfilesDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t('pomodoroProfiles')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: _profiles.length,
+            itemBuilder: (_, i) {
+              final p = _profiles[i];
+              final isActive = p.id == _activeId;
+              return ListTile(
+                leading: Radio<String>(
+                  value: p.id,
+                  groupValue: _activeId,
+                  onChanged: (_) {
+                    Navigator.pop(ctx);
+                    _switchProfile(p.id);
+                  },
+                ),
+                title: Text(_profileName(p)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isActive)
+                      const Icon(Icons.check, size: 18)
+                    else
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 18),
+                        tooltip: l10n.t('edit'),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showProfileDialog(existing: p);
+                        },
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      tooltip: l10n.t('delete'),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _confirmDeleteProfile(p);
+                      },
+                    ),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _switchProfile(p.id);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('close')),
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.add),
+            label: Text(l10n.t('pomodoroNewProfile')),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _showProfileDialog();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Localized display name; the reserved default profile shows a localized
+  /// label instead of its raw id.
+  String _profileName(PomodoroProfile p) => p.id == PomodoroService.defaultId
+      ? AppLocalizations.of(context)!.t('pomodoroDefault')
+      : p.name;
 
   String _format(int s) {
     final m = s ~/ 60;
@@ -201,9 +615,9 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
 
   (String, Color) _phaseLabelColor(AppLocalizations l10n, ThemeData theme) {
     switch (_phase) {
-      case PomodoroConfig.phaseWork:
+      case PomodoroProfile.phaseWork:
         return (l10n.t('pomodoroFocus'), theme.colorScheme.error);
-      case PomodoroConfig.phaseLong:
+      case PomodoroProfile.phaseLong:
         return (l10n.t('pomodoroLongBreak'), theme.colorScheme.primary);
       default:
         return (l10n.t('pomodoroShortBreak'), Colors.green);
@@ -217,10 +631,96 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
     final (label, color) = _phaseLabelColor(l10n, theme);
     final progress = _total > 0 ? 1 - (_remaining / _total) : 0.0;
 
+    final body = Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Profile switcher
+          if (_profiles.length > 1)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                children: _profiles
+                    .map(
+                      (p) => ChoiceChip(
+                        label: Text(_profileName(p)),
+                        selected: p.id == _activeId,
+                        onSelected: (_) => _switchProfile(p.id),
+                      ),
+                    )
+                    .toList(),
+              ),
+            )
+          else
+            Text(_profileName(_active), style: theme.textTheme.titleMedium),
+          const SizedBox(height: 16),
+          Text(
+            label,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 32),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 240,
+                height: 240,
+                child: CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 12,
+                  color: color,
+                ),
+              ),
+              Text(
+                _format(_remaining),
+                style: theme.textTheme.displayMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FilledButton.icon(
+                onPressed: _running ? _pause : _start,
+                icon: Icon(_running ? Icons.pause : Icons.play_arrow),
+                label: Text(
+                  _running ? l10n.t('pomodoroPause') : l10n.t('pomodoroStart'),
+                ),
+              ),
+              const SizedBox(width: 16),
+              OutlinedButton.icon(
+                onPressed: _reset,
+                icon: const Icon(Icons.refresh),
+                label: Text(l10n.t('pomodoroReset')),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Text(
+            l10n.tArgs('pomodoroSessions', ['$_completed']),
+            style: theme.textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.t('pomodoro')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.playlist_play),
+            tooltip: l10n.t('pomodoroProfiles'),
+            onPressed: _showProfilesDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: l10n.t('pomodoroSettings'),
@@ -228,67 +728,18 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
           ),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 32),
-            Stack(
-              alignment: Alignment.center,
+      body: _bgFile != null
+          ? Stack(
+              fit: StackFit.expand,
               children: [
-                SizedBox(
-                  width: 240,
-                  height: 240,
-                  child: CircularProgressIndicator(
-                    value: progress,
-                    strokeWidth: 12,
-                    color: color,
-                  ),
+                Image.file(_bgFile!, fit: BoxFit.cover),
+                Container(
+                  color: theme.colorScheme.surface.withValues(alpha: 0.82),
                 ),
-                Text(
-                  _format(_remaining),
-                  style: theme.textTheme.displayMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                body,
               ],
-            ),
-            const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FilledButton.icon(
-                  onPressed: _running ? _pause : _start,
-                  icon: Icon(_running ? Icons.pause : Icons.play_arrow),
-                  label: Text(
-                    _running
-                        ? l10n.t('pomodoroPause')
-                        : l10n.t('pomodoroStart'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                OutlinedButton.icon(
-                  onPressed: _reset,
-                  icon: const Icon(Icons.refresh),
-                  label: Text(l10n.t('pomodoroReset')),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Text(
-              l10n.tArgs('pomodoroSessions', ['$_completed']),
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-        ),
-      ),
+            )
+          : body,
     );
   }
 }

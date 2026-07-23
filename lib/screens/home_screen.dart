@@ -208,32 +208,60 @@ class _HomeScreenState extends State<HomeScreen> {
           : _bottomIndex == 0
           ? _buildTasksDock(l10n)
           : _buildPomodoroDock(l10n),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (_fabOpen) ...[
-            _fabItem(Icons.note_add, l10n.t('newNote'), () {
-              setState(() => _fabOpen = false);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EditorScreen()),
-              );
-            }),
-            const SizedBox(height: 12),
-            _fabItem(Icons.create_new_folder, l10n.t('newRepository'), () {
-              setState(() => _fabOpen = false);
-              _createFolder(context);
-            }),
-            const SizedBox(height: 12),
-          ],
-          FloatingActionButton(
-            onPressed: () => setState(() => _fabOpen = !_fabOpen),
-            tooltip: l10n.t('add'),
-            child: Icon(_fabOpen ? Icons.close : Icons.add),
-          ),
-        ],
-      ),
+      floatingActionButton: _bottomIndex == 1
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (_fabOpen) ...[
+                  _fabItem(Icons.note_add, l10n.t('newNote'), () {
+                    setState(() => _fabOpen = false);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const EditorScreen()),
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                  _fabItem(
+                    Icons.create_new_folder,
+                    l10n.t('newRepository'),
+                    () {
+                      setState(() => _fabOpen = false);
+                      _createFolder(context);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                FloatingActionButton(
+                  onPressed: () => setState(() => _fabOpen = !_fabOpen),
+                  tooltip: l10n.t('add'),
+                  child: Icon(_fabOpen ? Icons.close : Icons.add),
+                ),
+              ],
+            )
+          : FloatingActionButton(
+              onPressed: () {
+                if (_bottomIndex == 0) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TaskPlanScreen(autoAdd: true),
+                    ),
+                  );
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PomodoroScreen(autoAdd: true),
+                    ),
+                  );
+                }
+              },
+              tooltip: _bottomIndex == 0
+                  ? l10n.t('newTask')
+                  : l10n.t('newPomodoro'),
+              child: const Icon(Icons.add),
+            ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _bottomIndex,
         onDestinationSelected: (i) => setState(() => _bottomIndex = i),
@@ -327,8 +355,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Task Planning quick view (left dock tab): list tasks, toggle done inline,
-  /// tap the header to open the full planner.
+  /// Task Planning quick view (left dock tab): directly lists the user's tasks
+  /// (toggle done inline). The full planner is reachable via the app-bar
+  /// checklist icon, so we don't show a redundant "plan task" header tile.
   Widget _buildTasksDock(AppLocalizations l10n) {
     return FutureBuilder<List<Task>>(
       future: TaskService.instance.loadTasks(),
@@ -340,25 +369,29 @@ class _HomeScreenState extends State<HomeScreen> {
         return ListView(
           padding: const EdgeInsets.all(8),
           children: [
-            ListTile(
-              leading: const Icon(Icons.checklist),
-              title: Text(
-                l10n.t('taskPlan'),
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              trailing: const Icon(Icons.open_in_full),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TaskPlanScreen()),
-              ),
-            ),
             if (tasks.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Center(
-                  child: Text(
-                    l10n.t('taskEmpty'),
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        l10n.t('taskEmpty'),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.open_in_full),
+                        label: Text(l10n.t('openFull')),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const TaskPlanScreen(),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               )
@@ -392,26 +425,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
-  /// Pomodoro quick view (right dock tab): shows the configured intervals and
-  /// opens the full timer.
+  /// Pomodoro quick view (right dock tab): shows the active profile's
+  /// intervals and opens the full timer. No redundant "pomodoro" header tile.
   Widget _buildPomodoroDock(AppLocalizations l10n) {
-    final cfg = PomodoroService.instance.config;
+    final cfg = PomodoroService.instance.active;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        ListTile(
-          leading: const Icon(Icons.timer),
-          title: Text(
-            l10n.t('pomodoro'),
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          trailing: const Icon(Icons.open_in_full),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const PomodoroScreen()),
-          ),
-        ),
-        const SizedBox(height: 8),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),

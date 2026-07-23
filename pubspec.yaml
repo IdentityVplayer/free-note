@@ -1,7 +1,7 @@
 name: free_note
 description: "Free Note - A multifunctional cross-platform note-taking app with Markdown, Plugins, AI, GitHub Sync, i18n and Dark Mode."
 publish_to: 'none'
-version: 1.12.1+31
+version: 1.13.0+32
 
 environment:
   sdk: ^3.12.2
@@ -36,6 +36,9 @@ dependencies:
   # Local notifications (Android system notifications / Windows toast)
   flutter_local_notifications: ^17.2.4
   timezone: ^0.9.4
+
+  # Pick a background image from the gallery (pomodoro backgrounds)
+  image_picker: ^1.1.2
 
   # Internationalization
   flutter_localizations:

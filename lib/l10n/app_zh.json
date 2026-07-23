@@ -241,5 +241,21 @@
   "unitWeek": "周",
   "unitMonth": "个月",
   "unitYear": "年",
-  "reminderAt": "提醒时间"
+  "reminderAt": "提醒时间",
+  "openFull": "打开完整",
+  "newPomodoro": "新建番茄钟",
+  "pomodoroProfiles": "番茄钟方案",
+  "pomodoroProfileName": "方案名称",
+  "pomodoroNewProfile": "新建番茄钟",
+  "pomodoroRenameProfile": "重命名方案",
+  "pomodoroDeleteProfile": "删除方案",
+  "pomodoroDeleteProfileConfirm": "确定删除该方案吗？",
+  "pomodoroKeepOne": "至少保留一个方案",
+  "pomodoroBackground": "背景",
+  "pomodoroBackgroundFromAlbum": "从相册选择",
+  "pomodoroBackgroundSet": "已设置背景",
+  "pomodoroBackgroundCleared": "已清除背景",
+  "pomodoroClearBackground": "清除背景",
+  "pomodoroDefault": "默认",
+  "close": "关闭"
 }
