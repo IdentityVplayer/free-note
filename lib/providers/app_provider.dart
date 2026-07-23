@@ -203,6 +203,9 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
     }
 
     _settings.notesFolderPath = path;
+    if (!_settings.repositories.contains(path)) {
+      _settings.repositories = [..._settings.repositories, path];
+    }
     await _storage.setFolder(path);
     await _storage.saveSettings(_settings);
     _notes = await _storage.loadNotes();

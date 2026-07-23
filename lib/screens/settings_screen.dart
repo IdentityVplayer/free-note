@@ -84,10 +84,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
             : _aiBaseUrlController.text.trim(),
         themeColorHex: _themeColorHex,
         notesFolderPath: provider.settings.notesFolderPath,
+        repositories: provider.settings.repositories,
         aiModels: _aiModels.where((m) => m.trim().isNotEmpty).toList(),
       ),
     );
     Navigator.pop(context);
+  }
+
+  Future<void> _changeRepository() async {
+    final l10n = AppLocalizations.of(context)!;
+    final provider = context.read<AppProvider>();
+    final repos = provider.settings.repositories;
+    final current = provider.settings.notesFolderPath;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t('switchRepository')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final r in repos)
+                ListTile(
+                  leading: Icon(
+                    r == current ? Icons.check_circle : Icons.folder,
+                    color: r == current
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                  title: Text(r),
+                  onTap: () => Navigator.pop(ctx, r),
+                ),
+              ListTile(
+                leading: const Icon(Icons.add),
+                title: Text(l10n.t('addRepository')),
+                onTap: () => Navigator.pop(ctx, '__add__'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('cancel')),
+          ),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    if (choice == '__add__') {
+      await _changeFolder();
+      return;
+    }
+    await provider.chooseFolder(choice);
+    if (mounted) setState(() {});
   }
 
   Future<void> _changeFolder() async {
@@ -167,13 +218,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final l10n = AppLocalizations.of(context)!;
     final storage = StorageService.instance;
     if (!storage.hasFolder || storage.currentFolderName == null) {
-      _toast(l10n.t('noFolderForExport'));
+      _toast(l10n.t('repositoryNeedFolder'));
       return;
     }
     try {
       final bytes = await storage.buildFolderFneBytes();
       if (bytes == null) {
-        _toast(l10n.t('noFolderForExport'));
+        _toast(l10n.t('repositoryNeedFolder'));
         return;
       }
       final fileName = '${storage.currentFolderName}_export.fne';
@@ -194,7 +245,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final provider = context.read<AppProvider>();
     final storage = StorageService.instance;
     if (!storage.hasFolder) {
-      _toast(l10n.t('noFolderForExport'));
+      _toast(l10n.t('repositoryNeedFolder'));
       return;
     }
     final proceed = await showDialog<bool>(
@@ -257,18 +308,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: ListView(
         children: [
-          // Folder
-          _sectionHeader(l10n.t('notesFolder')),
+          // Repository (notes folder)
+          _sectionHeader(l10n.t('repository')),
           ListTile(
-            leading: const Icon(Icons.folder),
-            title: Text(l10n.t('currentFolder')),
+            leading: const Icon(Icons.folder_special),
+            title: Text(l10n.t('currentRepository')),
             subtitle: Text(
               folder,
               style: Theme.of(context).textTheme.bodySmall,
             ),
             trailing: TextButton(
-              onPressed: _changeFolder,
-              child: Text(l10n.t('changeFolder')),
+              onPressed: _changeRepository,
+              child: Text(l10n.t('changeRepository')),
             ),
           ),
           // Appearance

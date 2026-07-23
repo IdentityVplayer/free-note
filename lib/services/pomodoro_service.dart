@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'storage_service.dart';
 
 /// Tunable durations for the Pomodoro timer.
 class PomodoroConfig {
@@ -99,14 +99,16 @@ class PomodoroService {
 
   Future<Directory> get _dir async {
     if (_overrideDir != null) return _overrideDir!;
-    final base = await getApplicationDocumentsDirectory();
-    final dir = Directory(p.join(base.path, 'free_note'));
-    if (!dir.existsSync()) dir.createSync(recursive: true);
-    return dir;
+    return StorageService.instance.configDir;
   }
 
   /// Load the saved config (falls back to defaults when none / corrupt).
   Future<PomodoroConfig> load() async {
+    // Migration only applies to the real config location, not an isolated
+    // (test) override dir — which has no legacy private-dir files to move.
+    if (_overrideDir == null) {
+      await StorageService.instance.migrateFileFromPrivate('pomodoro.json');
+    }
     final file = File(p.join((await _dir).path, 'pomodoro.json'));
     if (!file.existsSync()) {
       _config = const PomodoroConfig();

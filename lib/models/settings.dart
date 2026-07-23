@@ -29,6 +29,11 @@ class AppSettings {
   /// User-selected notes folder (absolute path). null = not chosen yet.
   String? notesFolderPath;
 
+  /// All repositories (folders) the user has opened, so they can be switched
+  /// between from Settings without re-picking each time. The current one is
+  /// [notesFolderPath].
+  List<String> repositories;
+
   /// Extra AI models the user has added (beyond [aiModel]). Combined with
   /// [aiModel] to build the model picker shown in the AI chat screen.
   List<String> aiModels;
@@ -53,6 +58,7 @@ class AppSettings {
     this.aiBaseUrl,
     this.themeColorHex,
     this.notesFolderPath,
+    this.repositories = const [],
     this.aiModels = const [],
     this.userPlugins = const [],
   });
@@ -72,6 +78,7 @@ class AppSettings {
     'aiBaseUrl': aiBaseUrl,
     'themeColorHex': themeColorHex,
     'notesFolderPath': notesFolderPath,
+    'repositories': repositories,
     'aiModels': aiModels,
     'userPlugins': userPlugins.map((p) => p.toJson()).toList(),
   };
@@ -91,6 +98,8 @@ class AppSettings {
     aiBaseUrl: json['aiBaseUrl'] as String?,
     themeColorHex: json['themeColorHex'] as String?,
     notesFolderPath: json['notesFolderPath'] as String?,
+    repositories:
+        (json['repositories'] as List<dynamic>?)?.cast<String>() ?? const [],
     aiModels: (json['aiModels'] as List<dynamic>?)?.cast<String>() ?? const [],
     userPlugins: (json['userPlugins'] as List<dynamic>?)
             ?.map((e) => PluginInfo.fromJson(e as Map<String, dynamic>))

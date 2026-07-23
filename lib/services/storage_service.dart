@@ -74,6 +74,31 @@ class StorageService {
     return dir;
   }
 
+  /// Public, awaitable config directory — used for settings.json, tasks.json,
+  /// pomodoro.json, etc. So all app config travels with the selected
+  /// repository (resides in `<repo>/.config`) and is portable.
+  Future<Directory> get configDir async =>
+      Directory(await _configDirPath);
+
+  /// One-time migration: move [fileName] from the legacy private app dir
+  /// (`free_note/`) into the current config dir. No-op when already present
+  /// in the config dir or absent from the private dir. Used so existing users
+  /// (whose config lived in the private dir) get their files moved into the
+  /// repository's `.config` on first launch after the change.
+  Future<void> migrateFileFromPrivate(String fileName) async {
+    final cfg = Directory(await _configDirPath);
+    final target = File(p.join(cfg.path, fileName));
+    if (target.existsSync()) return;
+    final src = File(p.join((await _privateDir).path, 'free_note', fileName));
+    if (!src.existsSync()) return;
+    try {
+      src.copySync(target.path);
+      src.deleteSync();
+    } catch (_) {
+      // best-effort; if it fails we just keep the legacy copy.
+    }
+  }
+
   /// Load every note in the selected folder AND its subfolders.
   ///
   /// 1. Notes with a `.config/<id>.json` entry are authoritative: their
@@ -217,8 +242,11 @@ class StorageService {
   // ── Settings: private app dir ──
 
   Future<AppSettings> loadSettings() async {
-    final dir = await _privateDir;
-    final file = File('${dir.path}/settings.json');
+    // Migrate the legacy private-dir settings.json into the repository's
+    // .config on first launch for existing users.
+    await migrateFileFromPrivate('settings.json');
+    final dir = await _configDirPath;
+    final file = File('$dir/settings.json');
     if (!file.existsSync()) return AppSettings();
     try {
       final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
@@ -229,8 +257,8 @@ class StorageService {
   }
 
   Future<void> saveSettings(AppSettings settings) async {
-    final dir = await _privateDir;
-    final file = File('${dir.path}/settings.json');
+    final dir = await _configDirPath;
+    final file = File('$dir/settings.json');
     file.writeAsStringSync(jsonEncode(settings.toJson()));
   }
 

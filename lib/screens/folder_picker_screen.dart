@@ -103,7 +103,7 @@ class _FolderPickerScreenState extends State<FolderPickerScreen> {
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.t('newFolder')),
+        title: Text(l10n.t('newRepository')),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -173,7 +173,7 @@ class _FolderPickerScreenState extends State<FolderPickerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.t('selectFolderTitle')),
+        title: Text(l10n.t('selectRepositoryTitle')),
         leading: canGoUp
             ? IconButton(
                 icon: const Icon(Icons.arrow_upward),
@@ -184,7 +184,7 @@ class _FolderPickerScreenState extends State<FolderPickerScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.create_new_folder),
-            tooltip: l10n.t('newFolder'),
+            tooltip: l10n.t('newRepository'),
             onPressed: _createFolder,
           ),
         ],
@@ -227,7 +227,7 @@ class _FolderPickerScreenState extends State<FolderPickerScreen> {
                     ),
                   )
                 : _folders.isEmpty
-                ? Center(child: Text(l10n.t('noFolders')))
+                ? Center(child: Text(l10n.t('repositoryEmpty')))
                 : ListView.builder(
                     itemCount: _folders.length,
                     itemBuilder: (context, index) {
@@ -257,7 +257,7 @@ class _FolderPickerScreenState extends State<FolderPickerScreen> {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: _useDefault,
-                child: Text(l10n.t('useDefaultFolder')),
+                child: Text(l10n.t('useDefaultRepository')),
               ),
             ],
           ),

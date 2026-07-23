@@ -145,7 +145,7 @@ class _ContextFilePickerScreenState extends State<ContextFilePickerScreen> {
                     const Icon(Icons.folder_off, size: 56, color: Colors.grey),
                     const SizedBox(height: 12),
                     Text(
-                      l10n.t('contextNeedFolder'),
+                      l10n.t('repositoryNeedFolder'),
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),

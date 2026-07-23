@@ -234,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   bottom: 8,
                                 ),
                                 child: Text(
-                                  l10n.t('folderEmpty'),
+                                  l10n.t('repositoryEmpty'),
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ),
@@ -266,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             }),
             const SizedBox(height: 12),
-            _fabItem(Icons.create_new_folder, l10n.t('newFolder'), () {
+            _fabItem(Icons.create_new_folder, l10n.t('newRepository'), () {
               setState(() => _fabOpen = false);
               _createFolder(context);
             }),
@@ -496,7 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.t('newFolder')),
+        title: Text(l10n.t('newRepository')),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -521,7 +521,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(l10n.t('contextNeedFolder'))));
+        ).showSnackBar(SnackBar(content: Text(l10n.t('repositoryNeedFolder'))));
       }
       return;
     }
@@ -531,7 +531,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadFolders();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l10n.t('newFolder')}: $name')),
+          SnackBar(content: Text('${l10n.t('newRepository')}: $name')),
         );
       }
     } catch (e) {
