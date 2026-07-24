@@ -69,6 +69,18 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
   /// Initialize the app — load data and register plugins.
   Future<void> init() async {
     _setLoading(true);
+
+    // Restore the last opened repository BEFORE reading settings. Settings
+    // live in <repo>/.config/settings.json, whose location depends on knowing
+    // the repo first — so without this, settings would be read from the
+    // private config dir (which is empty after the legacy migration moved them
+    // into the repo), `notesFolderPath` would be lost, and the app would fall
+    // back to FolderPickerScreen instead of reopening the last repository.
+    final lastRepo = await _storage.loadLastRepoPath();
+    if (lastRepo != null && Directory(lastRepo).existsSync()) {
+      await _storage.setFolder(lastRepo);
+    }
+
     _settings = await _storage.loadSettings();
     if (_settings.notesFolderPath != null &&
         _settings.notesFolderPath!.isNotEmpty) {
@@ -228,6 +240,7 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
     }
     await _storage.setFolder(path);
     await _storage.saveSettings(_settings);
+    await _storage.saveLastRepoPath(path);
     _notes = await _storage.loadNotes();
     _statusMessage = null;
     notifyListeners();

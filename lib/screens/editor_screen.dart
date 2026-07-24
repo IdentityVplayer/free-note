@@ -403,17 +403,22 @@ class _EditorScreenState extends State<EditorScreen>
   }
 
   /// A preview line; tapping it makes that line the active (raw) one.
+  ///
+  /// The markdown is rendered non-selectable so the tap reaches this
+  /// [GestureDetector] (a selectable [MarkdownBody] swallows taps for text
+  /// selection, which previously blocked tap-to-edit). Links still open via
+  /// [safeMarkdown]'s [onTapLink].
   Widget _buildPreviewLine(int i, String line) {
-    if (line.isEmpty) return const SizedBox(height: 22);
-    return GestureDetector(
-      onTap: () => _setActiveLine(i),
-      child: safeMarkdown(
-        data: line,
-        onTapLink: (text, href, title) {
-          if (href != null) _launchUrl(href);
-        },
-      ),
-    );
+    final child = line.isEmpty
+        ? const SizedBox(height: 22)
+        : safeMarkdown(
+            data: line,
+            selectable: false,
+            onTapLink: (text, href, title) {
+              if (href != null) _launchUrl(href);
+            },
+          );
+    return GestureDetector(onTap: () => _setActiveLine(i), child: child);
   }
 
   /// Activate line [i] for editing, seeding the raw field with its text and

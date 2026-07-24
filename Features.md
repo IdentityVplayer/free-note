@@ -4,6 +4,14 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.13.1
+
+### Changed
+- **应用启动默认打开上一个打开的仓库** — 新增稳定私有文件 `.config/last_repo.json`，在 `AppProvider.init()` 读取设置**之前**先恢复 `storage.setFolder(lastRepo)`，从而让 `settings.json`（位于 `<repo>/.config`）能被正确读取（此前因启动时 `currentFolder` 为 null，设置会从私有目录读取，导致 `notesFolderPath` 丢失、每次启动都回落到仓库选择页）。`chooseFolder` 在选库/切换仓库时持续写入该路径；若上次仓库已被删除/卸载，则跳过恢复、正常显示选择页。
+
+### Fixed
+- **Markdown 单击（非滑动）无法进入编辑** — 预览行原本用 `MarkdownBody(selectable: true)`，可选中文本会吞掉指针事件，导致外层 `GestureDetector.onTap`（激活该行编辑）永不触发。改为渲染不可选中的 markdown（`safeMarkdown(selectable: false)`），单击即可编辑；链接仍通过 `onTapLink` 照常打开。
+
 ## 1.12.1
 
 ### Fixed

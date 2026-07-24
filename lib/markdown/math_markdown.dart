@@ -112,12 +112,13 @@ Map<String, MarkdownElementBuilder> get mathBuilders => {
 Widget safeMarkdown({
   required String data,
   MarkdownTapLinkCallback? onTapLink,
+  bool selectable = true,
 }) {
   return Padding(
     padding: const EdgeInsets.all(16),
     child: MarkdownBody(
       data: data,
-      selectable: true,
+      selectable: selectable,
       extensionSet: md.ExtensionSet.gitHubFlavored,
       inlineSyntaxes: mathInlineSyntaxes,
       blockSyntaxes: mathBlockSyntaxes,

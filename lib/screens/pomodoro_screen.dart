@@ -544,7 +544,9 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
               return ListTile(
                 leading: Icon(
                   isActive ? Icons.check_circle : Icons.radio_button_unchecked,
-                  color: isActive ? Theme.of(context).colorScheme.primary : null,
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
                 title: Text(_profileName(p)),
                 trailing: Row(

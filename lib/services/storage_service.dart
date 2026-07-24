@@ -261,6 +261,37 @@ class StorageService {
     file.writeAsStringSync(jsonEncode(settings.toJson()));
   }
 
+  // ── Last opened repository (stable, repository-independent) ──
+  //
+  // The last opened repository path must survive restarts, but it can't live
+  // in the repository's own `.config/settings.json` — that file's location
+  // depends on knowing the repository first (a chicken-and-egg problem at
+  // startup, since `currentFolder` is still null when settings are first
+  // read). So we persist just the path in a stable private file, read before
+  // any repository folder is selected, which lets the app reopen the last
+  // repository on launch.
+
+  Future<String?> loadLastRepoPath() async {
+    final file = File(
+      p.join((await _privateDir).path, '.config', 'last_repo.json'),
+    );
+    if (!file.existsSync()) return null;
+    try {
+      final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      final path = json['path'] as String?;
+      return (path != null && path.isNotEmpty) ? path : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveLastRepoPath(String path) async {
+    final dir = Directory(p.join((await _privateDir).path, '.config'));
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    final file = File(p.join(dir.path, 'last_repo.json'));
+    file.writeAsStringSync(jsonEncode({'path': path}));
+  }
+
   // ── Export ──
 
   /// Export a single note as a standalone `.md` file into the **selected
