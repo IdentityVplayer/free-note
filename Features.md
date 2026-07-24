@@ -1,5 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.13.10
+
+### Fixed
+- **GitHub 同步 409 Conflict** — 上传文件遇到 SHA 不匹配（并发同步 / autoSync 触发 / Git Trees API 截断）时，自动通过 Contents API 重新拉取 SHA 并重试一次，避免误判上传失败。
+
 ## 1.13.9
 
 ### Changed

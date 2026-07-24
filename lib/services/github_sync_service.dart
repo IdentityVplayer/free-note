@@ -205,30 +205,59 @@ class GitHubSyncService {
 
   /// Create or update a file on GitHub at [path] with [base64Content].
   /// [existingSha] should be given when the file already exists (update);
-  /// null for new files.
+  /// null for new files. On a 409 (SHA mismatch from concurrent modification
+  /// or a truncated tree listing), re-fetch the SHA via the Contents API and
+  /// retry once before giving up.
   Future<void> _putFile(
     String path,
     String base64Content,
     String? existingSha,
   ) async {
-    final body = <String, dynamic>{
-      'message': 'Sync note: $path — ${DateTime.now().toIso8601String()}',
-      'content': base64Content,
-      'branch': branch,
-    };
-    if (existingSha != null) body['sha'] = existingSha;
-    final res = await http
-        .put(
-          Uri.parse('$_apiBase/contents/${_encPath(path)}'),
-          headers: _headers,
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 30));
+    Future<http.Response> doPut(String? sha) async {
+      final body = <String, dynamic>{
+        'message': 'Sync note: $path — ${DateTime.now().toIso8601String()}',
+        'content': base64Content,
+        'branch': branch,
+      };
+      if (sha != null) body['sha'] = sha;
+      return http
+          .put(
+            Uri.parse('$_apiBase/contents/${_encPath(path)}'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+    }
+
+    var res = await doPut(existingSha);
+    if (res.statusCode == 409) {
+      // SHA stale (concurrent sync / truncated tree) — refetch and retry.
+      final refreshed = await _fetchBlobSha(path);
+      if (refreshed != null) res = await doPut(refreshed);
+    }
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw GitHubAuthException(
         '上传 $path 失败: ${_describeError(res.statusCode)}',
       );
     }
+  }
+
+  /// Fetch a single file's blob SHA via the Contents API. Returns null on
+  /// 404 (file does not exist) or any error.
+  Future<String?> _fetchBlobSha(String path) async {
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$_apiBase/contents/${_encPath(path)}'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return data['sha'] as String?;
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Delete a file on GitHub at [path] (identified by [sha]).
