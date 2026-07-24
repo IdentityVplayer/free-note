@@ -1,5 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.13.5
+
+### Fixed
+- **首页任务计划 Dock 不自动刷新** — 嵌入式 `TaskPlanScreen` 在从完整任务计划页返回后不再重建，导致新增/修改的任务未即时显示。修复：`TaskPlanScreenState` 公开化 + `reloadTasks()` 方法 + `GlobalKey` + `didPopNext` 触发刷新。
+
 ## 1.13.4
 
 ### Added

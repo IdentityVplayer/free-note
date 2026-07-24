@@ -32,6 +32,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   /// double-fire [didPopNext]).
   bool _routeSubscribed = false;
 
+  /// Key for the embedded task-plan dock, so we can call [reloadTasks] when
+  /// the user returns from the standalone task-plan screen.
+  final GlobalKey<TaskPlanScreenState> _taskPlanKey =
+      GlobalKey<TaskPlanScreenState>();
+
   /// Bottom dock tab: 0 = 计划任务 (left), 1 = 笔记 (center), 2 = 番茄钟 (right).
   int _bottomIndex = 1;
 
@@ -71,9 +76,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   @override
   void didPopNext() {
-    // Returned from a sub-screen (e.g. TaskPlanScreen). The task dock is a
-    // FutureBuilder whose future is rebuilt on setState, so this makes a task
-    // added/edited there show up immediately on the home dock.
+    // Returned from a sub-screen (e.g. TaskPlanScreen). Reload the embedded
+    // task dock so tasks added/edited there show up immediately.
+    _taskPlanKey.currentState?.reloadTasks();
     if (mounted) setState(() {});
   }
 
@@ -383,7 +388,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   /// its own AppBar/FAB. The home FAB (when this tab is active) handles
   /// "new task", and the app-bar checklist icon opens it standalone.
   Widget _buildTasksDock(AppLocalizations l10n) {
-    return const TaskPlanScreen(embedded: true);
+    return TaskPlanScreen(embedded: true, key: _taskPlanKey);
   }
 
   /// Pomodoro quick view (right dock tab): shows the active profile's

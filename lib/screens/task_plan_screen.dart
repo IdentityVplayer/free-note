@@ -30,12 +30,16 @@ class TaskPlanScreen extends StatefulWidget {
   });
 
   @override
-  State<TaskPlanScreen> createState() => _TaskPlanScreenState();
+  State<TaskPlanScreen> createState() => TaskPlanScreenState();
 }
 
-class _TaskPlanScreenState extends State<TaskPlanScreen> {
+class TaskPlanScreenState extends State<TaskPlanScreen> {
   final List<Task> _tasks = [];
   bool _loading = true;
+
+  /// Reload tasks from disk (used by the home dock to refresh when the user
+  /// returns from the full task-plan screen).
+  void reloadTasks() => _load();
 
   @override
   void initState() {
