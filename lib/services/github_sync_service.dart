@@ -49,89 +49,176 @@ class GitHubSyncService {
   }
 
   /// Sync all notes to GitHub — uploads a single notes.json file.
+  /// Sync all notes to GitHub — each note becomes an individual `.md` file
+  /// under the `notes/` directory, preserving subfolder structure so the
+  /// repository stays human-readable. Files that no longer exist locally are
+  /// deleted from the remote, and the legacy single-file `notes/notes.json` is
+  /// cleaned up if it still exists.
   Future<SyncResult> syncNotes(List<Note> notes) async {
     if (!isConfigured) {
       return SyncResult(success: false, message: 'GitHub 未配置（请填写 Token 和仓库）');
     }
     try {
-      final json = jsonEncode(notes.map((n) => n.toJson()).toList());
-      // Remove newlines from base64 so the API accepts it reliably.
-      final content = base64Encode(utf8.encode(json)).replaceAll('\n', '');
-      const path = 'notes/notes.json';
+      // 1. List current files in notes/ on the remote (path → sha).
+      final remoteFiles = await _listNotesDir();
+      final remotePaths = remoteFiles.keys.toSet();
 
-      // Get existing file SHA (if any) for update.
-      String? sha;
-      try {
-        final getRes = await http.get(
-          Uri.parse('$_apiBase/contents/$path?ref=$branch'),
-          headers: _headers,
-        );
-        if (getRes.statusCode == 200) {
-          sha =
-              (jsonDecode(getRes.body) as Map<String, dynamic>)['sha']
-                  as String?;
-        } else if (getRes.statusCode != 404) {
-          return SyncResult(
-            success: false,
-            message: _describeError(getRes.statusCode),
-          );
-        }
-      } catch (_) {
-        // File doesn't exist yet — that's fine.
+      // 2. Upload every local note.
+      final localPaths = <String>{};
+      for (final note in notes) {
+        final path = _notePath(note);
+        localPaths.add(path);
+        final content = note.toMarkdownFile();
+        final encoded = base64Encode(utf8.encode(content)).replaceAll('\n', '');
+        await _putFile(path, encoded, remoteFiles[path]);
       }
 
-      final body = <String, dynamic>{
-        'message': 'Sync notes — ${DateTime.now().toIso8601String()}',
-        'content': content,
-        'branch': branch,
-      };
-      if (sha != null) body['sha'] = sha;
-
-      final res = await http
-          .put(
-            Uri.parse('$_apiBase/contents/$path'),
-            headers: _headers,
-            body: jsonEncode(body),
-          )
-          .timeout(const Duration(seconds: 30));
-
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        return SyncResult(
-          success: true,
-          message: '已同步 ${notes.length} 篇笔记到 GitHub',
-        );
+      // 3. Delete files that exist on GitHub but no longer locally.
+      for (final path in remotePaths.difference(localPaths)) {
+        final sha = remoteFiles[path];
+        if (sha != null) await _deleteFile(path, sha);
       }
+
+      // 4. Clean up the legacy single-file format if still present.
+      if (remoteFiles.containsKey('notes/notes.json')) {
+        await _deleteFile('notes/notes.json', remoteFiles['notes/notes.json']!);
+      }
+
       return SyncResult(
-        success: false,
-        message: _describeError(res.statusCode),
+        success: true,
+        message: '已同步 ${notes.length} 篇笔记到 GitHub',
       );
     } catch (e) {
       return SyncResult(success: false, message: '同步失败: $e');
     }
   }
 
-  /// Pull notes from GitHub.
+  /// Pull notes from GitHub — download every `.md` file under `notes/`,
+  /// parse YAML frontmatter and return the resulting [Note] list.
   Future<List<Note>?> pullNotes() async {
     if (!isConfigured) return null;
     try {
-      final res = await http
-          .get(
-            Uri.parse('$_apiBase/contents/notes/notes.json?ref=$branch'),
-            headers: _headers,
-          )
-          .timeout(const Duration(seconds: 30));
-      if (res.statusCode == 200) {
+      final remoteFiles = await _listNotesDir();
+      final notes = <Note>[];
+      for (final entry in remoteFiles.entries) {
+        final path = entry.key;
+        if (!path.endsWith('.md')) continue;
+        final res = await http
+            .get(
+              Uri.parse(_encPath('$_apiBase/contents/$path')),
+              headers: _headers,
+            )
+            .timeout(const Duration(seconds: 30));
+        if (res.statusCode != 200) continue;
         final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final content = data['content'] as String;
-        final decoded = utf8.decode(base64Decode(content.replaceAll('\n', '')));
-        final json = jsonDecode(decoded) as List<dynamic>;
-        return json
-            .map((e) => Note.fromJson(e as Map<String, dynamic>))
-            .toList();
+        final raw = data['content'] as String;
+        final decoded = utf8.decode(base64Decode(raw.replaceAll('\n', '')));
+        final relativePath = path.startsWith('notes/')
+            ? path.substring(6)
+            : path;
+        final note = Note.fromMarkdownFile(decoded, relativePath);
+        if (note != null) notes.add(note);
       }
-      return null;
+      return notes.isNotEmpty ? notes : null;
     } catch (_) {
       return null;
+    }
+  }
+
+  // ── Helpers for file-based sync ──
+
+  /// URL-encode each segment of a repository file path so special characters
+  /// (spaces, Unicode, etc.) are safely included in API request URLs.
+  static String _encPath(String path) =>
+      path.split('/').map((s) => Uri.encodeComponent(s)).join('/');
+
+  /// Relative path for a note inside the `notes/` directory.
+  String _notePath(Note note) => 'notes/${note.relativePath ?? note.fileName}';
+
+  /// List every blob whose path starts with `notes/` using the Git Trees API,
+  /// returning a map of path → SHA. Returns an empty map on error (new repo
+  /// with no commits, network failure, etc.).
+  Future<Map<String, String>> _listNotesDir() async {
+    final result = <String, String>{};
+    try {
+      final ref = await http
+          .get(
+            Uri.parse(_encPath('$_apiBase/git/refs/heads/$branch')),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 15));
+      if (ref.statusCode != 200) return result;
+      final refData = jsonDecode(ref.body) as Map<String, dynamic>;
+      final commitSha = refData['object']['sha'] as String;
+
+      final tree = await http
+          .get(
+            Uri.parse(_encPath('$_apiBase/git/trees/$commitSha?recursive=1')),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 15));
+      if (tree.statusCode != 200) return result;
+      final treeData = jsonDecode(tree.body) as Map<String, dynamic>;
+      final items = treeData['tree'] as List<dynamic>;
+      for (final item in items) {
+        final itemPath = item['path'] as String;
+        if (!itemPath.startsWith('notes/')) continue;
+        if (item['type'] as String != 'blob') continue;
+        result[itemPath] = item['sha'] as String;
+      }
+    } catch (_) {
+      // New / empty repo — no files to list.
+    }
+    return result;
+  }
+
+  /// Create or update a file on GitHub at [path] with [base64Content].
+  /// [existingSha] should be given when the file already exists (update);
+  /// null for new files.
+  Future<void> _putFile(
+    String path,
+    String base64Content,
+    String? existingSha,
+  ) async {
+    final body = <String, dynamic>{
+      'message': 'Sync note: $path — ${DateTime.now().toIso8601String()}',
+      'content': base64Content,
+      'branch': branch,
+    };
+    if (existingSha != null) body['sha'] = existingSha;
+    final res = await http
+        .put(
+          Uri.parse(_encPath('$_apiBase/contents/$path')),
+          headers: _headers,
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      throw GitHubAuthException(
+        '上传 $path 失败: ${_describeError(res.statusCode)}',
+      );
+    }
+  }
+
+  /// Delete a file on GitHub at [path] (identified by [sha]).
+  Future<void> _deleteFile(String path, String sha) async {
+    final body = jsonEncode({
+      'message': 'Remove note: $path',
+      'sha': sha,
+      'branch': branch,
+    });
+    final res = await http
+        .delete(
+          Uri.parse(_encPath('$_apiBase/contents/$path')),
+          headers: _headers,
+          body: body,
+        )
+        .timeout(const Duration(seconds: 30));
+    // Non-200 is best-effort — the next sync will retry.
+    if (res.statusCode != 200) {
+      throw GitHubAuthException(
+        '删除 $path 失败: ${_describeError(res.statusCode)}',
+      );
     }
   }
 

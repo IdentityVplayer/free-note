@@ -1,5 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.13.6
+
+### Changed
+- **GitHub 同步改为逐个文件上传** — 每篇笔记单独上传为 `notes/<relativePath>.md`（YAML 前后端格式），保持子目录结构；删除的笔记自动清理远端；遗留的 `notes/notes.json` 自动删除。拉取时遍历 `notes/` 目录下载每个 `.md` 文件解析回笔记。
+
 ## 1.13.5
 
 ### Fixed
