@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **274**（三语一致，截至 v1.13.11） |
-| 当前稳定版本 | `1.13.11+43`（已发布，tag `v1.13.11`） |
+| i18n key 总数 | **278**（三语一致，截至 v1.14.0） |
+| 当前稳定版本 | `1.14.0+44`（已发布，tag `v1.14.0`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -193,6 +193,16 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 1. ✅ **fix：409 仍然报错** — 重试逻辑增强：增加 300ms 延迟等待分支 commit 落定；`_fetchBlobSha` 返回 null 时仍用 null SHA 重试（视为新建文件）；添加 `_deleteFile` 的 409 重试。现 `_putFile` 和 `_deleteFile` 均在 409 时延迟 + 刷新 SHA + 重试。
 2. ✅ `flutter analyze` 0 issues + `flutter test` 56 passed。
 3. ✅ bump `pubspec.yaml` 版本 `1.13.10+42` → `1.13.11+43`；最终 commit / tag / push。
+
+### v1.14.0 最终化（已完成 ✅，2026-07-24）
+1. ✅ **fix：完成任务后页面自动刷新** — `_persist` 中的空列表守卫修复为从磁盘重新加载而非静默返回，保证 UI 一致性。
+2. ✅ **fix：设置"子任务完成后自动完成主任务"开关不立即刷新** — `onChanged` 回调后加 `setState` 保证 UI 即时更新。
+3. ✅ **add：长按文件/文件夹弹出菜单（删除）** — 首页笔记卡片和文件夹标题支持长按，弹出 BottomSheet 菜单（含删除、后续扩展重命名/移动/复制）。
+4. ✅ **fix：删除按钮文案统一** — `task_plan_screen` 中的三个 `deleteNote` 引用改为通用 `delete`，不再显示"删除笔记"。
+5. ✅ **fix：Android 通知不提示** — 添加 `SCHEDULE_EXACT_ALARM` 权限声明，`scheduleReminder`/`showNotification` 包裹 try-catch 避免静默失败。
+6. ✅ **change：新建笔记流程** — 点击添加笔记后弹出对话框输入文件名和选择所属文件夹；编辑页面的文件夹栏目已删除；长按笔记弹出重命名/移动/复制/删除菜单。新增 `noteNameHint`/`rename`/`move`/`copy` 四组三语 key（274 → 278）。
+7. ✅ `flutter analyze` 0 issues + `flutter test` 56 passed。
+8. ✅ bump `pubspec.yaml` 版本 `1.13.11+43` → `1.14.0+44`；更新 `Memory.md` / `Features.md`；最终 commit / tag / push。
 
 ---
 

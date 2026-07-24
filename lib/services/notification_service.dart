@@ -78,16 +78,21 @@ class NotificationService {
         importance: Importance.high,
       ),
     );
-    await _plugin.zonedSchedule(
-      task.reminder!.hashCode,
-      title,
-      task.title,
-      when,
-      details,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    );
+    try {
+      await _plugin.zonedSchedule(
+        task.reminder!.hashCode,
+        title,
+        task.title,
+        when,
+        details,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+    } catch (_) {
+      // Best-effort: on some Android versions without SCHEDULE_EXACT_ALARM
+      // permission the scheduling may fail silently.
+    }
   }
 
   /// Show an immediate notification.
@@ -104,11 +109,13 @@ class NotificationService {
         importance: Importance.high,
       ),
     );
-    await _plugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      details,
-    );
+    try {
+      await _plugin.show(
+        DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title,
+        body,
+        details,
+      );
+    } catch (_) {}
   }
 }

@@ -62,20 +62,24 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
 
   /// Persist the current [\_tasks] to disk. Guards: never writes an empty list
   /// when the on-disk file already has data (to prevent the "completing a
-  /// subtask clears all tasks" bug).
+  /// subtask clears all tasks" bug). Always calls setState so the UI refreshes.
   Future<void> _persist() async {
     if (_tasks.isEmpty) {
-      // Refuse to write empty unless the file is already empty or absent.
       try {
         final existing = await TaskService.instance.loadTasks();
-        if (existing.isNotEmpty) return;
-      } catch (_) {
-        // Best-effort guard; if we can't read, proceed with the save.
-      }
+        if (existing.isNotEmpty) {
+          // Block the empty save, but reload from disk to fix UI.
+          _tasks
+            ..clear()
+            ..addAll(existing);
+        }
+      } catch (_) {}
     }
     _tasks.sort(Task.compareForDisplay);
     await TaskService.instance.saveTasks(_tasks);
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _addTask(Task task) async {
@@ -446,7 +450,7 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.t('deleteNote')),
+        title: Text(l10n.t('delete')),
         content: Text(l10n.t('taskDeleteConfirm')),
         actions: [
           TextButton(
@@ -612,10 +616,7 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
                     value: 'open',
                     child: Text(l10n.t('taskOpenLinked')),
                   ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Text(l10n.t('deleteNote')),
-                ),
+                PopupMenuItem(value: 'delete', child: Text(l10n.t('delete'))),
               ],
             ),
           ],
@@ -659,7 +660,7 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
             },
             itemBuilder: (_) => [
               PopupMenuItem(value: 'edit', child: Text(l10n.t('edit'))),
-              PopupMenuItem(value: 'delete', child: Text(l10n.t('deleteNote'))),
+              PopupMenuItem(value: 'delete', child: Text(l10n.t('delete'))),
             ],
           ),
         ),

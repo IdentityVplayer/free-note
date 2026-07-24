@@ -580,6 +580,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               provider.updateSettings(
                 provider.settings.copyWith(autoCompleteMainTasks: v),
               );
+              setState(() {});
             },
           ),
           // About

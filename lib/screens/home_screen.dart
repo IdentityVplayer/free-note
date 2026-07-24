@@ -245,10 +245,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 if (_fabOpen) ...[
                   _fabItem(Icons.note_add, l10n.t('newNote'), () {
                     setState(() => _fabOpen = false);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const EditorScreen()),
-                    );
+                    _showNewNoteDialog(context);
                   }),
                   const SizedBox(height: 12),
                   _fabItem(
@@ -309,6 +306,95 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           ),
         ],
       ),
+    );
+  }
+
+  /// Show a pre-creation dialog for new notes: choose name and subfolder.
+  Future<void> _showNewNoteDialog(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final provider = context.read<AppProvider>();
+    final nameCtl = TextEditingController();
+    String? targetFolder;
+
+    // Scan top-level folders from the notes directory.
+    final base = StorageService.instance.currentFolder;
+    final folders = <String>[];
+    if (base != null) {
+      final dir = Directory(base);
+      if (dir.existsSync()) {
+        for (final e in dir.listSync()) {
+          if (e is Directory && !e.path.contains('.config')) {
+            final name = p.basename(e.path);
+            if (!name.startsWith('.')) folders.add(name);
+          }
+        }
+      }
+      folders.sort();
+    }
+    folders.insert(0, l10n.t('topLevel'));
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: Text(l10n.t('newNote')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: l10n.t('noteNameHint'),
+                  border: const OutlineInputBorder(),
+                ),
+                onSubmitted: (_) => Navigator.pop(ctx, true),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: targetFolder ?? folders.first,
+                decoration: InputDecoration(
+                  labelText: l10n.t('subfolder'),
+                  border: const OutlineInputBorder(),
+                ),
+                items: folders
+                    .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+                    .toList(),
+                onChanged: (v) => setInner(() => targetFolder = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.t('create')),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    final name = nameCtl.text.trim();
+    if (name.isEmpty) return;
+    final note = provider.createNote(title: name);
+    final noteId = note.id;
+    final folder = (targetFolder != null && targetFolder != l10n.t('topLevel'))
+        ? targetFolder!
+        : null;
+    if (folder != null) {
+      provider.updateNote(
+        note.copyWith(relativePath: p.join(folder, note.fileName)),
+      );
+    }
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EditorScreen(noteId: noteId)),
     );
   }
 
@@ -502,8 +588,69 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             _expanded.add(folderKey);
           }
         }),
+        onLongPress: () => _showFolderContextMenu(context, folderKey),
       ),
     );
+  }
+
+  /// Long-press context menu for a folder header.
+  void _showFolderContextMenu(BuildContext context, String folderKey) {
+    final l10n = AppLocalizations.of(context)!;
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: Text(l10n.t('delete')),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDeleteFolder(context, folderKey);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteFolder(
+    BuildContext context,
+    String folderKey,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${l10n.t('delete')} $folderKey'),
+        content: Text(l10n.t('deleteConfirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.t('delete')),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final base = StorageService.instance.currentFolder;
+      if (base != null) {
+        final dir = Directory('$base/$folderKey');
+        if (dir.existsSync()) {
+          try {
+            dir.deleteSync(recursive: true);
+            _loadFolders();
+            if (mounted) setState(() {});
+          } catch (_) {}
+        }
+      }
+    }
   }
 
   /// A single note's card (extracted from the old flat list item).
@@ -521,119 +668,318 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
 
     return Card(
-      child: ListTile(
-        leading: isAiChat
-            ? Icon(
-                Icons.auto_awesome,
-                color: Theme.of(context).colorScheme.primary,
-              )
-            : (note.isFavorite
-                  ? const Icon(Icons.star, color: Colors.amber)
-                  : const Icon(Icons.note_outlined)),
-        title: Row(
-          children: [
-            if (note.isPinned)
-              const Padding(
-                padding: EdgeInsets.only(right: 4),
-                child: Icon(Icons.push_pin, size: 16, color: Colors.blue),
-              ),
-            if (isAiChat)
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Chip(
-                  label: const Text('AI', style: TextStyle(fontSize: 10)),
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      child: GestureDetector(
+        onLongPress: () => _showNoteContextMenu(context, l10n, provider, note),
+        child: ListTile(
+          leading: isAiChat
+              ? Icon(
+                  Icons.auto_awesome,
+                  color: Theme.of(context).colorScheme.primary,
+                )
+              : (note.isFavorite
+                    ? const Icon(Icons.star, color: Colors.amber)
+                    : const Icon(Icons.note_outlined)),
+          title: Row(
+            children: [
+              if (note.isPinned)
+                const Padding(
+                  padding: EdgeInsets.only(right: 4),
+                  child: Icon(Icons.push_pin, size: 16, color: Colors.blue),
                 ),
-              ),
-            Expanded(
-              child: Text(
-                note.title,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(note.preview, maxLines: 2, overflow: TextOverflow.ellipsis),
-            if (note.tags.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 4,
-                children: note.tags
-                    .map(
-                      (tag) => Chip(
-                        label: Text(tag, style: const TextStyle(fontSize: 10)),
-                        padding: EdgeInsets.zero,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    )
-                    .toList(),
+              if (isAiChat)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Chip(
+                    label: const Text('AI', style: TextStyle(fontSize: 10)),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              Expanded(
+                child: Text(
+                  note.title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isAiChat && aiEnabled)
-              IconButton(
-                icon: const Icon(Icons.chat),
-                tooltip: l10n.t('resumeChat'),
-                onPressed: () => _resumeAiChat(note, l10n),
-              ),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                switch (value) {
-                  case 'resume':
-                    _resumeAiChat(note, l10n);
-                    break;
-                  case 'pin':
-                    provider.togglePin(note.id);
-                    break;
-                  case 'favorite':
-                    provider.toggleFavorite(note.id);
-                    break;
-                  case 'delete':
-                    _confirmDelete(context, provider, note.id);
-                    break;
-                }
-              },
-              itemBuilder: (_) => [
-                if (isAiChat && aiEnabled)
-                  PopupMenuItem(
-                    value: 'resume',
-                    child: Text(l10n.t('resumeChat')),
-                  ),
-                PopupMenuItem(
-                  value: 'pin',
-                  child: Text(note.isPinned ? l10n.t('unpin') : l10n.t('pin')),
-                ),
-                PopupMenuItem(
-                  value: 'favorite',
-                  child: Text(
-                    note.isFavorite ? l10n.t('unfavorite') : l10n.t('favorite'),
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Text(l10n.t('deleteNote')),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(note.preview, maxLines: 2, overflow: TextOverflow.ellipsis),
+              if (note.tags.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 4,
+                  children: note.tags
+                      .map(
+                        (tag) => Chip(
+                          label: Text(
+                            tag,
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                          padding: EdgeInsets.zero,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      )
+                      .toList(),
                 ),
               ],
-            ),
-          ],
-        ),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => EditorScreen(noteId: note.id)),
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isAiChat && aiEnabled)
+                IconButton(
+                  icon: const Icon(Icons.chat),
+                  tooltip: l10n.t('resumeChat'),
+                  onPressed: () => _resumeAiChat(note, l10n),
+                ),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  switch (value) {
+                    case 'resume':
+                      _resumeAiChat(note, l10n);
+                      break;
+                    case 'pin':
+                      provider.togglePin(note.id);
+                      break;
+                    case 'favorite':
+                      provider.toggleFavorite(note.id);
+                      break;
+                    case 'delete':
+                      _confirmDelete(context, provider, note.id);
+                      break;
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (isAiChat && aiEnabled)
+                    PopupMenuItem(
+                      value: 'resume',
+                      child: Text(l10n.t('resumeChat')),
+                    ),
+                  PopupMenuItem(
+                    value: 'pin',
+                    child: Text(
+                      note.isPinned ? l10n.t('unpin') : l10n.t('pin'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'favorite',
+                    child: Text(
+                      note.isFavorite
+                          ? l10n.t('unfavorite')
+                          : l10n.t('favorite'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text(l10n.t('deleteNote')),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => EditorScreen(noteId: note.id)),
+          ),
         ),
       ),
     );
+  }
+
+  /// Long-press context menu for a note card.
+  void _showNoteContextMenu(
+    BuildContext context,
+    AppLocalizations l10n,
+    AppProvider provider,
+    Note note,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.drive_file_rename_outline),
+              title: Text(l10n.t('rename')),
+              onTap: () {
+                Navigator.pop(ctx);
+                _renameNote(context, provider, note);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.drive_file_move_outline),
+              title: Text(l10n.t('move')),
+              onTap: () {
+                Navigator.pop(ctx);
+                _moveNote(context, provider, note);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_copy),
+              title: Text(l10n.t('copy')),
+              onTap: () {
+                Navigator.pop(ctx);
+                _copyNote(context, provider, note);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: Text(l10n.t('delete')),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDelete(context, provider, note.id);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _renameNote(
+    BuildContext context,
+    AppProvider provider,
+    Note note,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ctl = TextEditingController(text: note.title);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t('rename')),
+        content: TextField(
+          controller: ctl,
+          autofocus: true,
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctl.text.trim()),
+            child: Text(l10n.t('rename')),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty && name != note.title) {
+      provider.updateNote(note.copyWith(title: name));
+    }
+  }
+
+  Future<void> _moveNote(
+    BuildContext context,
+    AppProvider provider,
+    Note note,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final base = StorageService.instance.currentFolder;
+    if (base == null) return;
+    final folders = <String>[''];
+    final dir = Directory(base);
+    if (dir.existsSync()) {
+      for (final e in dir.listSync()) {
+        if (e is Directory && !e.path.contains('.config')) {
+          final name = p.basename(e.path);
+          if (!name.startsWith('.')) folders.add(name);
+        }
+      }
+    }
+    String? target =
+        note.relativePath != null && note.relativePath!.contains('/')
+        ? p.dirname(note.relativePath!)
+        : '';
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t('move')),
+        content: DropdownButtonFormField<String>(
+          initialValue: target,
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+          items: folders
+              .map(
+                (f) => DropdownMenuItem(
+                  value: f,
+                  child: Text(f.isEmpty ? l10n.t('topLevel') : f),
+                ),
+              )
+              .toList(),
+          onChanged: (v) => target = v,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, target),
+            child: Text(l10n.t('move')),
+          ),
+        ],
+      ),
+    );
+    if (picked != null) {
+      final newRel = picked.isEmpty
+          ? note.fileName
+          : '$picked/${note.fileName}';
+      if (newRel != note.relativePath) {
+        provider.updateNote(note.copyWith(relativePath: newRel));
+      }
+    }
+  }
+
+  Future<void> _copyNote(
+    BuildContext context,
+    AppProvider provider,
+    Note note,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ctl = TextEditingController(text: '${note.title} (copy)');
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t('copy')),
+        content: TextField(
+          controller: ctl,
+          autofocus: true,
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctl.text.trim()),
+            child: Text(l10n.t('copy')),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty) {
+      final copy = provider.createNote(title: name, content: note.content);
+      provider.updateNote(
+        copy.copyWith(
+          relativePath: note.relativePath != null
+              ? '${p.dirname(note.relativePath!)}/${copy.fileName}'
+              : copy.fileName,
+        ),
+      );
+    }
   }
 
   /// Resume an AI chat note from the home screen: open the in-file dialog with
