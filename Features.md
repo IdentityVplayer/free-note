@@ -1,5 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.13.9
+
+### Changed
+- **`.config` 文件夹同步到 GitHub** — GitHub 同步现在将 `.config/` 下的配置文件（tasks.json、settings.json、secrets.json 等）一起上传到 `notes/.config/` 目录，拉取时自动写回本地 `.config/`，实现跨设备配置/任务/番茄钟同步。
+
 ## 1.13.8
 
 ### Fixed

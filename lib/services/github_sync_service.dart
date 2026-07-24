@@ -49,12 +49,15 @@ class GitHubSyncService {
   }
 
   /// Sync all notes to GitHub — uploads a single notes.json file.
-  /// Sync all notes to GitHub — each note becomes an individual `.md` file
-  /// under the `notes/` directory, preserving subfolder structure so the
-  /// repository stays human-readable. Files that no longer exist locally are
-  /// deleted from the remote, and the legacy single-file `notes/notes.json` is
-  /// cleaned up if it still exists.
-  Future<SyncResult> syncNotes(List<Note> notes) async {
+  /// Sync all notes AND `.config` files to GitHub — each note becomes an
+  /// individual `.md` file under `notes/`; each config file (tasks, pomodoro,
+  /// settings, etc.) is uploaded to `notes/.config/<filename>`. Files that no
+  /// longer exist locally are deleted from the remote, and the legacy
+  /// single-file `notes/notes.json` is cleaned up if it still exists.
+  Future<SyncResult> syncNotes(
+    List<Note> notes, {
+    Map<String, String>? configFiles,
+  }) async {
     if (!isConfigured) {
       return SyncResult(success: false, message: 'GitHub 未配置（请填写 Token 和仓库）');
     }
@@ -84,6 +87,18 @@ class GitHubSyncService {
         await _deleteFile('notes/notes.json', remoteFiles['notes/notes.json']!);
       }
 
+      // 5. Upload every config file (.json) to notes/.config/.
+      if (configFiles != null) {
+        for (final entry in configFiles.entries) {
+          final cfgPath = 'notes/.config/${entry.key}';
+          localPaths.add(cfgPath);
+          final encoded = base64Encode(
+            utf8.encode(entry.value),
+          ).replaceAll('\n', '');
+          await _putFile(cfgPath, encoded, remoteFiles[cfgPath]);
+        }
+      }
+
       return SyncResult(
         success: true,
         message: '已同步 ${notes.length} 篇笔记到 GitHub',
@@ -93,33 +108,52 @@ class GitHubSyncService {
     }
   }
 
-  /// Pull notes from GitHub — download every `.md` file under `notes/`,
-  /// parse YAML frontmatter and return the resulting [Note] list.
-  Future<List<Note>?> pullNotes() async {
+  /// Pull notes AND `.config` files from GitHub — download every `.md` file
+  /// under `notes/` (parsed as [Note] with YAML frontmatter) and every `.json`
+  /// file under `notes/.config/` (returned as raw JSON strings).
+  Future<PullResult?> pullNotes() async {
     if (!isConfigured) return null;
     try {
       final remoteFiles = await _listNotesDir();
       final notes = <Note>[];
+      final configContent = <String, String>{};
       for (final entry in remoteFiles.entries) {
         final path = entry.key;
-        if (!path.endsWith('.md')) continue;
-        final res = await http
-            .get(
-              Uri.parse('$_apiBase/contents/${_encPath(path)}'),
-              headers: _headers,
-            )
-            .timeout(const Duration(seconds: 30));
-        if (res.statusCode != 200) continue;
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final raw = data['content'] as String;
-        final decoded = utf8.decode(base64Decode(raw.replaceAll('\n', '')));
-        final relativePath = path.startsWith('notes/')
-            ? path.substring(6)
-            : path;
-        final note = Note.fromMarkdownFile(decoded, relativePath);
-        if (note != null) notes.add(note);
+        if (path.endsWith('.md')) {
+          final res = await http
+              .get(
+                Uri.parse('$_apiBase/contents/${_encPath(path)}'),
+                headers: _headers,
+              )
+              .timeout(const Duration(seconds: 30));
+          if (res.statusCode != 200) continue;
+          final data = jsonDecode(res.body) as Map<String, dynamic>;
+          final raw = data['content'] as String;
+          final decoded = utf8.decode(base64Decode(raw.replaceAll('\n', '')));
+          final relativePath = path.startsWith('notes/')
+              ? path.substring(6)
+              : path;
+          final note = Note.fromMarkdownFile(decoded, relativePath);
+          if (note != null) notes.add(note);
+        } else if (path.startsWith('notes/.config/') &&
+            path.endsWith('.json')) {
+          final res = await http
+              .get(
+                Uri.parse('$_apiBase/contents/${_encPath(path)}'),
+                headers: _headers,
+              )
+              .timeout(const Duration(seconds: 30));
+          if (res.statusCode != 200) continue;
+          final data = jsonDecode(res.body) as Map<String, dynamic>;
+          final raw = data['content'] as String;
+          final decoded = utf8.decode(base64Decode(raw.replaceAll('\n', '')));
+          final filename = path.startsWith('notes/.config/')
+              ? path.substring(14)
+              : path;
+          configContent[filename] = decoded;
+        }
       }
-      return notes.isNotEmpty ? notes : null;
+      return PullResult(notes, configContent);
     } catch (_) {
       return null;
     }
@@ -241,6 +275,15 @@ class SyncResult {
   final String message;
 
   SyncResult({required this.success, required this.message});
+}
+
+/// Result of a pull operation: parsed notes (from YAML frontmatter `.md`
+/// files) plus raw JSON config-file content (from `notes/.config/*.json`).
+class PullResult {
+  final List<Note> notes;
+  final Map<String, String> configContent;
+
+  PullResult(this.notes, this.configContent);
 }
 
 /// A GitHub release, as returned by GET /repos/{owner}/{repo}/releases/latest.

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:permission_handler/permission_handler.dart';
 import '../models/note.dart';
 import '../models/settings.dart';
@@ -147,6 +148,27 @@ class AppProvider extends ChangeNotifier
   /// the local notes (by id, keeping the newer [updatedAt]), persist the merged
   /// set locally, then push it. Guarded by [_isSyncing] so overlapping calls
   /// are coalesced. Does not block the UI (no global loading spinner).
+
+  /// Read all local `.config` files (except per-note metadata) into a map of
+  /// filename → JSON content, for uploading alongside notes.
+  Future<Map<String, String>> _readConfigFiles() async {
+    final out = <String, String>{};
+    try {
+      final cfgDir = await _storage.configDir;
+      if (cfgDir.existsSync()) {
+        for (final entity in cfgDir.listSync()) {
+          if (entity is! File || !entity.path.endsWith('.json')) continue;
+          final name = p.basename(entity.path);
+          // Skip per-note metadata files (numeric-id.json) — frontmatter
+          // in the .md file already covers them on GitHub.
+          if (RegExp(r'^\d+\.json$').hasMatch(name)) continue;
+          out[name] = entity.readAsStringSync();
+        }
+      }
+    } catch (_) {}
+    return out;
+  }
+
   Future<String> syncBidirectional() async {
     if (!githubService.isConfigured) {
       return 'GitHub 未配置，请先在设置中填写 Token 和仓库';
@@ -154,9 +176,29 @@ class AppProvider extends ChangeNotifier
     if (_isSyncing) return _statusMessage ?? '同步中…';
     _isSyncing = true;
     try {
-      final remote = await githubService.pullNotes();
-      if (remote != null && remote.isNotEmpty) _mergeRemoteNotes(remote);
-      final result = await githubService.syncNotes(_notes);
+      // Pull remote data (notes + config files).
+      final pullResult = await githubService.pullNotes();
+      if (pullResult != null) {
+        if (pullResult.notes.isNotEmpty) _mergeRemoteNotes(pullResult.notes);
+        // Write pulled config files into the local .config/ directory.
+        for (final entry in pullResult.configContent.entries) {
+          try {
+            final cfgDir = await _storage.configDir;
+            final f = File('${cfgDir.path}/${entry.key}');
+            f.writeAsStringSync(entry.value);
+          } catch (_) {
+            // best-effort per file
+          }
+        }
+      }
+
+      // Read local config files to push alongside notes.
+      final configFiles = await _readConfigFiles();
+
+      final result = await githubService.syncNotes(
+        _notes,
+        configFiles: configFiles,
+      );
       _statusMessage = result.message;
     } catch (e) {
       _statusMessage = '同步失败: $e';
@@ -473,7 +515,11 @@ class AppProvider extends ChangeNotifier
       return _statusMessage!;
     }
     _setLoading(true);
-    final result = await githubService.syncNotes(_notes);
+    final configFiles = await _readConfigFiles();
+    final result = await githubService.syncNotes(
+      _notes,
+      configFiles: configFiles,
+    );
     _statusMessage = result.message;
     _setLoading(false);
     notifyListeners();
@@ -488,11 +534,18 @@ class AppProvider extends ChangeNotifier
       return _statusMessage!;
     }
     _setLoading(true);
-    final remoteNotes = await githubService.pullNotes();
-    if (remoteNotes != null) {
-      _notes = remoteNotes;
+    final pullResult = await githubService.pullNotes();
+    if (pullResult != null) {
+      _notes = pullResult.notes;
+      for (final entry in pullResult.configContent.entries) {
+        try {
+          final cfgDir = await _storage.configDir;
+          final f = File('${cfgDir.path}/${entry.key}');
+          f.writeAsStringSync(entry.value);
+        } catch (_) {}
+      }
       await _persist();
-      _statusMessage = '已从 GitHub 拉取 ${remoteNotes.length} 篇笔记';
+      _statusMessage = '已从 GitHub 拉取 ${pullResult.notes.length} 篇笔记';
     } else {
       _statusMessage = '从 GitHub 拉取失败';
     }
