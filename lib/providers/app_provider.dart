@@ -239,6 +239,21 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
       _settings.repositories = [..._settings.repositories, path];
     }
     await _storage.setFolder(path);
+    // Preserve credentials already stored in this repository's settings.json
+    // (e.g. an OAuth/PAT GitHub token saved in a previous session). Without
+    // this, (re)selecting the folder would overwrite the on-disk settings with
+    // the in-memory copy — which can have a null token if the app had to fall
+    // back to the folder picker on launch — permanently dropping the GitHub
+    // login. Reloading from the just-selected folder and merging keeps the
+    // existing token/username/repo/mode intact.
+    final existing = await _storage.loadSettings();
+    _settings.githubToken ??= existing.githubToken;
+    _settings.githubUsername ??= existing.githubUsername;
+    _settings.githubRepo ??= existing.githubRepo;
+    if (_settings.githubSyncMode == 'device' &&
+        existing.githubSyncMode != 'device') {
+      _settings.githubSyncMode = existing.githubSyncMode;
+    }
     await _storage.saveSettings(_settings);
     await _storage.saveLastRepoPath(path);
     _notes = await _storage.loadNotes();
@@ -282,6 +297,7 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
     String? repo,
     String? clientId,
     bool? autoSync,
+    String? syncMode,
   }) async {
     if (token != null) _settings.githubToken = token.isEmpty ? null : token;
     if (username != null) {
@@ -292,6 +308,7 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
       _settings.githubClientId = clientId.isEmpty ? null : clientId;
     }
     if (autoSync != null) _settings.autoSync = autoSync;
+    if (syncMode != null) _settings.githubSyncMode = syncMode;
     githubService.token = _settings.githubToken;
     githubService.repo = _settings.githubRepo;
     await _storage.saveSettings(_settings);

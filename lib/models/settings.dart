@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'plugin.dart';
 
 /// App settings model.
@@ -13,6 +15,12 @@ class AppSettings {
 
   /// Login name of the authenticated GitHub user (filled after Device login).
   String? githubUsername;
+
+  /// GitHub Sync login mode: 'device' (OAuth Device flow) or 'token'
+  /// (paste a Personal Access Token). Persisted so the settings UI can show
+  /// the right input on reopen.
+  String githubSyncMode;
+
   String? aiApiKey;
   String aiModel;
   bool autoSync;
@@ -57,6 +65,7 @@ class AppSettings {
     this.githubRepo,
     this.githubClientId,
     this.githubUsername,
+    this.githubSyncMode = 'device',
     this.aiApiKey,
     this.aiModel = 'gpt-3.5-turbo',
     this.autoSync = false,
@@ -71,14 +80,33 @@ class AppSettings {
     this.autoCompleteMainTasks = false,
   });
 
+  /// Obfuscate a secret (API key / token) with base64 before persisting.
+  /// A `b64:` prefix marks encoded values so plaintext (legacy) settings are
+  /// still read back unchanged (backward compatible).
+  static String? _encodeSecret(String? v) {
+    if (v == null || v.isEmpty) return v;
+    return 'b64:${base64Encode(utf8.encode(v))}';
+  }
+
+  /// Reverse [_encodeSecret]; returns the value as-is if not encoded.
+  static String? _decodeSecret(String? v) {
+    if (v == null || v.isEmpty || !v.startsWith('b64:')) return v;
+    try {
+      return utf8.decode(base64Decode(v.substring(4)));
+    } catch (_) {
+      return v;
+    }
+  }
+
   Map<String, dynamic> toJson() => {
     'languageCode': languageCode,
     'isDarkMode': isDarkMode,
-    'githubToken': githubToken,
+    'githubToken': _encodeSecret(githubToken),
     'githubRepo': githubRepo,
     'githubClientId': githubClientId,
     'githubUsername': githubUsername,
-    'aiApiKey': aiApiKey,
+    'githubSyncMode': githubSyncMode,
+    'aiApiKey': _encodeSecret(aiApiKey),
     'aiModel': aiModel,
     'autoSync': autoSync,
     'enableAI': enableAI,
@@ -95,11 +123,12 @@ class AppSettings {
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
     languageCode: json['languageCode'] as String? ?? '',
     isDarkMode: json['isDarkMode'] as bool? ?? false,
-    githubToken: json['githubToken'] as String?,
+    githubToken: _decodeSecret(json['githubToken'] as String?),
     githubRepo: json['githubRepo'] as String?,
     githubClientId: json['githubClientId'] as String?,
     githubUsername: json['githubUsername'] as String?,
-    aiApiKey: json['aiApiKey'] as String?,
+    githubSyncMode: json['githubSyncMode'] as String? ?? 'device',
+    aiApiKey: _decodeSecret(json['aiApiKey'] as String?),
     aiModel: json['aiModel'] as String? ?? 'gpt-3.5-turbo',
     autoSync: json['autoSync'] as bool? ?? false,
     enableAI: json['enableAI'] as bool? ?? true,
@@ -126,6 +155,7 @@ class AppSettings {
     String? githubRepo,
     String? githubClientId,
     String? githubUsername,
+    String? githubSyncMode,
     String? aiApiKey,
     String? aiModel,
     bool? autoSync,
@@ -145,6 +175,7 @@ class AppSettings {
     githubRepo: githubRepo ?? this.githubRepo,
     githubClientId: githubClientId ?? this.githubClientId,
     githubUsername: githubUsername ?? this.githubUsername,
+    githubSyncMode: githubSyncMode ?? this.githubSyncMode,
     aiApiKey: aiApiKey ?? this.aiApiKey,
     aiModel: aiModel ?? this.aiModel,
     autoSync: autoSync ?? this.autoSync,

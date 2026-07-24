@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -235,7 +237,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         bytes: bytes,
       );
       if (path == null) return; // user cancelled
-      _toast(l10n.tArgs('exportSuccessFne', [p.basename(path)]));
+      // file_picker may append a platform extension (e.g. `.zip` on Windows);
+      // normalize the saved file so it ends with `.fne`.
+      var outPath = path;
+      if (!outPath.toLowerCase().endsWith('.fne')) {
+        final corrected = outPath.toLowerCase().endsWith('.zip')
+            ? outPath.substring(0, outPath.length - 4)
+            : '$outPath.fne';
+        try {
+          final old = File(outPath);
+          outPath = old.existsSync()
+              ? old.renameSync(corrected).path
+              : corrected;
+        } catch (_) {
+          outPath = corrected;
+        }
+      }
+      _toast(l10n.tArgs('exportSuccessFne', [p.basename(outPath)]));
     } catch (e) {
       _toast(l10n.tArgs('exportFailed', [e.toString()]));
     }

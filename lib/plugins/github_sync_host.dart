@@ -11,13 +11,15 @@ abstract class GitHubSyncHost {
   AppSettings get settings;
   GitHubSyncService get githubService;
 
-  /// Persist GitHub auth fields (token / username / repo / clientId / autoSync).
+  /// Persist GitHub auth fields (token / username / repo / clientId /
+  /// autoSync / syncMode). [syncMode] is 'device' (OAuth) or 'token' (PAT).
   Future<void> updateGitHubAuth({
     String? token,
     String? username,
     String? repo,
     String? clientId,
     bool? autoSync,
+    String? syncMode,
   });
 
   /// Immediate sync to GitHub.

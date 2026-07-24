@@ -4,6 +4,19 @@ This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.
 
+## 1.13.2
+
+### Added
+- **GitHub Sync 新增「令牌 (Key) 登录」模式** — 同步设置页新增登录方式切换（设备登录 OAuth / 令牌登录）。选择「令牌登录」后可直接粘贴 GitHub Personal Access Token (PAT) 连接并同步，无需创建 OAuth App；连接时会校验令牌并拉取仓库列表。模式持久化于 `AppSettings.githubSyncMode`。
+
+### Changed
+- **AI API Key 与 GitHub Token 以 base64 混淆后存储** — `AppSettings` 在序列化时对 `aiApiKey` / `githubToken` 做 base64 编码（带 `b64:` 前缀），读回时解码；旧版明文设置文件因无前缀会被原样读取，向后兼容。密钥仍位于 `.config/settings.json`，但不再以明文暴露。
+
+### Fixed
+- **导出归档后缀错误（`.fne.zip` → `.fne`）** — 部分平台（如 Windows）的 `FilePicker.saveFile` 会在 `.fne` 文件名后追加 `.zip`；导出后统一把落盘文件规整为以 `.fne` 结尾，避免导入时因扩展名不匹配而选不到文件。
+- **任务计划板块添加后不立即显示** — 首页「计划任务」Dock 是 `FutureBuilder`，返回 `TaskPlanScreen` 后不会重建。新增 `RouteObserver`，首页 `RouteAware` 在 `didPopNext` 时触发重建，重新加载任务列表，新增/编辑的任务立即出现。
+- **OAuth 登录重启 APP 后失效** — `chooseFolder` 在（重新）选库时会把内存中的 `_settings`（若启动回落到选库页、`githubToken` 可能为 null）整体写回 `<repo>/.config/settings.json`，覆盖此前 OAuth 登录保存的令牌，导致重新打开 APP 后登录丢失。改为选库前先从目标仓库读取已持久化的设置并保留其中的 `githubToken` / `githubUsername` / `githubRepo` / `githubSyncMode` 再保存，确保重新选库不会丢失登录态。
+
 ## 1.13.1
 
 ### Changed

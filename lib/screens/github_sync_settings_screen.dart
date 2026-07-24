@@ -25,11 +25,16 @@ class GitHubSyncSettingsScreen extends StatefulWidget {
 
 class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
   late TextEditingController _clientIdController;
+  late TextEditingController _tokenController;
   List<GitHubRepo> _repos = [];
   String? _selectedRepo;
   bool _loadingRepos = false;
   bool _busy = false;
   String? _status;
+
+  /// GitHub Sync login mode: 'device' (OAuth Device flow) or 'token'
+  /// (paste a Personal Access Token). Mirrors [AppSettings.githubSyncMode].
+  String _syncMode = 'device';
 
   /// The active device-code session (null when not authorizing).
   DeviceCodeResponse? _deviceSession;
@@ -49,6 +54,10 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
     _clientIdController = TextEditingController(text: s.githubClientId ?? '');
     _showCustomClientId =
         s.githubClientId != null && s.githubClientId!.isNotEmpty;
+    _syncMode = s.githubSyncMode;
+    // Token mode input is prefilled with the (in-memory, plaintext) token so
+    // the user can see / re-edit it.
+    _tokenController = TextEditingController(text: s.githubToken ?? '');
     _selectedRepo = s.githubRepo;
     if (s.githubToken != null && s.githubToken!.isNotEmpty) {
       _loadRepos(s.githubToken!);
@@ -58,6 +67,7 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
   @override
   void dispose() {
     _clientIdController.dispose();
+    _tokenController.dispose();
     super.dispose();
   }
 
@@ -142,6 +152,7 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
         token: token,
         username: user.login,
         clientId: clientId,
+        syncMode: 'device',
       );
       await _loadRepos(token);
       if (mounted) {
@@ -175,6 +186,42 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
       _deviceSession = null;
       _busy = false;
     });
+  }
+
+  // ── Login: Token (Key) mode ─────────────────────────────────────
+
+  /// Connect using a pasted Personal Access Token. Validates the token by
+  /// resolving the authenticated user, then persists it (same path the Device
+  /// flow would have produced) so sync works identically.
+  Future<void> _connectWithToken() async {
+    final l10n = AppLocalizations.of(context)!;
+    final token = _tokenController.text.trim();
+    if (token.isEmpty) {
+      setState(() => _status = l10n.t('githubTokenRequired'));
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _status = l10n.t('githubVerifying');
+    });
+    try {
+      final user = await widget.host.githubService.getAuthenticatedUser(token);
+      await widget.host.updateGitHubAuth(
+        token: token,
+        username: user.login,
+        syncMode: 'token',
+      );
+      await _loadRepos(token);
+      if (mounted) {
+        setState(() => _status = l10n.tArgs('githubLoggedInAs', [user.login]));
+      }
+    } on GitHubAuthException catch (e) {
+      if (mounted) setState(() => _status = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _status = '连接失败: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   // ── Disconnect / sync helpers ─────────────────────────────────────
@@ -233,77 +280,148 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
           ),
           const Divider(),
 
-          // ── Custom OAuth client id (collapsed by default) ──
-          if (_showCustomClientId) ...[
+          // ── Login mode selector ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              l10n.t('githubMode'),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: SegmentedButton<String>(
+              segments: [
+                ButtonSegment(
+                  value: 'device',
+                  label: Text(l10n.t('githubDeviceMode')),
+                ),
+                ButtonSegment(
+                  value: 'token',
+                  label: Text(l10n.t('githubTokenMode')),
+                ),
+              ],
+              selected: {_syncMode},
+              onSelectionChanged: (sel) =>
+                  setState(() => _syncMode = sel.first),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // ── Device (OAuth) mode ──
+          if (_syncMode == 'device') ...[
+            if (_showCustomClientId) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: _clientIdController,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('githubClientId'),
+                    border: const OutlineInputBorder(),
+                    hintText: 'Iv1.xxxxx',
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Text(
+                  l10n.t('githubClientIdHint'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (authorizing) ...[
+              const SizedBox(height: 12),
+              _buildAuthorizingCard(l10n),
+            ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.login),
+                      label: Text(l10n.t('githubLoginNow')),
+                      onPressed: _busy ? null : _startLogin,
+                    ),
+                  ),
+                  if (connected || authorizing) ...[
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.close),
+                      label: Text(
+                        authorizing
+                            ? l10n.t('cancel')
+                            : l10n.t('githubDisconnect'),
+                      ),
+                      onPressed: _busy
+                          ? null
+                          : (authorizing ? _cancelAuth : _disconnect),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (!connected && !authorizing && !_showCustomClientId)
+              Center(
+                child: TextButton(
+                  onPressed: () => setState(() => _showCustomClientId = true),
+                  child: Text(
+                    l10n.t('githubUseOtherOauth'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+
+          // ── Token (Key) mode ──
+          if (_syncMode == 'token') ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
-                controller: _clientIdController,
+                controller: _tokenController,
+                obscureText: true,
                 decoration: InputDecoration(
-                  labelText: l10n.t('githubClientId'),
+                  labelText: l10n.t('githubToken'),
                   border: const OutlineInputBorder(),
-                  hintText: 'Iv1.xxxxx',
+                  hintText: l10n.t('githubTokenHint'),
                 ),
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
-                l10n.t('githubClientIdHint'),
+                l10n.t('githubTokenHint'),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
             const SizedBox(height: 12),
-          ],
-
-          // ── Authorizing state: big user code + cancel ──
-          if (authorizing) ...[
-            const SizedBox(height: 12),
-            _buildAuthorizingCard(l10n),
-          ],
-
-          // ── Login / Disconnect buttons ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.login),
-                    label: Text(l10n.t('githubLoginNow')),
-                    onPressed: _busy ? null : _startLogin,
-                  ),
-                ),
-                if (connected || authorizing) ...[
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.close),
-                    label: Text(
-                      authorizing
-                          ? l10n.t('cancel')
-                          : l10n.t('githubDisconnect'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.key),
+                      label: Text(l10n.t('githubLoginNow')),
+                      onPressed: _busy ? null : _connectWithToken,
                     ),
-                    onPressed: _busy
-                        ? null
-                        : (authorizing ? _cancelAuth : _disconnect),
                   ),
+                  if (connected) ...[
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.close),
+                      label: Text(l10n.t('githubDisconnect')),
+                      onPressed: _busy ? null : _disconnect,
+                    ),
+                  ],
                 ],
-              ],
-            ),
-          ),
-          // Small line: use a different OAuth app.
-          if (!connected && !authorizing && !_showCustomClientId)
-            Center(
-              child: TextButton(
-                onPressed: () => setState(() => _showCustomClientId = true),
-                child: Text(
-                  l10n.t('githubUseOtherOauth'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
               ),
             ),
+          ],
           const Divider(),
 
           // ── Repository picker ──

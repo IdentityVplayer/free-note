@@ -16,6 +16,7 @@ import 'ai_assistant_screen.dart';
 import 'task_plan_screen.dart';
 import 'pomodoro_screen.dart';
 import '../plugins/ai_context_plugin.dart';
+import '../route_observer.dart';
 
 /// Main screen — shows a list of notes with search, app bar actions.
 class HomeScreen extends StatefulWidget {
@@ -25,9 +26,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with RouteAware {
   String _searchQuery = '';
   bool _fabOpen = false;
+
+  /// True once we've subscribed to [routeObserver] (subscribing twice would
+  /// double-fire [didPopNext]).
+  bool _routeSubscribed = false;
 
   /// Bottom dock tab: 0 = 计划任务 (left), 1 = 笔记 (center), 2 = 番茄钟 (right).
   int _bottomIndex = 1;
@@ -52,11 +57,32 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_routeSubscribed) {
+      final route = ModalRoute.of(context);
+      if (route is PageRoute) {
+        routeObserver.subscribe(this, route);
+        _routeSubscribed = true;
+      }
+    }
     final cur = StorageService.instance.currentFolder;
     if (cur != _lastFolder) {
       _lastFolder = cur;
       _loadFolders();
     }
+  }
+
+  @override
+  void didPopNext() {
+    // Returned from a sub-screen (e.g. TaskPlanScreen). The task dock is a
+    // FutureBuilder whose future is rebuilt on setState, so this makes a task
+    // added/edited there show up immediately on the home dock.
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
   }
 
   /// Scan the notes directory tree and collect every top-level folder name
