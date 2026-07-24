@@ -542,13 +542,9 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
               final p = _profiles[i];
               final isActive = p.id == _activeId;
               return ListTile(
-                leading: Radio<String>(
-                  value: p.id,
-                  groupValue: _activeId,
-                  onChanged: (_) {
-                    Navigator.pop(ctx);
-                    _switchProfile(p.id);
-                  },
+                leading: Icon(
+                  isActive ? Icons.check_circle : Icons.radio_button_unchecked,
+                  color: isActive ? Theme.of(context).colorScheme.primary : null,
                 ),
                 title: Text(_profileName(p)),
                 trailing: Row(
