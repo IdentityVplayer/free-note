@@ -105,7 +105,7 @@ class GitHubSyncService {
         if (!path.endsWith('.md')) continue;
         final res = await http
             .get(
-              Uri.parse(_encPath('$_apiBase/contents/$path')),
+              Uri.parse('$_apiBase/contents/${_encPath(path)}'),
               headers: _headers,
             )
             .timeout(const Duration(seconds: 30));
@@ -142,10 +142,7 @@ class GitHubSyncService {
     final result = <String, String>{};
     try {
       final ref = await http
-          .get(
-            Uri.parse(_encPath('$_apiBase/git/refs/heads/$branch')),
-            headers: _headers,
-          )
+          .get(Uri.parse('$_apiBase/git/refs/heads/$branch'), headers: _headers)
           .timeout(const Duration(seconds: 15));
       if (ref.statusCode != 200) return result;
       final refData = jsonDecode(ref.body) as Map<String, dynamic>;
@@ -153,7 +150,7 @@ class GitHubSyncService {
 
       final tree = await http
           .get(
-            Uri.parse(_encPath('$_apiBase/git/trees/$commitSha?recursive=1')),
+            Uri.parse('$_apiBase/git/trees/$commitSha?recursive=1'),
             headers: _headers,
           )
           .timeout(const Duration(seconds: 15));
@@ -188,7 +185,7 @@ class GitHubSyncService {
     if (existingSha != null) body['sha'] = existingSha;
     final res = await http
         .put(
-          Uri.parse(_encPath('$_apiBase/contents/$path')),
+          Uri.parse('$_apiBase/contents/${_encPath(path)}'),
           headers: _headers,
           body: jsonEncode(body),
         )
@@ -209,7 +206,7 @@ class GitHubSyncService {
     });
     final res = await http
         .delete(
-          Uri.parse(_encPath('$_apiBase/contents/$path')),
+          Uri.parse('$_apiBase/contents/${_encPath(path)}'),
           headers: _headers,
           body: body,
         )

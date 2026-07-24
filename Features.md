@@ -1,5 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.13.6.1 (BugFix)
+
+### Fixed
+- **GitHub 同步 URI 错误** — `_encPath` 误用于整个 URL（包含 `https://`），导致 `:` 被编码为 `%3A`，所有 API 请求失败（"No host specified in URI"）。修正：仅编码 `notes/` 下文件路径段，base URL 直接拼接。
+
 ## 1.13.6
 
 ### Changed
