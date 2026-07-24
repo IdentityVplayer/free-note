@@ -34,6 +34,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _aiModelAddController = TextEditingController();
   String? _themeColorHex;
 
+  /// Whether the (obscured by default) AI API key field is revealed.
+  bool _showApiKey = false;
+
   static const List<Color> _themeColors = [
     Color(0xFF6750A4),
     Color(0xFF1976D2),
@@ -457,9 +460,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 labelText: l10n.t('aiApiKey'),
                 border: const OutlineInputBorder(),
                 hintText: 'sk-...',
+                // Eye toggle: the key stays hidden by default so it is never
+                // leaked on screen. The built-in key is never shown here.
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _showApiKey ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  tooltip: _showApiKey ? l10n.t('hide') : l10n.t('show'),
+                  onPressed: () => setState(() => _showApiKey = !_showApiKey),
+                ),
               ),
-              obscureText: true,
+              obscureText: !_showApiKey,
             ),
+          ),
+          // When the user hasn't set their own key, the app falls back to the
+          // built-in key — but we never print that key, only a neutral hint.
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _aiApiKeyController,
+            builder: (ctx, val, _) => val.text.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                    child: Text(
+                      l10n.t('aiBuiltInHint'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
           const SizedBox(height: 8),
           Padding(
@@ -593,6 +621,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Ollama (local)';
       case 'sealos':
         return 'Sealos AIProxy';
+      case 'openrouter':
+        return 'OpenRouter';
       case 'custom':
         return l10n.t('customProvider');
       default:

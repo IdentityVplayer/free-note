@@ -1,5 +1,18 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.13.4
+
+### Added
+- **内置 AI 密钥 + OpenRouter 预设** — 新增 `openrouter` AI 提供商预设（baseUrl: `https://openrouter.ai/api/v1`，模型 `openrouter/free`），内置 OpenRouter API Key，新用户无需配置 API Key 即可使用 AI 功能。内置密钥永不展示在 UI 中。
+- **`.config/secrets.json` 密钥隔离** — `aiApiKey` 与 `githubToken` 从 `settings.json` 移出，独立持久化到 `.config/secrets.json`（base64 编码），减少密钥意外泄露风险。旧版 `settings.json` 中的密钥在首次加载时自动迁移。
+
+### Changed
+- **设置页 API Key 防泄露** — AI API Key 输入框默认隐藏，增加可见性切换（默认隐蔽）；当用户未填写自有密钥时显示"将使用内置密钥"提示（不展示真实密钥）。
+- **无密钥时自动走内置 OpenRouter** — 若用户未配置自有 API Key，系统自动使用内置 OpenRouter 密钥，并将端点与模型强制设为 OpenRouter，确保回退链路可用。
+
+### Fixed
+- **番茄钟/任务可能被清空** — 持久化改为原子写入（临时文件 → 替换 → 保留 `.bak` 备份）；读取时若主文件损坏自动回退到 `.bak`，避免中途崩溃或磁盘满后 `loadTasks` 返回空并被永久覆盖。新增 4 个回归测试。
+
 ## 1.13.3
 
 ### Added

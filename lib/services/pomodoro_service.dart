@@ -60,6 +60,52 @@ class PomodoroService {
     return StorageService.instance.configDir;
   }
 
+  /// Atomically write [name] inside the (possibly test-overridden) config dir,
+  /// keeping a `.bak` backup so a crash mid-write or a full disk can be
+  /// recovered on the next read (the temp file is fully written before the
+  /// live file is replaced, so the data is never truncated in place).
+  Future<void> _writeAtomic(String name, Object object) async {
+    final dir = await _dir;
+    final target = File(p.join(dir.path, name));
+    final tmp = File('${target.path}.tmp');
+    try {
+      // Write the full payload to a temp file first, then copy the (still-good)
+      // live file to `.bak` before replacing it — so a crash mid-replace never
+      // leaves the live file truncated. The post-write copy guarantees a backup
+      // exists after every successful save.
+      tmp.writeAsStringSync(jsonEncode(object));
+      if (tmp.existsSync()) {
+        if (target.existsSync()) target.copySync('${target.path}.bak');
+        target.writeAsStringSync(tmp.readAsStringSync());
+        tmp.deleteSync();
+        if (target.existsSync()) target.copySync('${target.path}.bak');
+      }
+    } catch (_) {
+      // best-effort
+    }
+  }
+
+  /// Read [name]; on a parse error fall back to its `.bak` backup. Returns null
+  /// when neither exists or both are unreadable.
+  Future<dynamic> _readWithBackup(String name) async {
+    final dir = await _dir;
+    final target = File(p.join(dir.path, name));
+    if (target.existsSync()) {
+      try {
+        return jsonDecode(target.readAsStringSync());
+      } catch (_) {
+        // fall through to backup
+      }
+    }
+    final bak = File('${target.path}.bak');
+    if (bak.existsSync()) {
+      try {
+        return jsonDecode(bak.readAsStringSync());
+      } catch (_) {}
+    }
+    return null;
+  }
+
   /// Load the saved profiles (falls back to a single default when none /
   /// corrupt). Migrates the legacy single `pomodoro.json` config into a
   /// default profile on first run.
@@ -68,8 +114,8 @@ class PomodoroService {
       await StorageService.instance.migrateFileFromPrivate('pomodoro.json');
     }
     final dir = await _dir;
-    final file = File(p.join(dir.path, 'pomodoro_profiles.json'));
-    if (!file.existsSync()) {
+    final raw = await _readWithBackup('pomodoro_profiles.json');
+    if (raw == null) {
       final legacy = File(p.join(dir.path, 'pomodoro.json'));
       PomodoroProfile initial;
       if (legacy.existsSync()) {
@@ -98,7 +144,7 @@ class PomodoroService {
       return _profiles;
     }
     try {
-      final map = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      final map = raw as Map<String, dynamic>;
       final list = (map['profiles'] as List? ?? [])
           .map((e) => PomodoroProfile.fromJson(e))
           .toList();
@@ -113,16 +159,15 @@ class PomodoroService {
   }
 
   /// Load the completed-phase history (best-effort; missing/corrupt → empty).
+  /// Falls back to the `.bak` backup when the primary file is unreadable.
   Future<void> _loadHistory() async {
+    final raw = await _readWithBackup('pomodoro_history.json');
+    if (raw == null) {
+      _history = [];
+      return;
+    }
     try {
-      final dir = await _dir;
-      final file = File(p.join(dir.path, 'pomodoro_history.json'));
-      if (!file.existsSync()) {
-        _history = [];
-        return;
-      }
-      final raw = jsonDecode(file.readAsStringSync()) as List<dynamic>;
-      _history = raw
+      _history = (raw as List<dynamic>)
           .map((e) => PomodoroSession.fromJson(e as Map<String, dynamic>))
           .toList();
     } catch (_) {
@@ -131,19 +176,14 @@ class PomodoroService {
   }
 
   Future<void> _persistHistory() async {
-    try {
-      final dir = await _dir;
-      final file = File(p.join(dir.path, 'pomodoro_history.json'));
-      // Keep the log bounded so it can't grow without limit.
-      final trimmed = _history.length > 5000
-          ? _history.sublist(_history.length - 5000)
-          : _history;
-      file.writeAsStringSync(
-        jsonEncode(trimmed.map((s) => s.toJson()).toList()),
-      );
-    } catch (_) {
-      // best-effort
-    }
+    // Keep the log bounded so it can't grow without limit.
+    final trimmed = _history.length > 5000
+        ? _history.sublist(_history.length - 5000)
+        : _history;
+    await _writeAtomic(
+      'pomodoro_history.json',
+      trimmed.map((s) => s.toJson()).toList(),
+    );
   }
 
   /// Record a completed phase so it shows up in the statistics. [phase] is one
@@ -206,18 +246,10 @@ class PomodoroService {
       a.year == b.year && a.month == b.month && a.day == b.day;
 
   Future<void> _persist() async {
-    final dir = await _dir;
-    final file = File(p.join(dir.path, 'pomodoro_profiles.json'));
-    try {
-      file.writeAsStringSync(
-        jsonEncode({
-          'activeId': _activeId,
-          'profiles': _profiles.map((p) => p.toJson()).toList(),
-        }),
-      );
-    } catch (_) {
-      // best-effort
-    }
+    await _writeAtomic('pomodoro_profiles.json', {
+      'activeId': _activeId,
+      'profiles': _profiles.map((p) => p.toJson()).toList(),
+    });
   }
 
   /// Replace the whole list and the active id (used by the profile manager).

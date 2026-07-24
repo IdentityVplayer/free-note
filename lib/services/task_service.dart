@@ -25,6 +25,52 @@ class TaskService {
     return StorageService.instance.configDir;
   }
 
+  /// Atomically write [name] inside the (possibly test-overridden) config dir,
+  /// keeping a `.bak` backup so a crash mid-write or a full disk can be
+  /// recovered on the next read (the temp file is fully written before the
+  /// live file is replaced, so the data is never truncated in place).
+  Future<void> _writeAtomic(String name, Object object) async {
+    final dir = await _dir;
+    final target = File(p.join(dir.path, name));
+    final tmp = File('${target.path}.tmp');
+    try {
+      // Write the full payload to a temp file first, then copy the (still-good)
+      // live file to `.bak` before replacing it — so a crash mid-replace never
+      // leaves the live file truncated. The post-write copy guarantees a backup
+      // exists after every successful save.
+      tmp.writeAsStringSync(jsonEncode(object));
+      if (tmp.existsSync()) {
+        if (target.existsSync()) target.copySync('${target.path}.bak');
+        target.writeAsStringSync(tmp.readAsStringSync());
+        tmp.deleteSync();
+        if (target.existsSync()) target.copySync('${target.path}.bak');
+      }
+    } catch (_) {
+      // best-effort
+    }
+  }
+
+  /// Read [name]; on a parse error fall back to its `.bak` backup. Returns null
+  /// when neither exists or both are unreadable.
+  Future<dynamic> _readWithBackup(String name) async {
+    final dir = await _dir;
+    final target = File(p.join(dir.path, name));
+    if (target.existsSync()) {
+      try {
+        return jsonDecode(target.readAsStringSync());
+      } catch (_) {
+        // fall through to backup
+      }
+    }
+    final bak = File('${target.path}.bak');
+    if (bak.existsSync()) {
+      try {
+        return jsonDecode(bak.readAsStringSync());
+      } catch (_) {}
+    }
+    return null;
+  }
+
   /// Load all tasks, sorted for display (incomplete → priority → due → created).
   Future<List<Task>> loadTasks() async {
     // Migration only applies to the real config location, not an isolated
@@ -32,28 +78,23 @@ class TaskService {
     if (_overrideDir == null) {
       await StorageService.instance.migrateFileFromPrivate('tasks.json');
     }
-    final file = File(p.join((await _dir).path, 'tasks.json'));
-    if (!file.existsSync()) return [];
+    final raw = await _readWithBackup('tasks.json');
+    if (raw == null) return [];
     try {
-      final raw = jsonDecode(file.readAsStringSync()) as List<dynamic>;
-      final tasks = raw
+      final tasks = (raw as List<dynamic>)
           .map((e) => Task.fromJson(e as Map<String, dynamic>))
           .toList();
       tasks.sort(Task.compareForDisplay);
       return tasks;
     } catch (_) {
+      // Both primary and backup unreadable — start empty rather than crash.
       return [];
     }
   }
 
   /// Persist the full task list. Order is preserved as given.
   Future<void> saveTasks(List<Task> tasks) async {
-    final file = File(p.join((await _dir).path, 'tasks.json'));
-    try {
-      file.writeAsStringSync(jsonEncode(tasks.map((t) => t.toJson()).toList()));
-    } catch (_) {
-      // Best-effort persistence: a failed write must not crash the UI.
-    }
+    await _writeAtomic('tasks.json', tasks.map((t) => t.toJson()).toList());
   }
 
   /// For every *main* task that has a repeat rule and whose reminder is due

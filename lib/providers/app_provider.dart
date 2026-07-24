@@ -92,12 +92,11 @@ class AppProvider extends ChangeNotifier
     }
     _notes = await _storage.loadNotes();
 
-    // Initialize services with loaded settings.
-    aiService = AIService(
-      apiKey: _settings.aiApiKey,
-      model: _settings.aiModel,
-      baseUrl: _settings.resolvedAiBaseUrl,
-    );
+    // Initialize services with loaded settings. When the user hasn't supplied
+    // their own key, fall back to the built-in OpenRouter key so AI works out
+    // of the box (the key itself is never surfaced in the UI).
+    aiService = AIService();
+    _configureAiService(aiService, _settings);
     githubService = GitHubSyncService(
       token: _settings.githubToken,
       repo: _settings.githubRepo,
@@ -346,11 +345,31 @@ class AppProvider extends ChangeNotifier
 
   // ---- Settings ----
 
+  /// Whether the user has supplied their own API key (vs. relying on the
+  /// built-in fallback).
+  static bool _hasOwnKey(AppSettings s) =>
+      s.aiApiKey != null && s.aiApiKey!.isNotEmpty;
+
+  /// Configure an [AIService] from user settings. When the user has set their
+  /// own key, their chosen provider + model + baseUrl are respected. When there
+  /// is no user key, the built-in OpenRouter key is used and the endpoint +
+  /// model are forced to OpenRouter — otherwise the built-in PAT would be sent
+  /// to the wrong API and silently fail.
+  void _configureAiService(AIService ai, AppSettings s) {
+    if (_hasOwnKey(s)) {
+      ai.apiKey = s.aiApiKey;
+      ai.baseUrl = s.resolvedAiBaseUrl;
+      ai.model = s.aiModel;
+    } else {
+      ai.apiKey = AIService.builtInKey;
+      ai.baseUrl = AIProviderPresets.baseUrlFor('openrouter');
+      ai.model = AIService.defaultModelFor('openrouter');
+    }
+  }
+
   Future<void> updateSettings(AppSettings settings) async {
     _settings = settings;
-    aiService.apiKey = settings.aiApiKey;
-    aiService.model = settings.aiModel;
-    aiService.baseUrl = settings.resolvedAiBaseUrl;
+    _configureAiService(aiService, settings);
     githubService.token = settings.githubToken;
     githubService.repo = settings.githubRepo;
     await _storage.saveSettings(settings);

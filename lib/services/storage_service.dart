@@ -241,24 +241,116 @@ class StorageService {
   // ── Settings: private app dir ──
 
   Future<AppSettings> loadSettings() async {
-    // Migrate the legacy private-dir settings.json into the repository's
-    // .config on first launch for existing users.
+    // Migrate the legacy private-dir files into the repository's .config on
+    // first launch for existing users.
     await migrateFileFromPrivate('settings.json');
-    final dir = await _configDirPath;
-    final file = File('$dir/settings.json');
-    if (!file.existsSync()) return AppSettings();
-    try {
-      final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-      return AppSettings.fromJson(json);
-    } catch (_) {
-      return AppSettings();
+    await migrateFileFromPrivate('secrets.json');
+
+    // Load the non-secret settings.
+    AppSettings settings;
+    final settingsJson = await readJsonWithBackup('settings.json');
+    if (settingsJson == null) {
+      settings = AppSettings();
+    } else {
+      try {
+        settings = AppSettings.fromJson(settingsJson as Map<String, dynamic>);
+      } catch (_) {
+        settings = AppSettings();
+      }
     }
+
+    // Merge secrets from the dedicated secrets file. Fall back to any legacy
+    // secrets still embedded in settings.json for backward compatibility.
+    final secrets = await _loadSecrets();
+    final key = secrets.aiApiKey ?? settings.aiApiKey;
+    final token = secrets.githubToken ?? settings.githubToken;
+    settings = settings.copyWith(aiApiKey: key, githubToken: token);
+
+    // If secrets.json had nothing but the legacy settings still carried them,
+    // persist them into secrets.json (and rewrite settings.json without them).
+    if ((secrets.aiApiKey == null || secrets.githubToken == null) &&
+        (settings.aiApiKey != null || settings.githubToken != null)) {
+      await saveSettings(settings);
+    }
+    return settings;
   }
 
   Future<void> saveSettings(AppSettings settings) async {
+    // Secrets go to a dedicated file; settings.json stays secret-free.
+    await _saveSecrets(settings);
+    await writeJsonAtomic('settings.json', settings.toJson());
+  }
+
+  /// Load secrets from the dedicated `.config/secrets.json` (with `.bak`
+  /// fallback). Returns nulls when absent or unreadable.
+  Future<({String? aiApiKey, String? githubToken})> _loadSecrets() async {
+    final json = await readJsonWithBackup('secrets.json');
+    if (json == null) return (aiApiKey: null, githubToken: null);
+    try {
+      final map = json as Map<String, dynamic>;
+      return (
+        aiApiKey: AppSettings.decodeSecret(map['aiApiKey'] as String?),
+        githubToken: AppSettings.decodeSecret(map['githubToken'] as String?),
+      );
+    } catch (_) {
+      return (aiApiKey: null, githubToken: null);
+    }
+  }
+
+  /// Persist secrets to the dedicated `.config/secrets.json`.
+  Future<void> _saveSecrets(AppSettings settings) async {
+    await writeJsonAtomic('secrets.json', {
+      'aiApiKey': AppSettings.encodeSecret(settings.aiApiKey),
+      'githubToken': AppSettings.encodeSecret(settings.githubToken),
+    });
+  }
+
+  /// Atomically replace [fileName] inside the config dir with [object] encoded
+  /// as JSON. The previous file is snapshotted as `<fileName>.bak` first, so a
+  /// crash mid-write or a full disk can be recovered on the next read (the temp
+  /// file is fully written before the rename, so the live file is never
+  /// truncated in place).
+  Future<void> writeJsonAtomic(String fileName, Object object) async {
     final dir = await _configDirPath;
-    final file = File('$dir/settings.json');
-    file.writeAsStringSync(jsonEncode(settings.toJson()));
+    final target = File(p.join(dir, fileName));
+    final tmp = File('${target.path}.tmp');
+    try {
+      // Write the full payload to a temp file first, then copy the (still-good)
+      // live file to `.bak` before replacing it — so a crash mid-replace never
+      // leaves the live file truncated. The post-write copy guarantees a backup
+      // exists after every successful save.
+      tmp.writeAsStringSync(jsonEncode(object));
+      if (tmp.existsSync()) {
+        if (target.existsSync()) target.copySync('${target.path}.bak');
+        target.writeAsStringSync(tmp.readAsStringSync());
+        tmp.deleteSync();
+        if (target.existsSync()) target.copySync('${target.path}.bak');
+      }
+    } catch (_) {
+      // best-effort
+    }
+  }
+
+  /// Read a JSON file from the config dir. On a parse error the `.bak` backup
+  /// is tried before giving up. Returns null when neither exists or both are
+  /// unreadable.
+  Future<dynamic> readJsonWithBackup(String fileName) async {
+    final dir = await _configDirPath;
+    final target = File(p.join(dir, fileName));
+    if (target.existsSync()) {
+      try {
+        return jsonDecode(target.readAsStringSync());
+      } catch (_) {
+        // fall through to backup
+      }
+    }
+    final bak = File('${target.path}.bak');
+    if (bak.existsSync()) {
+      try {
+        return jsonDecode(bak.readAsStringSync());
+      } catch (_) {}
+    }
+    return null;
   }
 
   // ── Last opened repository (stable, repository-independent) ──

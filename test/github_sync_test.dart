@@ -40,22 +40,32 @@ void main() {
   });
 
   group('AppSettings GitHub fields', () {
-    test('round-trips clientId and username', () {
-      final s = AppSettings(
-        githubToken: 'tok',
-        githubRepo: 'a/b',
-        githubClientId: 'client_1',
-        githubUsername: 'octocat',
-        autoSync: true,
-      );
-      final json = s.toJson();
-      final back = AppSettings.fromJson(json);
-      expect(back.githubToken, 'tok');
-      expect(back.githubRepo, 'a/b');
-      expect(back.githubClientId, 'client_1');
-      expect(back.githubUsername, 'octocat');
-      expect(back.autoSync, isTrue);
-    });
+    test(
+      'non-secret GitHub fields round-trip; secrets excluded from settings.json',
+      () {
+        final s = AppSettings(
+          githubToken: 'tok',
+          githubRepo: 'a/b',
+          githubClientId: 'client_1',
+          githubUsername: 'octocat',
+          autoSync: true,
+        );
+        final json = s.toJson();
+        // Secrets must NOT be persisted inside settings.json — they live in the
+        // dedicated `.config/secrets.json` (see StorageService).
+        expect(json.containsKey('githubToken'), isFalse);
+        expect(json.containsKey('aiApiKey'), isFalse);
+        final back = AppSettings.fromJson(json);
+        expect(back.githubRepo, 'a/b');
+        expect(back.githubClientId, 'client_1');
+        expect(back.githubUsername, 'octocat');
+        expect(back.autoSync, isTrue);
+        // A legacy settings.json that still carries a secret is still readable
+        // (so StorageService can migrate it into secrets.json).
+        final legacy = AppSettings.fromJson({'githubToken': 'tok'});
+        expect(legacy.githubToken, 'tok');
+      },
+    );
 
     test('missing new fields default to null/false', () {
       final back = AppSettings.fromJson({'githubToken': 'tok'});

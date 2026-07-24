@@ -67,10 +67,10 @@ class AppSettings {
     this.githubUsername,
     this.githubSyncMode = 'device',
     this.aiApiKey,
-    this.aiModel = 'gpt-3.5-turbo',
+    this.aiModel = 'openrouter/free',
     this.autoSync = false,
     this.enableAI = true,
-    this.aiProvider = 'openai',
+    this.aiProvider = 'openrouter',
     this.aiBaseUrl,
     this.themeColorHex,
     this.notesFolderPath,
@@ -82,14 +82,16 @@ class AppSettings {
 
   /// Obfuscate a secret (API key / token) with base64 before persisting.
   /// A `b64:` prefix marks encoded values so plaintext (legacy) settings are
-  /// still read back unchanged (backward compatible).
-  static String? _encodeSecret(String? v) {
+  /// still read back unchanged (backward compatible). Secrets are persisted in
+  /// a dedicated `.config/secrets.json` (see [StorageService]), never inside
+  /// `settings.json`, so they are isolated from the rest of the config.
+  static String? encodeSecret(String? v) {
     if (v == null || v.isEmpty) return v;
     return 'b64:${base64Encode(utf8.encode(v))}';
   }
 
-  /// Reverse [_encodeSecret]; returns the value as-is if not encoded.
-  static String? _decodeSecret(String? v) {
+  /// Reverse [encodeSecret]; returns the value as-is if not encoded.
+  static String? decodeSecret(String? v) {
     if (v == null || v.isEmpty || !v.startsWith('b64:')) return v;
     try {
       return utf8.decode(base64Decode(v.substring(4)));
@@ -99,14 +101,14 @@ class AppSettings {
   }
 
   Map<String, dynamic> toJson() => {
+    // NOTE: secrets (aiApiKey / githubToken) are intentionally NOT written
+    // here — they live in `.config/secrets.json` via StorageService.
     'languageCode': languageCode,
     'isDarkMode': isDarkMode,
-    'githubToken': _encodeSecret(githubToken),
     'githubRepo': githubRepo,
     'githubClientId': githubClientId,
     'githubUsername': githubUsername,
     'githubSyncMode': githubSyncMode,
-    'aiApiKey': _encodeSecret(aiApiKey),
     'aiModel': aiModel,
     'autoSync': autoSync,
     'enableAI': enableAI,
@@ -123,12 +125,14 @@ class AppSettings {
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
     languageCode: json['languageCode'] as String? ?? '',
     isDarkMode: json['isDarkMode'] as bool? ?? false,
-    githubToken: _decodeSecret(json['githubToken'] as String?),
+    // Secrets may still be present in a legacy settings.json; read them so
+    // StorageService can migrate them into `.config/secrets.json`.
+    githubToken: decodeSecret(json['githubToken'] as String?),
     githubRepo: json['githubRepo'] as String?,
     githubClientId: json['githubClientId'] as String?,
     githubUsername: json['githubUsername'] as String?,
     githubSyncMode: json['githubSyncMode'] as String? ?? 'device',
-    aiApiKey: _decodeSecret(json['aiApiKey'] as String?),
+    aiApiKey: decodeSecret(json['aiApiKey'] as String?),
     aiModel: json['aiModel'] as String? ?? 'gpt-3.5-turbo',
     autoSync: json['autoSync'] as bool? ?? false,
     enableAI: json['enableAI'] as bool? ?? true,
@@ -220,6 +224,7 @@ class AIProviderPresets {
     'google': 'https://generativelanguage.googleapis.com/v1beta/openai',
     'ollama': 'http://localhost:11434/v1',
     'sealos': 'https://aiproxy.hzh.sealos.run/v1',
+    'openrouter': 'https://openrouter.ai/api/v1',
     'custom': '',
   };
 
@@ -230,6 +235,7 @@ class AIProviderPresets {
     'google',
     'ollama',
     'sealos',
+    'openrouter',
     'custom',
   ];
 
