@@ -1,9 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
-## 1.13.6.1 (BugFix)
+## 1.13.7
 
 ### Fixed
-- **GitHub 同步 URI 错误** — `_encPath` 误用于整个 URL（包含 `https://`），导致 `:` 被编码为 `%3A`，所有 API 请求失败（"No host specified in URI"）。修正：仅编码 `notes/` 下文件路径段，base URL 直接拼接。
+- **GitHub 同步 URI 错误** — `_encPath` 误用于整个 URL（包含 `https://`），导致 `:` 被编码为 `%3A`，所有 API 请求失败。修正：仅编码 `notes/` 下文件路径段，base URL 直接拼接。
+- **版本号格式非法** — `1.13.6.1+39`（4 段）不符合 Dart pubspec 规范，导致 `flutter pub get` 崩溃。修正为 `1.13.7+39`。
 
 ## 1.13.6
 
