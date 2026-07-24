@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **274**（三语一致，截至 v1.13.10） |
-| 当前稳定版本 | `1.13.10+42`（已发布，tag `v1.13.10`） |
+| i18n key 总数 | **274**（三语一致，截至 v1.13.11） |
+| 当前稳定版本 | `1.13.11+43`（已发布，tag `v1.13.11`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -189,6 +189,10 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 1. ✅ **fix：GitHub 同步 409 Conflict 错误** — `_putFile` 收到 409 时（SHA 过期：并发同步 / autoSync 触发 / Git Trees API 截断等），自动通过 Contents API 重新拉取 SHA 并重试一次，避免误判上传失败。新增 `_fetchBlobSha` 辅助方法。
 2. ✅ `flutter analyze` 0 issues + `flutter test` 56 passed。
 3. ✅ bump `pubspec.yaml` 版本 `1.13.9+41` → `1.13.10+42`；最终 commit / tag / push。
+### v1.13.11 最终化（已完成 ✅，2026-07-24）
+1. ✅ **fix：409 仍然报错** — 重试逻辑增强：增加 300ms 延迟等待分支 commit 落定；`_fetchBlobSha` 返回 null 时仍用 null SHA 重试（视为新建文件）；添加 `_deleteFile` 的 409 重试。现 `_putFile` 和 `_deleteFile` 均在 409 时延迟 + 刷新 SHA + 重试。
+2. ✅ `flutter analyze` 0 issues + `flutter test` 56 passed。
+3. ✅ bump `pubspec.yaml` 版本 `1.13.10+42` → `1.13.11+43`；最终 commit / tag / push。
 
 ---
 

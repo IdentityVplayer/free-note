@@ -205,15 +205,15 @@ class GitHubSyncService {
 
   /// Create or update a file on GitHub at [path] with [base64Content].
   /// [existingSha] should be given when the file already exists (update);
-  /// null for new files. On a 409 (SHA mismatch from concurrent modification
-  /// or a truncated tree listing), re-fetch the SHA via the Contents API and
-  /// retry once before giving up.
+  /// null for new files. On a 409 (SHA stale because each PUT creates a new
+  /// commit, invalidating subsequent SHAs from the initial listing),
+  /// re-fetch the SHA via the Contents API and retry once.
   Future<void> _putFile(
     String path,
     String base64Content,
     String? existingSha,
   ) async {
-    Future<http.Response> doPut(String? sha) async {
+    Future<http.Response> retryPut(String? sha) async {
       final body = <String, dynamic>{
         'message': 'Sync note: $path — ${DateTime.now().toIso8601String()}',
         'content': base64Content,
@@ -229,11 +229,12 @@ class GitHubSyncService {
           .timeout(const Duration(seconds: 30));
     }
 
-    var res = await doPut(existingSha);
+    var res = await retryPut(existingSha);
     if (res.statusCode == 409) {
-      // SHA stale (concurrent sync / truncated tree) — refetch and retry.
-      final refreshed = await _fetchBlobSha(path);
-      if (refreshed != null) res = await doPut(refreshed);
+      // SHA stale — refetch and retry so the file upload still goes through
+      // even though the branch HEAD has moved since our initial listing.
+      await Future.delayed(const Duration(milliseconds: 300));
+      res = await retryPut(await _fetchBlobSha(path));
     }
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw GitHubAuthException(
@@ -261,20 +262,29 @@ class GitHubSyncService {
   }
 
   /// Delete a file on GitHub at [path] (identified by [sha]).
+  /// On 409 refetches the SHA and retries once (same reason — prior PUT in
+  /// the same batch has advanced the branch HEAD).
   Future<void> _deleteFile(String path, String sha) async {
-    final body = jsonEncode({
-      'message': 'Remove note: $path',
-      'sha': sha,
-      'branch': branch,
-    });
-    final res = await http
-        .delete(
-          Uri.parse('$_apiBase/contents/${_encPath(path)}'),
-          headers: _headers,
-          body: body,
-        )
-        .timeout(const Duration(seconds: 30));
-    // Non-200 is best-effort — the next sync will retry.
+    Future<http.Response> retryDel(String? s) async {
+      final body = <String, dynamic>{
+        'message': 'Remove note: $path',
+        'branch': branch,
+      };
+      if (s != null) body['sha'] = s;
+      return http
+          .delete(
+            Uri.parse('$_apiBase/contents/${_encPath(path)}'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+    }
+
+    var res = await retryDel(sha);
+    if (res.statusCode == 409) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      res = await retryDel(await _fetchBlobSha(path));
+    }
     if (res.statusCode != 200) {
       throw GitHubAuthException(
         '删除 $path 失败: ${_describeError(res.statusCode)}',

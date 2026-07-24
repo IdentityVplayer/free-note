@@ -1,5 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.13.11
+
+### Fixed
+- **GitHub 同步 409 仍报错** — 增强重试逻辑：增加 300ms 延迟；`_fetchBlobSha` 返回 null 时仍用 null SHA 重试；`_deleteFile` 也加同款 409 重试。
+
 ## 1.13.10
 
 ### Fixed
