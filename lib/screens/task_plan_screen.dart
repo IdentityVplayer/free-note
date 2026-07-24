@@ -18,7 +18,16 @@ class TaskPlanScreen extends StatefulWidget {
   /// home-screen FAB so a single tap on the tasks tab creates a task).
   final bool autoAdd;
 
-  const TaskPlanScreen({super.key, this.autoAdd = false});
+  /// When true, render only the task list body (no AppBar / FAB) so it can be
+  /// embedded inside another screen — e.g. the home-screen "计划任务" dock,
+  /// which should show the same full UI as this screen.
+  final bool embedded;
+
+  const TaskPlanScreen({
+    super.key,
+    this.autoAdd = false,
+    this.embedded = false,
+  });
 
   @override
   State<TaskPlanScreen> createState() => _TaskPlanScreenState();
@@ -78,9 +87,15 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
       final auto = context.read<AppProvider>().settings.autoCompleteMainTasks;
       if (auto) {
         final updated = recomputeMainDone(_tasks, task.parentId!, auto);
+        // Defensive: the merge must never drop tasks. If anything ever
+        // returned a shorter list, keep the previous full set so we never
+        // lose data (the reported "completing subtasks deletes tasks" bug).
+        final safe = updated.length >= _tasks.length
+            ? updated
+            : List<Task>.from(_tasks);
         _tasks
           ..clear()
-          ..addAll(updated);
+          ..addAll(safe);
         await _persist();
       }
     }
@@ -461,35 +476,40 @@ class _TaskPlanScreenState extends State<TaskPlanScreen> {
     List<Task> subtasksOf(String id) =>
         _tasks.where((t) => t.parentId == id).toList();
 
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.t('taskPlan'))),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _tasks.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.checklist, size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  Text(
-                    l10n.t('taskEmpty'),
-                    style: theme.textTheme.titleMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            )
-          : ListView(
-              padding: const EdgeInsets.all(8),
+    final content = _loading
+        ? const Center(child: CircularProgressIndicator())
+        : _tasks.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                for (final main in mainTasks) ...[
-                  _buildMainCard(main, l10n, theme),
-                  for (final sub in subtasksOf(main.id))
-                    _buildSubCard(sub, l10n, theme),
-                ],
+                const Icon(Icons.checklist, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(
+                  l10n.t('taskEmpty'),
+                  style: theme.textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
+          )
+        : ListView(
+            padding: const EdgeInsets.all(8),
+            children: [
+              for (final main in mainTasks) ...[
+                _buildMainCard(main, l10n, theme),
+                for (final sub in subtasksOf(main.id))
+                  _buildSubCard(sub, l10n, theme),
+              ],
+            ],
+          );
+
+    // Embedded mode: caller (e.g. home dock) supplies its own AppBar/FAB.
+    if (widget.embedded) return content;
+
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.t('taskPlan'))),
+      body: content,
       floatingActionButton: FloatingActionButton(
         tooltip: l10n.t('newTask'),
         onPressed: () => _showTaskDialog(),

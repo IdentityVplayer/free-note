@@ -1,5 +1,20 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.13.3
+
+### Added
+- **GitHub Sync 双向自动同步** — 开关 `autoSync` 现在真正生效：应用启动、退出前/切后台（`paused`/`detached`）、退出编辑器时自动同步。同步为双向：先拉取远端 `notes.json`，按 `id` 合并（以较新的 `updatedAt` 为准），本地落盘后再推送，避免互相覆盖丢失。由 `_isSyncing` 防重入，且不阻塞界面。
+- **番茄钟统计** — 番茄钟页面顶部展示「今日 / 本周 / 本月 / 本年」的累计专注时长与休息时长（含短休息+长休息），数据来自每次阶段完成的本地历史记录。
+- **番茄钟多预设卡片** — 番茄钟页面以卡片展示每个预设：底部高斯模糊背景图、左下角「开始」直接开始该预设计时、右下角铅笔按钮进入编辑。
+
+### Changed
+- **首页「计划任务」Dock 显示完整 UI** — 与完整计划页（`TaskPlanScreen`）一致，支持勾选、子任务、新增等完整交互（不再是截断的平铺复选框）。
+
+### Fixed
+- **计划任务子任务完成后误删任务（加固）** — 自动完成主任务（子任务全完成时）的合并结果加防御，确保任何情况下都不会丢失任务；并补充回归测试。
+
+## 1.13.2
+
 This file records feature highlights and version history. On each GitHub
 Release, the section matching the current version (from `pubspec.yaml`) is
 used as the release description.

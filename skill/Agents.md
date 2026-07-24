@@ -160,7 +160,7 @@ abstract class GitHubSyncHost {
 
 1. 在 `lib/l10n/app_en.json` / `app_zh.json` / `app_ja.json` 各加一个 key。
 2. 用 `AppLocalizations.of(context)!.t('yourKey')` 取文案。
-3. 三个文件必须**同步**保持 key 数量一致（当前 265 个），否则 CI 会挂。
+3. 三个文件必须**同步**保持 key 数量一致（当前 286 个），否则 CI 会挂。
 
 ---
 

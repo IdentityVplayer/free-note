@@ -263,5 +263,11 @@
   "pomodoroBackgroundCleared": "Background cleared",
   "pomodoroClearBackground": "Clear background",
   "pomodoroDefault": "Default",
+  "pomodoroStats": "Statistics",
+  "pomodoroToday": "Today",
+  "pomodoroWeek": "This week",
+  "pomodoroMonth": "This month",
+  "pomodoroYear": "This year",
+  "pomodoroBreak": "Break",
   "close": "Close"
 }

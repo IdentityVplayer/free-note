@@ -3,10 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import '../models/note.dart';
-import '../models/task.dart';
 import '../providers/app_provider.dart';
 import '../services/storage_service.dart';
-import '../services/task_service.dart';
 import '../services/pomodoro_service.dart';
 import '../l10n/app_localizations.dart';
 import 'editor_screen.dart';
@@ -381,74 +379,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 
-  /// Task Planning quick view (left dock tab): directly lists the user's tasks
-  /// (toggle done inline). The full planner is reachable via the app-bar
-  /// checklist icon, so we don't show a redundant "plan task" header tile.
+  /// Task Planning view (left dock tab): the full planner, embedded without
+  /// its own AppBar/FAB. The home FAB (when this tab is active) handles
+  /// "new task", and the app-bar checklist icon opens it standalone.
   Widget _buildTasksDock(AppLocalizations l10n) {
-    return FutureBuilder<List<Task>>(
-      future: TaskService.instance.loadTasks(),
-      builder: (ctx, snap) {
-        if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final tasks = snap.data!;
-        return ListView(
-          padding: const EdgeInsets.all(8),
-          children: [
-            if (tasks.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        l10n.t('taskEmpty'),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      FilledButton.icon(
-                        icon: const Icon(Icons.open_in_full),
-                        label: Text(l10n.t('openFull')),
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const TaskPlanScreen(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ...tasks.map(
-                (t) => CheckboxListTile(
-                  title: Text(
-                    t.title,
-                    style: t.done
-                        ? const TextStyle(
-                            decoration: TextDecoration.lineThrough,
-                          )
-                        : null,
-                  ),
-                  value: t.done,
-                  onChanged: (v) => _toggleTaskDone(t, v ?? false),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _toggleTaskDone(Task task, bool done) async {
-    final tasks = await TaskService.instance.loadTasks();
-    final updated = tasks
-        .map((t) => t.id == task.id ? t.copyWith(done: done) : t)
-        .toList();
-    await TaskService.instance.saveTasks(updated);
-    if (mounted) setState(() {});
+    return const TaskPlanScreen(embedded: true);
   }
 
   /// Pomodoro quick view (right dock tab): shows the active profile's

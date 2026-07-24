@@ -263,5 +263,11 @@
   "pomodoroBackgroundCleared": "已清除背景",
   "pomodoroClearBackground": "清除背景",
   "pomodoroDefault": "默认",
+  "pomodoroStats": "统计",
+  "pomodoroToday": "今日",
+  "pomodoroWeek": "本周",
+  "pomodoroMonth": "本月",
+  "pomodoroYear": "本年",
+  "pomodoroBreak": "休息",
   "close": "关闭"
 }

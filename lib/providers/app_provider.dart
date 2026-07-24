@@ -18,13 +18,16 @@ import '../plugins/github_sync_host.dart';
 import '../plugins/user_plugin.dart';
 
 /// Central app state provider — manages notes, settings, AI, sync, and plugins.
-class AppProvider extends ChangeNotifier implements GitHubSyncHost {
+class AppProvider extends ChangeNotifier
+    with WidgetsBindingObserver
+    implements GitHubSyncHost {
   final StorageService _storage = StorageService.instance;
 
   // State
   List<Note> _notes = [];
   AppSettings _settings = AppSettings();
   bool _isLoading = false;
+  bool _isSyncing = false;
   String? _statusMessage;
 
   // Services
@@ -69,6 +72,7 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
   /// Initialize the app — load data and register plugins.
   Future<void> init() async {
     _setLoading(true);
+    WidgetsBinding.instance.addObserver(this);
 
     // Restore the last opened repository BEFORE reading settings. Settings
     // live in <repo>/.config/settings.json, whose location depends on knowing
@@ -114,9 +118,74 @@ class AppProvider extends ChangeNotifier implements GitHubSyncHost {
 
     _setLoading(false);
 
+    // Auto-sync on launch when enabled (bidirectional, fire-and-forget so it
+    // never blocks the home screen from appearing).
+    if (_settings.autoSync) syncBidirectional();
+
     // Notifications: initialize, respawn any due repeating tasks, and schedule
     // upcoming reminders. Best-effort — failures must not block startup.
     _initNotifications();
+  }
+
+  /// App lifecycle: when auto-sync is on, push/pull on background & detach
+  /// (i.e. before the app is closed / sent to background).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_settings.autoSync) return;
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      syncBidirectional();
+    }
+  }
+
+  /// Trigger a bidirectional sync only if the user enabled auto-sync.
+  /// Safe to call from anywhere (editor exit, lifecycle, launch).
+  void autoSyncIfEnabled() {
+    if (_settings.autoSync) syncBidirectional();
+  }
+
+  /// Bidirectional GitHub sync: pull the remote notes first, merge them with
+  /// the local notes (by id, keeping the newer [updatedAt]), persist the merged
+  /// set locally, then push it. Guarded by [_isSyncing] so overlapping calls
+  /// are coalesced. Does not block the UI (no global loading spinner).
+  Future<String> syncBidirectional() async {
+    if (!githubService.isConfigured) {
+      return 'GitHub 未配置，请先在设置中填写 Token 和仓库';
+    }
+    if (_isSyncing) return _statusMessage ?? '同步中…';
+    _isSyncing = true;
+    try {
+      final remote = await githubService.pullNotes();
+      if (remote != null && remote.isNotEmpty) _mergeRemoteNotes(remote);
+      final result = await githubService.syncNotes(_notes);
+      _statusMessage = result.message;
+    } catch (e) {
+      _statusMessage = '同步失败: $e';
+    } finally {
+      _isSyncing = false;
+    }
+    notifyListeners();
+    return _statusMessage!;
+  }
+
+  /// Merge [remote] notes into the in-memory [_notes], preferring the newer
+  /// [updatedAt] on id collisions, then persist locally so pulled content is
+  /// written to disk.
+  void _mergeRemoteNotes(List<Note> remote) {
+    final byId = <String, Note>{};
+    for (final n in _notes) {
+      byId[n.id] = n;
+    }
+    for (final r in remote) {
+      final local = byId[r.id];
+      if (local == null) {
+        byId[r.id] = r;
+      } else if (r.updatedAt.isAfter(local.updatedAt)) {
+        byId[r.id] = r;
+      }
+    }
+    _notes = byId.values.toList();
+    _persist();
   }
 
   Future<void> _initNotifications() async {

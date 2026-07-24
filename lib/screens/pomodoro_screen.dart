@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import '../models/pomodoro_profile.dart';
+import '../models/pomodoro_session.dart';
 import '../services/pomodoro_service.dart';
 import '../services/storage_service.dart';
 import '../l10n/app_localizations.dart';
@@ -39,7 +41,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
   int _completed = 0;
   bool _running = false;
   Timer? _timer;
-  File? _bgFile;
 
   PomodoroProfile get _active => _profiles.firstWhere(
     (p) => p.id == _activeId,
@@ -65,7 +66,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
       _profiles = profiles;
       _activeId = PomodoroService.instance.active.id;
       _applyProfile(reset: true);
-      _refreshBg();
     });
     if (widget.autoAdd) _showProfileDialog();
   }
@@ -80,11 +80,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
       _total = _active.secondsForPhase(_phase);
       _remaining = _total;
     }
-  }
-
-  void _refreshBg() {
-    final path = _active.backgroundPath;
-    _bgFile = (path != null && File(path).existsSync()) ? File(path) : null;
   }
 
   void _tick() {
@@ -121,6 +116,11 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
 
   void _onPhaseComplete() {
     final l10n = AppLocalizations.of(context);
+    // Log the just-finished phase for the focus / break statistics.
+    PomodoroService.instance.recordSession(
+      _phase,
+      _active.secondsForPhase(_phase),
+    );
     if (_phase == PomodoroProfile.phaseWork) _completed++;
     final next = nextPomodoroPhase(_active, _phase, _completed);
     if (mounted) {
@@ -151,7 +151,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
     setState(() {
       _activeId = id;
       _applyProfile(reset: true);
-      _refreshBg();
     });
   }
 
@@ -171,7 +170,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
         _profiles = _profiles
             .map((p) => p.id == updated.id ? updated : p)
             .toList();
-        _refreshBg();
       });
       ScaffoldMessenger.of(
         context,
@@ -196,7 +194,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
         _profiles = _profiles
             .map((p) => p.id == updated.id ? updated : p)
             .toList();
-        _bgFile = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.t('pomodoroBackgroundCleared'))),
@@ -470,7 +467,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
           _profiles = [..._profiles, profile];
           _activeId = profile.id;
           _applyProfile(reset: true);
-          _refreshBg();
         });
       }
     }
@@ -519,7 +515,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
           if (_activeId == profile.id) {
             _activeId = _profiles.first.id;
             _applyProfile(reset: true);
-            _refreshBg();
           }
         });
       }
@@ -626,87 +621,73 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final stats = PomodoroService.instance.stats();
     final (label, color) = _phaseLabelColor(l10n, theme);
     final progress = _total > 0 ? 1 - (_remaining / _total) : 0.0;
 
-    final body = Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Profile switcher
-          if (_profiles.length > 1)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                children: _profiles
-                    .map(
-                      (p) => ChoiceChip(
-                        label: Text(_profileName(p)),
-                        selected: p.id == _activeId,
-                        onSelected: (_) => _switchProfile(p.id),
-                      ),
-                    )
-                    .toList(),
-              ),
-            )
-          else
+    final timer = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
             Text(_profileName(_active), style: theme.textTheme.titleMedium),
-          const SizedBox(height: 16),
-          Text(
-            label,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const SizedBox(height: 32),
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 240,
-                height: 240,
-                child: CircularProgressIndicator(
-                  value: progress,
-                  strokeWidth: 12,
-                  color: color,
+            const SizedBox(height: 16),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 180,
+                  height: 180,
+                  child: CircularProgressIndicator(
+                    value: progress,
+                    strokeWidth: 10,
+                    color: color,
+                  ),
                 ),
-              ),
-              Text(
-                _format(_remaining),
-                style: theme.textTheme.displayMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+                Text(
+                  _format(_remaining),
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              FilledButton.icon(
-                onPressed: _running ? _pause : _start,
-                icon: Icon(_running ? Icons.pause : Icons.play_arrow),
-                label: Text(
-                  _running ? l10n.t('pomodoroPause') : l10n.t('pomodoroStart'),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FilledButton.icon(
+                  onPressed: _running ? _pause : _start,
+                  icon: Icon(_running ? Icons.pause : Icons.play_arrow),
+                  label: Text(
+                    _running
+                        ? l10n.t('pomodoroPause')
+                        : l10n.t('pomodoroStart'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              OutlinedButton.icon(
-                onPressed: _reset,
-                icon: const Icon(Icons.refresh),
-                label: Text(l10n.t('pomodoroReset')),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Text(
-            l10n.tArgs('pomodoroSessions', ['$_completed']),
-            style: theme.textTheme.bodyMedium,
-          ),
-        ],
+                const SizedBox(width: 16),
+                OutlinedButton.icon(
+                  onPressed: _reset,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(l10n.t('pomodoroReset')),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.tArgs('pomodoroSessions', ['$_completed']),
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
+        ),
       ),
     );
 
@@ -720,24 +701,180 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
             onPressed: _showProfilesDialog,
           ),
           IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: l10n.t('pomodoroNewProfile'),
+            onPressed: () => _showProfileDialog(),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             tooltip: l10n.t('pomodoroSettings'),
             onPressed: _editSettings,
           ),
         ],
       ),
-      body: _bgFile != null
-          ? Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.file(_bgFile!, fit: BoxFit.cover),
-                Container(
-                  color: theme.colorScheme.surface.withValues(alpha: 0.82),
-                ),
-                body,
-              ],
-            )
-          : body,
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildStats(l10n, stats),
+          const SizedBox(height: 16),
+          timer,
+          const SizedBox(height: 16),
+          Text(l10n.t('pomodoroProfiles'), style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          for (final p in _profiles) _buildProfileCard(p, l10n),
+        ],
+      ),
     );
+  }
+
+  /// Top-of-screen statistics: focus + break time for today / week / month /
+  /// year, powered by the completed-phase history.
+  Widget _buildStats(AppLocalizations l10n, Map<String, PomodoroStats> stats) {
+    final theme = Theme.of(context);
+    final rows = [
+      ('today', l10n.t('pomodoroToday')),
+      ('week', l10n.t('pomodoroWeek')),
+      ('month', l10n.t('pomodoroMonth')),
+      ('year', l10n.t('pomodoroYear')),
+    ];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.t('pomodoroStats'), style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            for (final (key, label) in rows) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Text(
+                      '${l10n.t('pomodoroFocus')} ${_fmtDur(stats[key]!.focusSeconds)}'
+                      '  ·  '
+                      '${l10n.t('pomodoroBreak')} ${_fmtDur(stats[key]!.breakSeconds)}',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// A preset card: name + durations, a blurred background image along the
+  /// bottom, a start button (bottom-left) and an edit pencil (bottom-right).
+  Widget _buildProfileCard(PomodoroProfile p, AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final bg = p.backgroundPath != null && File(p.backgroundPath!).existsSync()
+        ? File(p.backgroundPath!)
+        : null;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Stack(
+        children: [
+          if (bg != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 90,
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Image.file(bg, fit: BoxFit.cover),
+              ),
+            ),
+          if (bg != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 90,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      theme.colorScheme.surface.withValues(alpha: 0.92),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _profileName(p),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (p.id == _activeId)
+                      const Icon(Icons.check_circle, color: Colors.green),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${p.workMinutes} / ${p.shortBreakMinutes} / ${p.longBreakMinutes}',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () => _startProfile(p.id),
+                      icon: const Icon(Icons.play_arrow),
+                      label: Text(l10n.t('pomodoroStart')),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      tooltip: l10n.t('edit'),
+                      onPressed: () => _showProfileDialog(existing: p),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Switch to [id] (if needed) and start its timer immediately.
+  Future<void> _startProfile(String id) async {
+    if (_running) _pause();
+    if (_activeId != id) await _switchProfile(id);
+    _start();
+  }
+
+  /// Format a duration in seconds as "Xh Ym" / "Ym".
+  String _fmtDur(int seconds) {
+    final totalMin = (seconds / 60).floor();
+    final h = totalMin ~/ 60;
+    final m = totalMin % 60;
+    return h > 0 ? '${h}h${m}m' : '${m}m';
   }
 }

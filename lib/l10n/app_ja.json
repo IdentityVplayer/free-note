@@ -263,5 +263,11 @@
   "pomodoroBackgroundCleared": "背景を解除しました",
   "pomodoroClearBackground": "背景を解除",
   "pomodoroDefault": "デフォルト",
+  "pomodoroStats": "統計",
+  "pomodoroToday": "今日",
+  "pomodoroWeek": "今週",
+  "pomodoroMonth": "今月",
+  "pomodoroYear": "今年",
+  "pomodoroBreak": "休憩",
   "close": "閉じる"
 }

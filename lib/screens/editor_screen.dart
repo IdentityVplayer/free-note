@@ -78,6 +78,8 @@ class _EditorScreenState extends State<EditorScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _autoSaveIfEnabled();
+    // Auto-sync on editor exit when enabled (bidirectional).
+    _provider.autoSyncIfEnabled();
     // Detach the insert hook so no stale closure outlives this editor.
     PluginHost.insertHandler = null;
     _titleController.dispose();
@@ -489,6 +491,8 @@ class _EditorScreenState extends State<EditorScreen>
       // Save when the user taps back (top-left / system gesture).
       onPopInvokedWithResult: (didPop, result) {
         _autoSaveIfEnabled();
+        // Auto-sync on editor exit when enabled (bidirectional).
+        _provider.autoSyncIfEnabled();
       },
       child: Scaffold(
         appBar: AppBar(

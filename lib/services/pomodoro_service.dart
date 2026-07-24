@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../models/pomodoro_profile.dart';
+import '../models/pomodoro_session.dart';
 import 'storage_service.dart';
 
 /// Determine the next phase after [current] finishes.
@@ -31,6 +32,9 @@ class PomodoroService {
 
   List<PomodoroProfile> _profiles = [];
   String? _activeId;
+
+  /// Completed-phase log used for the focus / break statistics.
+  List<PomodoroSession> _history = [];
 
   /// Test hook for an alternate storage directory.
   Directory? _overrideDir;
@@ -90,6 +94,7 @@ class PomodoroService {
       _profiles = [initial];
       _activeId = initial.id;
       await _persist();
+      await _loadHistory();
       return _profiles;
     }
     try {
@@ -103,8 +108,102 @@ class PomodoroService {
       _profiles = [_defaultProfile()];
       _activeId = _profiles.first.id;
     }
+    await _loadHistory();
     return _profiles;
   }
+
+  /// Load the completed-phase history (best-effort; missing/corrupt → empty).
+  Future<void> _loadHistory() async {
+    try {
+      final dir = await _dir;
+      final file = File(p.join(dir.path, 'pomodoro_history.json'));
+      if (!file.existsSync()) {
+        _history = [];
+        return;
+      }
+      final raw = jsonDecode(file.readAsStringSync()) as List<dynamic>;
+      _history = raw
+          .map((e) => PomodoroSession.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      _history = [];
+    }
+  }
+
+  Future<void> _persistHistory() async {
+    try {
+      final dir = await _dir;
+      final file = File(p.join(dir.path, 'pomodoro_history.json'));
+      // Keep the log bounded so it can't grow without limit.
+      final trimmed = _history.length > 5000
+          ? _history.sublist(_history.length - 5000)
+          : _history;
+      file.writeAsStringSync(
+        jsonEncode(trimmed.map((s) => s.toJson()).toList()),
+      );
+    } catch (_) {
+      // best-effort
+    }
+  }
+
+  /// Record a completed phase so it shows up in the statistics. [phase] is one
+  /// of [PomodoroProfile.phaseWork] / [phaseShort] / [phaseLong]; [seconds] is
+  /// the phase's duration.
+  Future<void> recordSession(String phase, int seconds) async {
+    if (seconds <= 0) return;
+    _history.add(
+      PomodoroSession(phase: phase, seconds: seconds, at: DateTime.now()),
+    );
+    await _persistHistory();
+  }
+
+  /// Aggregate focus (work) and break (short+long) seconds for four periods:
+  /// today, this week (last 7 days), this month, and this year.
+  Map<String, PomodoroStats> stats() {
+    final now = DateTime.now();
+    final weekStart = now.subtract(const Duration(days: 7));
+    int todayFocus = 0, todayBreak = 0;
+    int weekFocus = 0, weekBreak = 0;
+    int monthFocus = 0, monthBreak = 0;
+    int yearFocus = 0, yearBreak = 0;
+    for (final s in _history) {
+      final secs = s.seconds;
+      final isFocus = s.isFocus;
+      final f = isFocus ? secs : 0;
+      final b = isFocus ? 0 : secs;
+      if (_sameDay(s.at, now)) {
+        todayFocus += f;
+        todayBreak += b;
+      }
+      if (!s.at.isBefore(weekStart)) {
+        weekFocus += f;
+        weekBreak += b;
+      }
+      if (s.at.year == now.year && s.at.month == now.month) {
+        monthFocus += f;
+        monthBreak += b;
+      }
+      if (s.at.year == now.year) {
+        yearFocus += f;
+        yearBreak += b;
+      }
+    }
+    return {
+      'today': PomodoroStats(
+        focusSeconds: todayFocus,
+        breakSeconds: todayBreak,
+      ),
+      'week': PomodoroStats(focusSeconds: weekFocus, breakSeconds: weekBreak),
+      'month': PomodoroStats(
+        focusSeconds: monthFocus,
+        breakSeconds: monthBreak,
+      ),
+      'year': PomodoroStats(focusSeconds: yearFocus, breakSeconds: yearBreak),
+    };
+  }
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 
   Future<void> _persist() async {
     final dir = await _dir;
