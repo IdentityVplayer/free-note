@@ -60,48 +60,62 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
     if (widget.autoAdd && mounted) _showTaskDialog();
   }
 
+  /// Persist the current [\_tasks] to disk. Guards: never writes an empty list
+  /// when the on-disk file already has data (to prevent the "completing a
+  /// subtask clears all tasks" bug).
   Future<void> _persist() async {
+    if (_tasks.isEmpty) {
+      // Refuse to write empty unless the file is already empty or absent.
+      try {
+        final existing = await TaskService.instance.loadTasks();
+        if (existing.isNotEmpty) return;
+      } catch (_) {
+        // Best-effort guard; if we can't read, proceed with the save.
+      }
+    }
     _tasks.sort(Task.compareForDisplay);
     await TaskService.instance.saveTasks(_tasks);
     if (mounted) setState(() {});
   }
 
-  void _addTask(Task task) {
+  Future<void> _addTask(Task task) async {
     _tasks.add(task);
-    _persist();
+    await _persist();
     _scheduleIfNeeded(task);
   }
 
-  void _updateTask(Task task) {
+  Future<void> _updateTask(Task task) async {
     final idx = _tasks.indexWhere((t) => t.id == task.id);
     if (idx >= 0) _tasks[idx] = task;
-    _persist();
+    await _persist();
     _scheduleIfNeeded(task);
   }
 
-  void _removeTask(String id) {
+  Future<void> _removeTask(String id) async {
     _tasks.removeWhere((t) => t.id == id || t.parentId == id);
-    _persist();
+    await _persist();
   }
 
   Future<void> _toggleDone(Task task) async {
-    _updateTask(task.copyWith(done: !task.done));
+    // Read the auto-complete flag BEFORE the async gap so we don't rely on
+    // BuildContext after an await.
+    final auto = task.parentId != null
+        ? context.read<AppProvider>().settings.autoCompleteMainTasks
+        : false;
+    await _updateTask(task.copyWith(done: !task.done));
     // Auto-complete the parent main task when all its subtasks are done.
-    if (task.parentId != null) {
-      final auto = context.read<AppProvider>().settings.autoCompleteMainTasks;
-      if (auto) {
-        final updated = recomputeMainDone(_tasks, task.parentId!, auto);
-        // Defensive: the merge must never drop tasks. If anything ever
-        // returned a shorter list, keep the previous full set so we never
-        // lose data (the reported "completing subtasks deletes tasks" bug).
-        final safe = updated.length >= _tasks.length
-            ? updated
-            : List<Task>.from(_tasks);
-        _tasks
-          ..clear()
-          ..addAll(safe);
-        await _persist();
-      }
+    if (task.parentId != null && auto) {
+      final updated = recomputeMainDone(_tasks, task.parentId!, auto);
+      // Defensive: the merge must never drop tasks. If anything ever
+      // returned a shorter list, keep the previous full set so we never
+      // lose data (the reported "completing subtasks deletes tasks" bug).
+      final safe = updated.length >= _tasks.length
+          ? updated
+          : List<Task>.from(_tasks);
+      _tasks
+        ..clear()
+        ..addAll(safe);
+      await _persist();
     }
   }
 
@@ -421,9 +435,9 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
     );
 
     if (existing != null) {
-      _updateTask(task);
+      await _updateTask(task);
     } else {
-      _addTask(task);
+      await _addTask(task);
     }
   }
 
@@ -446,7 +460,7 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
         ],
       ),
     );
-    if (ok == true) _removeTask(task.id);
+    if (ok == true) await _removeTask(task.id);
   }
 
   void _openLinkedNote(String? noteId) {

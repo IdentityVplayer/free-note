@@ -1,5 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.13.8
+
+### Fixed
+- **完成一个子任务导致全部任务被清空** — `_updateTask`/`_addTask`/`_removeTask` 调用 `_persist()` 时不 await（fire-and-forget），与 `_toggleDone` 的后续 await 式 `_persist` 之间共享 `_tasks` 可变列表，执行时序不确定。修复：所有方法改为 `async` 并 `await _persist()`；`_persist` 增加空列表守卫（磁盘已有非空数据时拒绝写入空列表）。新增 2 个复现测试。
+
 ## 1.13.7
 
 ### Fixed

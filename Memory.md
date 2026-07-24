@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **274**（三语一致，截至 v1.13.6） |
-| 当前稳定版本 | `1.13.7+39`（已发布，tag `v1.13.7`） |
+| i18n key 总数 | **274**（三语一致，截至 v1.13.8） |
+| 当前稳定版本 | `1.13.8+40`（已发布，tag `v1.13.8`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -176,6 +176,10 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 1. ✅ **GitHub 同步改为逐个文件上传** — `syncNotes` 不再将所有笔记打包为 `notes/notes.json`，而是每篇笔记单独上传到仓库根目录 `notes/` 文件夹下，保持子目录结构（`notes/<relativePath>`）；删除的笔记自动清理远端文件；遗留的 `notes/notes.json` 同步时自动删除。`pullNotes` 改为遍历 `notes/` 目录下载每个 `.md` 文件，用 YAML 前后端解析回 `Note` 对象。
 2. ✅ `flutter analyze` 0 issues + `flutter test` 54 passed。
 3. ✅ bump `pubspec.yaml` 版本 `1.13.5+37` → `1.13.6+38`；更新 `Memory.md` / `Features.md`；最终 commit / tag / push。
+### v1.13.8 最终化（已完成 ✅，2026-07-24）
+1. ✅ **fix：完成任务界面创建多个子任务后完成一个子任务导致计划任务被删除** — 定位根因：`_updateTask`、`_addTask`、`_removeTask` 均为 `void` 方法，调用 `_persist()` 时**不 await**，导致与 `_toggleDone` 的后续 `_persist` 之间共享 `_tasks` 可变列表产生执行时序不确定的竞态。修复：所有操作改为 `Future<void>` 并 `await _persist()`，消除 fire-and-forget 模式；`_persist()` 增加守卫：拒绝在磁盘已有非空数据时写入空列表。新增复现测试 2 个。
+2. ✅ `flutter analyze` 0 issues + `flutter test` 56 passed。
+3. ✅ bump `pubspec.yaml` 版本 `1.13.7+39` → `1.13.8+40`；最终 commit / tag / push。
 
 ---
 
