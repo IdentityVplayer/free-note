@@ -6,6 +6,7 @@ import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../services/storage_service.dart';
 import '../services/pomodoro_service.dart';
+import '../services/notification_service.dart';
 import '../l10n/app_localizations.dart';
 import 'editor_screen.dart';
 import 'settings_screen.dart';
@@ -1078,11 +1079,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Future<void> _syncNow(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
     final provider = context.read<AppProvider>();
+    NotificationService.instance.showSync(l10n.t('syncNow'), '开始上传…');
     final msg = await provider.syncToGitHub();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    }
+    final success = !msg.startsWith('同步失败') && !msg.startsWith('GitHub 未配置');
+    NotificationService.instance.showSync(success ? '上传成功' : '上传失败', msg);
   }
 
   void _confirmDelete(

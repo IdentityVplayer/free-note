@@ -317,12 +317,26 @@ class _EditorScreenState extends State<EditorScreen>
     final child = safeMarkdown(
       data: line,
       selectable: false,
+      relativeBaseDir: _noteDirFor(_note),
       onTapLink: (text, href, title) {
         if (href != null) _launchUrl(href);
       },
     );
     // Use InkWell so empty rows and text rows get the same ripple feedback.
     return InkWell(onTap: () => _setActiveLine(i), child: child);
+  }
+
+  /// Resolve the absolute directory containing the current note, so that
+  /// `./name.jpg` and `../name.jpg` style image references can be rendered
+  /// against the note's own folder. Returns null if the notes folder isn't
+  /// selected yet.
+  String? _noteDirFor(Note note) {
+    final base = StorageService.instance.currentFolder;
+    if (base == null) return null;
+    final rp = note.relativePath ?? note.fileName;
+    final dir = p.dirname(rp);
+    if (dir == '.' || dir.isEmpty) return base;
+    return p.join(base, dir);
   }
 
   /// Activate line [i] for editing, seeding the raw field with its text and

@@ -33,6 +33,10 @@ class AIAssistantScreen extends StatefulWidget {
   /// it can be embedded — e.g. in the split "AI 问答" view under a note.
   final bool embedded;
 
+  /// Fired whenever the user selects text inside a chat message. The AI Q&A
+  /// screen uses this to show an "insert into note" button.
+  final void Function(String? selectedText)? onSelectionChanged;
+
   const AIAssistantScreen({
     super.key,
     this.initialContextContent,
@@ -40,6 +44,7 @@ class AIAssistantScreen extends StatefulWidget {
     this.initialMessages,
     this.noteId,
     this.embedded = false,
+    this.onSelectionChanged,
   });
 
   @override
@@ -363,20 +368,29 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
                     ],
                   ),
                 )
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _messages.length + (_loading ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == _messages.length) {
-                      return const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-                    final msg = _messages[index];
-                    return _buildMessage(msg, theme);
+              : SelectionArea(
+                  onSelectionChanged: (sel) {
+                    final text = sel?.plainText;
+                    final trimmed = (text == null || text.trim().isEmpty)
+                        ? null
+                        : text;
+                    widget.onSelectionChanged?.call(trimmed);
                   },
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _messages.length + (_loading ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == _messages.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      final msg = _messages[index];
+                      return _buildMessage(msg, theme);
+                    },
+                  ),
                 ),
         ),
         // Input bar

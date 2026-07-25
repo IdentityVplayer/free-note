@@ -1,5 +1,12 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.16.0
+
+### Changed
+- **主界面云端上传改用系统通知** — 点击不再弹出 SnackBar 遮挡编辑区；改为发"开始上传"→ 完成后发"上传成功 / 失败"系统通知，可继续编辑。
+- **AI 问答改为"选择文字 → 按钮 → 插入"** — 删除长按拖拽 FAB 和底部提示条；在 AI 聊天窗口选中文字后，右上角浮现"插入到笔记"按钮，点击即把选中文本追加到笔记末尾；退出 AI 问答自动保存笔记。
+- **Markdown 图片相对路径解析** — 编辑器 `safeMarkdown` 新增 `relativeBaseDir` 参数 + `sizedImageBuilder`；笔记中写 `./name.jpg` 或 `../name.jpg` 时，相对当前笔记所在目录解析并渲染图片。
+
 ## 1.15.9
 
 ### Fixed

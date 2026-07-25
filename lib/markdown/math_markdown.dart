@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
@@ -109,10 +111,15 @@ Map<String, MarkdownElementBuilder> get mathBuilders => {
 
 /// A safe [MarkdownBody] pre-configured with LaTeX support so that a note
 /// never goes blank on a parse/render fault.
+///
+/// [relativeBaseDir] is the absolute directory under which `./name.jpg` and
+/// `../name.jpg` style image references are resolved. If null, only
+/// absolute paths (or HTTP URLs) are rendered.
 Widget safeMarkdown({
   required String data,
   MarkdownTapLinkCallback? onTapLink,
   bool selectable = true,
+  String? relativeBaseDir,
 }) {
   return Padding(
     padding: const EdgeInsets.all(16),
@@ -123,7 +130,47 @@ Widget safeMarkdown({
       inlineSyntaxes: mathInlineSyntaxes,
       blockSyntaxes: mathBlockSyntaxes,
       builders: mathBuilders,
+      sizedImageBuilder: relativeBaseDir == null
+          ? null
+          : (config) => _buildLocalImage(config.uri, relativeBaseDir),
       onTapLink: (text, href, title) => onTapLink?.call(text, href, title),
     ),
+  );
+}
+
+/// Build an `Image` widget for `<img src="./foo.jpg">` style references.
+/// Resolves `./` and `../` relative to [baseDir] (the note's parent folder).
+/// Falls back to a broken-image placeholder when the file is missing.
+Widget _buildLocalImage(Uri uri, String baseDir) {
+  String path = uri.toFilePath();
+  if (path.isEmpty) return const _MissingImage();
+  // Strip a leading '/' that Uri.toFilePath() leaves on absolute paths.
+  if (path.startsWith('/')) path = path.substring(1);
+  // Resolve relative to the note's directory.
+  if (path.startsWith('./') ||
+      path.startsWith('../') ||
+      !path.startsWith('/')) {
+    final normalized = path.replaceFirst(RegExp(r'^\./'), '');
+    final resolved =
+        Directory(baseDir).path +
+        (normalized.startsWith('/') ? normalized : '/$normalized');
+    final file = File(resolved);
+    if (!file.existsSync()) return const _MissingImage();
+    return Image.file(file, fit: BoxFit.contain);
+  }
+  // Absolute path — use as-is.
+  final file = File('/$path');
+  if (!file.existsSync()) return const _MissingImage();
+  return Image.file(file, fit: BoxFit.contain);
+}
+
+class _MissingImage extends StatelessWidget {
+  const _MissingImage();
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 80,
+    alignment: Alignment.center,
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    child: const Icon(Icons.broken_image_outlined),
   );
 }

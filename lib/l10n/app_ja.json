@@ -6,6 +6,7 @@
   "rename": "名前変更",
   "move": "移動",
   "copy": "コピー",
+  "insertToNote": "ノートに挿入",
   "editNote": "ノートを編集",
   "deleteNote": "ノートを削除",
   "deleteConfirm": "このノートを削除してもよろしいですか？",

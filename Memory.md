@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **274**（三语一致，截至 v1.15.9） |
-| 当前稳定版本 | `1.15.9+54`（已发布，tag `v1.15.9`） |
+| i18n key 总数 | **277**（三语一致，截至 v1.16.0） |
+| 当前稳定版本 | `1.16.0+55`（已发布，tag `v1.16.0`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -245,6 +245,13 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 1. ✅ **fix：v1.15.8 Android CI 仍然失败** — 根因不是 androidx.core 缺失，而是 `MainActivity.kt` 里 `setMethodCallHandler { ... }` lambda 中的 `return`（line 36）。Kotlin 编译器不允许非 inline lambda 中使用裸 `return`。修复：lambda 加 `handler@` 标签，`return` → `return@handler`；同时删除未使用的 import（DownloadManager/BroadcastReceiver/Context/IntentFilter）。
 2. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
 3. ✅ bump `pubspec.yaml` 版本 `1.15.8+53` → `1.15.9+54`；最终 commit / tag / push。
+
+### v1.16.0 最终化（已完成 ✅，2026-07-25）
+1. ✅ **change：主界面云端上传按钮改用系统通知** — `home_screen.dart:_syncNow` 移除 SnackBar overlay，改为 `NotificationService.showSync("上传成功/失败", msg)`；点击上传不阻塞编辑。
+2. ✅ **change：AI 问答改"选择文字 → 按钮 → 插入"** — 删除 `LongPressDraggable` FAB 和底部 `aiQaDragHint` 提示条；`AIAssistantScreen` 包裹 `SelectionArea(onSelectionChanged:)`，选中文本时回调到 `AIQaScreen` 显示"插入到笔记"悬浮按钮；点击按钮将选中文本追加到文件末尾；`dispose()` 自动保存（已存在）。新增 `insertToNote` 三语 key（274 → 277）。
+3. ✅ **add：Markdown `./` `../` 图片路径解析** — `safeMarkdown` 新增 `relativeBaseDir` 参数 + `sizedImageBuilder`；编辑器计算当前笔记所在目录（`base/relativePath 的父目录`），传给 `safeMarkdown`；相对路径 `./name.jpg`、`../name.jpg` 都解析为绝对路径后渲染 `Image.file`。
+4. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
+5. ✅ bump `pubspec.yaml` 版本 `1.15.9+54` → `1.16.0+55`；最终 commit / tag / push。
 
 ---
 

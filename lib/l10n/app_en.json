@@ -6,6 +6,7 @@
   "rename": "Rename",
   "move": "Move",
   "copy": "Copy",
+  "insertToNote": "Insert into note",
   "editNote": "Edit Note",
   "deleteNote": "Delete Note",
   "deleteConfirm": "Delete this note?",

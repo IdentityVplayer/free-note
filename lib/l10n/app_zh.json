@@ -6,6 +6,7 @@
   "rename": "重命名",
   "move": "移动",
   "copy": "复制",
+  "insertToNote": "插入到笔记",
   "editNote": "编辑笔记",
   "deleteNote": "删除笔记",
   "deleteConfirm": "确定要删除这篇笔记吗？",
