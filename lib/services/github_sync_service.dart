@@ -59,9 +59,10 @@ class GitHubSyncService {
     Map<String, String>? configFiles,
 
     /// Additional files to upload under `notes/` (map of relative-path → raw
-    /// text content). These are files in the local notes folder that are not
+    /// file bytes). These are files in the local notes folder that are not
     /// managed as [Note] objects (e.g. images, PDFs, or any non-`.md` files).
-    Map<String, String>? extraFiles,
+    /// The raw bytes are base64-encoded inside the service.
+    Map<String, List<int>>? extraFiles,
   }) async {
     if (!isConfigured) {
       return SyncResult(success: false, message: 'GitHub 未配置（请填写 Token 和仓库）');
@@ -109,9 +110,7 @@ class GitHubSyncService {
         for (final entry in extraFiles.entries) {
           final extPath = 'notes/${entry.key}';
           localPaths.add(extPath);
-          final encoded = base64Encode(
-            utf8.encode(entry.value),
-          ).replaceAll('\n', '');
+          final encoded = base64Encode(entry.value).replaceAll('\n', '');
           await _putFile(extPath, encoded, remoteFiles[extPath]);
         }
       }

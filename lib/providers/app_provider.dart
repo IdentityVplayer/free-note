@@ -177,8 +177,8 @@ class AppProvider extends ChangeNotifier
   /// [Note] objects and NOT config files — e.g. images, PDFs, or any other
   /// non-`.md` files placed by the user. Returns a map of relative-path →
   /// raw text content.
-  Future<Map<String, String>> _readExtraFiles() async {
-    final out = <String, String>{};
+  Future<Map<String, List<int>>> _readExtraFiles() async {
+    final out = <String, List<int>>{};
     if (!_storage.hasFolder) return out;
     try {
       final base = _storage.currentFolder!;
@@ -195,9 +195,9 @@ class AppProvider extends ChangeNotifier
         // Skip hidden files (starting with dot).
         if (rel.split('/').any((s) => s.startsWith('.'))) continue;
         try {
-          out[rel] = entity.readAsStringSync();
+          out[rel] = entity.readAsBytesSync();
         } catch (_) {
-          // Skip binary / unreadable files.
+          // Skip unreadable files.
         }
       }
     } catch (_) {}

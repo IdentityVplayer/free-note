@@ -6,7 +6,6 @@ import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../services/task_service.dart';
 import '../services/notification_service.dart';
-import '../utils/task_helpers.dart';
 import '../l10n/app_localizations.dart';
 import 'editor_screen.dart';
 
@@ -84,31 +83,12 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
   }
 
   Future<void> _removeTask(String id) async {
-    _tasks.removeWhere((t) => t.id == id || t.parentId == id);
+    _tasks.removeWhere((t) => t.id == id);
     await _persist();
   }
 
   Future<void> _toggleDone(Task task) async {
-    // Read the auto-complete flag BEFORE the async gap so we don't rely on
-    // BuildContext after an await.
-    final auto = task.parentId != null
-        ? context.read<AppProvider>().settings.autoCompleteMainTasks
-        : false;
     await _updateTask(task.copyWith(done: !task.done));
-    // Auto-complete the parent main task when all its subtasks are done.
-    if (task.parentId != null && auto) {
-      final updated = recomputeMainDone(_tasks, task.parentId!, auto);
-      // Defensive: the merge must never drop tasks. If anything ever
-      // returned a shorter list, keep the previous full set so we never
-      // lose data (the reported "completing subtasks deletes tasks" bug).
-      final safe = updated.length >= _tasks.length
-          ? updated
-          : List<Task>.from(_tasks);
-      _tasks
-        ..clear()
-        ..addAll(safe);
-      await _persist();
-    }
   }
 
   void _scheduleIfNeeded(Task task) {
@@ -122,7 +102,7 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
 
   // ── Dialogs ──
 
-  Future<void> _showTaskDialog({Task? existing, String? parentId}) async {
+  Future<void> _showTaskDialog({Task? existing}) async {
     final l10n = AppLocalizations.of(context)!;
     final titleCtl = TextEditingController(text: existing?.title ?? '');
     DateTime? due = existing?.dueDate;
@@ -202,9 +182,7 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setInner) => AlertDialog(
           title: Text(
-            existing != null
-                ? l10n.t('editNote')
-                : (parentId != null ? l10n.t('addSubtask') : l10n.t('newTask')),
+            existing != null ? l10n.t('editNote') : l10n.t('newTask'),
           ),
           content: SizedBox(
             width: double.maxFinite,
@@ -421,7 +399,7 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
       priority: priority,
       noteId: noteId,
       noteTitle: noteTitle,
-      parentId: parentId ?? existing?.parentId,
+      parentId: existing?.parentId,
       reminder: reminder,
       repeat: repeatCfg,
     );
@@ -483,8 +461,6 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
 
     final mainTasks = _tasks.where((t) => t.parentId == null).toList()
       ..sort(Task.compareForDisplay);
-    List<Task> subtasksOf(String id) =>
-        _tasks.where((t) => t.parentId == id).toList();
 
     // Group main tasks by priority for sectioned display.
     final highTasks = mainTasks
@@ -523,27 +499,16 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
             children: [
               if (highTasks.isNotEmpty) ...[
                 _priorityHeader(l10n, Task.priorityHigh, highTasks.length),
-                for (final main in highTasks) ...[
-                  _buildMainCard(main, l10n, theme),
-                  for (final sub in subtasksOf(main.id))
-                    _buildSubCard(sub, l10n, theme),
-                ],
+                for (final main in highTasks) _buildMainCard(main, l10n, theme),
               ],
               if (normalTasks.isNotEmpty) ...[
                 _priorityHeader(l10n, Task.priorityNormal, normalTasks.length),
-                for (final main in normalTasks) ...[
+                for (final main in normalTasks)
                   _buildMainCard(main, l10n, theme),
-                  for (final sub in subtasksOf(main.id))
-                    _buildSubCard(sub, l10n, theme),
-                ],
               ],
               if (lowTasks.isNotEmpty) ...[
                 _priorityHeader(l10n, Task.priorityLow, lowTasks.length),
-                for (final main in lowTasks) ...[
-                  _buildMainCard(main, l10n, theme),
-                  for (final sub in subtasksOf(main.id))
-                    _buildSubCard(sub, l10n, theme),
-                ],
+                for (final main in lowTasks) _buildMainCard(main, l10n, theme),
               ],
             ],
           );
@@ -643,92 +608,29 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
           ],
         ),
         subtitle: _buildMetaRow(task, l10n, theme),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.add),
-              tooltip: l10n.t('addSubtask'),
-              onPressed: () => _showTaskDialog(parentId: task.id),
-            ),
-            PopupMenuButton<String>(
-              onSelected: (v) {
-                switch (v) {
-                  case 'edit':
-                    _showTaskDialog(existing: task);
-                    break;
-                  case 'open':
-                    _openLinkedNote(task.noteId);
-                    break;
-                  case 'delete':
-                    _confirmDelete(task);
-                    break;
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(value: 'edit', child: Text(l10n.t('edit'))),
-                if (task.noteId != null)
-                  PopupMenuItem(
-                    value: 'open',
-                    child: Text(l10n.t('taskOpenLinked')),
-                  ),
-                PopupMenuItem(value: 'delete', child: Text(l10n.t('delete'))),
-              ],
-            ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (v) {
+            switch (v) {
+              case 'edit':
+                _showTaskDialog(existing: task);
+                break;
+              case 'open':
+                _openLinkedNote(task.noteId);
+                break;
+              case 'delete':
+                _confirmDelete(task);
+                break;
+            }
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(value: 'edit', child: Text(l10n.t('edit'))),
+            if (task.noteId != null)
+              PopupMenuItem(
+                value: 'open',
+                child: Text(l10n.t('taskOpenLinked')),
+              ),
+            PopupMenuItem(value: 'delete', child: Text(l10n.t('delete'))),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSubCard(Task task, AppLocalizations l10n, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 32),
-      child: Card(
-        color: theme.colorScheme.surfaceContainerHighest,
-        child: ListTile(
-          leading: Checkbox(
-            value: task.done,
-            onChanged: (_) => _toggleDone(task),
-          ),
-          title: Text(
-            task.title,
-            style: task.done
-                ? const TextStyle(
-                    decoration: TextDecoration.lineThrough,
-                    color: Colors.grey,
-                  )
-                : null,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: _buildMetaRow(task, l10n, theme),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 18),
-                tooltip: l10n.t('delete'),
-                onPressed: () => _confirmDelete(task),
-              ),
-              PopupMenuButton<String>(
-                onSelected: (v) {
-                  switch (v) {
-                    case 'edit':
-                      _showTaskDialog(existing: task);
-                      break;
-                    case 'delete':
-                      _confirmDelete(task);
-                      break;
-                  }
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem(value: 'edit', child: Text(l10n.t('edit'))),
-                  PopupMenuItem(value: 'delete', child: Text(l10n.t('delete'))),
-                ],
-              ),
-            ],
-          ),
         ),
       ),
     );
