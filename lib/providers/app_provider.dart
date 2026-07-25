@@ -173,6 +173,37 @@ class AppProvider extends ChangeNotifier
     return out;
   }
 
+  /// Scan the entire local notes folder for files that are NOT managed as
+  /// [Note] objects and NOT config files — e.g. images, PDFs, or any other
+  /// non-`.md` files placed by the user. Returns a map of relative-path →
+  /// raw text content.
+  Future<Map<String, String>> _readExtraFiles() async {
+    final out = <String, String>{};
+    if (!_storage.hasFolder) return out;
+    try {
+      final base = _storage.currentFolder!;
+      final baseDir = Directory(base);
+      if (!baseDir.existsSync()) return out;
+      for (final entity in baseDir.listSync(
+        recursive: true,
+        followLinks: false,
+      )) {
+        if (entity is! File) continue;
+        final rel = p.relative(entity.path, from: base);
+        // Skip note files and config files — they are handled separately.
+        if (rel.startsWith('.config/') || rel.endsWith('.md')) continue;
+        // Skip hidden files (starting with dot).
+        if (rel.split('/').any((s) => s.startsWith('.'))) continue;
+        try {
+          out[rel] = entity.readAsStringSync();
+        } catch (_) {
+          // Skip binary / unreadable files.
+        }
+      }
+    } catch (_) {}
+    return out;
+  }
+
   Future<String> syncBidirectional() async {
     if (!githubService.isConfigured) {
       return 'GitHub 未配置，请先在设置中填写 Token 和仓库';
@@ -198,10 +229,12 @@ class AppProvider extends ChangeNotifier
 
       // Read local config files to push alongside notes.
       final configFiles = await _readConfigFiles();
+      final extraFiles = await _readExtraFiles();
 
       final result = await githubService.syncNotes(
         _notes,
         configFiles: configFiles,
+        extraFiles: extraFiles,
       );
       _statusMessage = result.message;
       if (result.success) _refreshSyncedIds();
@@ -521,9 +554,11 @@ class AppProvider extends ChangeNotifier
     }
     _setLoading(true);
     final configFiles = await _readConfigFiles();
+    final extraFiles = await _readExtraFiles();
     final result = await githubService.syncNotes(
       _notes,
       configFiles: configFiles,
+      extraFiles: extraFiles,
     );
     _statusMessage = result.message;
     _setLoading(false);
