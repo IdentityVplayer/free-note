@@ -9,8 +9,8 @@ import '../services/notification_service.dart';
 import '../l10n/app_localizations.dart';
 import 'editor_screen.dart';
 
-/// Task planning screen — a hierarchical to-do list (main tasks + subtasks)
-/// with due dates, priority, optional note links, reminders and repetition.
+/// Task planning screen — a flat priority-grouped to-do list with due dates,
+/// priority, optional note links, reminders and repetition.
 /// Tasks persist via [TaskService].
 class TaskPlanScreen extends StatefulWidget {
   /// When true, opens the "new task" dialog on first load (used by the
@@ -399,7 +399,6 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
       priority: priority,
       noteId: noteId,
       noteTitle: noteTitle,
-      parentId: existing?.parentId,
       reminder: reminder,
       repeat: repeatCfg,
     );
@@ -459,8 +458,7 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    final mainTasks = _tasks.where((t) => t.parentId == null).toList()
-      ..sort(Task.compareForDisplay);
+    final mainTasks = List<Task>.from(_tasks)..sort(Task.compareForDisplay);
 
     // Group main tasks by priority for sectioned display.
     final highTasks = mainTasks

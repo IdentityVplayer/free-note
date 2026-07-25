@@ -108,7 +108,7 @@ class TaskService {
     final fresh = <Task>[];
 
     for (final t in tasks) {
-      if (t.parentId != null || t.repeat == null || t.reminder == null) {
+      if (t.repeat == null || t.reminder == null) {
         updated.add(t);
         continue;
       }
@@ -118,10 +118,8 @@ class TaskService {
       }
       // Due → create a fresh one-off instance (repeat dropped) and advance
       // the original's reminder to the next occurrence.
-      final subs = tasks.where((s) => s.parentId == t.id).toList();
-      final (_, freshMain, freshSubs) = freshTaskCopy(t, subs);
-      fresh.add(freshMain.copyWith(repeat: null));
-      fresh.addAll(freshSubs.map((s) => s.copyWith(repeat: null)));
+      final newId = '${DateTime.now().microsecondsSinceEpoch}_${t.id}';
+      fresh.add(t.copyWith(id: newId, done: false, repeat: null));
       updated.add(t.copyWith(reminder: nextRepeatDue(t.reminder!, t.repeat!)));
     }
 

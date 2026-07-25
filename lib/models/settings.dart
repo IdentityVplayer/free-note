@@ -53,11 +53,6 @@ class AppSettings {
   /// Persisted as [PluginInfo] so they can be re-registered on next launch.
   List<PluginInfo> userPlugins;
 
-  // ── New in 1.12.0 ──
-  /// When true, completing every subtask of a main task automatically marks
-  /// the main task itself done.
-  bool autoCompleteMainTasks;
-
   AppSettings({
     this.languageCode = '',
     this.isDarkMode = false,
@@ -77,7 +72,6 @@ class AppSettings {
     this.repositories = const [],
     this.aiModels = const [],
     this.userPlugins = const [],
-    this.autoCompleteMainTasks = false,
   });
 
   /// Obfuscate a secret (API key / token) with base64 before persisting.
@@ -119,7 +113,9 @@ class AppSettings {
     'repositories': repositories,
     'aiModels': aiModels,
     'userPlugins': userPlugins.map((p) => p.toJson()).toList(),
-    'autoCompleteMainTasks': autoCompleteMainTasks,
+    // Note: `autoCompleteMainTasks` was removed in v1.15.4 (subtask feature
+    // dropped). Existing settings.json entries with this key are ignored on
+    // load.
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -148,7 +144,6 @@ class AppSettings {
             ?.map((e) => PluginInfo.fromJson(e as Map<String, dynamic>))
             .toList() ??
         const [],
-    autoCompleteMainTasks: json['autoCompleteMainTasks'] as bool? ?? false,
   );
 
   /// Immutable update helper used by toggles in the settings UI.
@@ -171,7 +166,6 @@ class AppSettings {
     List<String>? repositories,
     List<String>? aiModels,
     List<PluginInfo>? userPlugins,
-    bool? autoCompleteMainTasks,
   }) => AppSettings(
     languageCode: languageCode ?? this.languageCode,
     isDarkMode: isDarkMode ?? this.isDarkMode,
@@ -191,7 +185,6 @@ class AppSettings {
     repositories: repositories ?? this.repositories,
     aiModels: aiModels ?? this.aiModels,
     userPlugins: userPlugins ?? this.userPlugins,
-    autoCompleteMainTasks: autoCompleteMainTasks ?? this.autoCompleteMainTasks,
   );
 
   /// Resolve the effective base URL from provider preset or custom value.

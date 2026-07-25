@@ -297,23 +297,32 @@ class _EditorScreenState extends State<EditorScreen>
     );
   }
 
-  /// A preview line; tapping it makes that line the active (raw) one.
-  ///
-  /// The markdown is rendered non-selectable so the tap reaches this
-  /// [GestureDetector] (a selectable [MarkdownBody] swallows taps for text
-  /// selection, which previously blocked tap-to-edit). Links still open via
-  /// [safeMarkdown]'s [onTapLink].
+  /// A preview line; tapping anywhere on it makes that line the active
+  /// (raw/editable) one. Empty lines render with a generous tap target so
+  /// the user can comfortably tap anywhere in the blank row to bring up the
+  /// keyboard (v1.15.4).
   Widget _buildPreviewLine(int i, String line) {
-    final child = line.isEmpty
-        ? const SizedBox(height: 22)
-        : safeMarkdown(
-            data: line,
-            selectable: false,
-            onTapLink: (text, href, title) {
-              if (href != null) _launchUrl(href);
-            },
-          );
-    return GestureDetector(onTap: () => _setActiveLine(i), child: child);
+    if (line.isEmpty) {
+      // Empty line: full-width tappable area, taller than text for an
+      // easy hit target.
+      return InkWell(
+        onTap: () => _setActiveLine(i),
+        child: SizedBox(
+          width: double.infinity,
+          height: 32,
+          child: const SizedBox.shrink(),
+        ),
+      );
+    }
+    final child = safeMarkdown(
+      data: line,
+      selectable: false,
+      onTapLink: (text, href, title) {
+        if (href != null) _launchUrl(href);
+      },
+    );
+    // Use InkWell so empty rows and text rows get the same ripple feedback.
+    return InkWell(onTap: () => _setActiveLine(i), child: child);
   }
 
   /// Activate line [i] for editing, seeding the raw field with its text and

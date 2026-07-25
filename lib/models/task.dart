@@ -21,11 +21,8 @@ class RepeatConfig {
 ///
 /// Tasks are kept lightweight: a title, completion flag, optional due date,
 /// a priority level, an *optional* link back to a note (so a task can
-/// point at the note it belongs to), and — for hierarchical planning — an
-/// optional [parentId] that makes a task a *subtask* of a main task.
-///
-/// Reminders ([reminder]) and repetition ([repeat]) drive the notification /
-/// auto-respawn feature.
+/// point at the note it belongs to). Reminders ([reminder]) and repetition
+/// ([repeat]) drive the notification / auto-respawn feature.
 class Task {
   final String id;
   final String title;
@@ -39,9 +36,6 @@ class Task {
   /// Optional note this task is linked to (display-only copy of the title).
   final String? noteId;
   final String? noteTitle;
-
-  /// Parent main-task id. null means this is a top-level (main) task.
-  final String? parentId;
 
   /// When to remind the user (local time). null = no reminder.
   final DateTime? reminder;
@@ -68,7 +62,6 @@ class Task {
     this.priority = priorityNormal,
     this.noteId,
     this.noteTitle,
-    this.parentId,
     this.reminder,
     this.repeat,
   });
@@ -81,7 +74,6 @@ class Task {
     String? priority,
     String? noteId,
     String? noteTitle,
-    String? parentId,
     DateTime? reminder,
     RepeatConfig? repeat,
   }) {
@@ -94,7 +86,6 @@ class Task {
       priority: priority ?? this.priority,
       noteId: noteId ?? this.noteId,
       noteTitle: noteTitle ?? this.noteTitle,
-      parentId: parentId ?? this.parentId,
       reminder: reminder ?? this.reminder,
       repeat: repeat ?? this.repeat,
     );
@@ -109,7 +100,8 @@ class Task {
     'priority': priority,
     'noteId': noteId,
     'noteTitle': noteTitle,
-    'parentId': parentId,
+    // Note: `parentId` was removed in v1.15.4 (subtask feature dropped).
+    // Older entries with a `parentId` are simply ignored on load.
     'reminder': reminder?.toIso8601String(),
     'repeat': repeat?.toJson(),
   };
@@ -132,7 +124,6 @@ class Task {
           : Task.priorityNormal,
       noteId: json['noteId'] as String?,
       noteTitle: json['noteTitle'] as String?,
-      parentId: json['parentId'] as String?,
       reminder: json['reminder'] != null
           ? DateTime.parse(json['reminder'] as String)
           : null,
@@ -172,7 +163,6 @@ class Task {
           priority == other.priority &&
           noteId == other.noteId &&
           noteTitle == other.noteTitle &&
-          parentId == other.parentId &&
           reminder == other.reminder &&
           repeat == other.repeat;
 
@@ -185,7 +175,6 @@ class Task {
     priority,
     noteId,
     noteTitle,
-    parentId,
     reminder,
     repeat,
   );
