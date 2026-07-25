@@ -1,5 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.15.5
+
+### Fixed
+- **GitHub Sync 二进制文件和配置文件无法上传** — `.config/` 下非 `.json` 文件（`.yaml`、`.gitignore`、二进制）以前因为只读取 `.json` 并经 UTF-8 往返，无法上传。现在直接读字节+base64 编码、递归扫描 `.config/` 全部文件、`.gitignore` 等二进制文件也能正确上传到 `notes/.config/`。
+
 ## 1.15.0
 
 ### Added

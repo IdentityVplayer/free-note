@@ -153,20 +153,29 @@ class AppProvider extends ChangeNotifier
   /// set locally, then push it. Guarded by [_isSyncing] so overlapping calls
   /// are coalesced. Does not block the UI (no global loading spinner).
 
-  /// Read all local `.config` files (except per-note metadata) into a map of
-  /// filename → JSON content, for uploading alongside notes.
-  Future<Map<String, String>> _readConfigFiles() async {
-    final out = <String, String>{};
+  /// Read every local `.config` file as raw bytes (skips per-note metadata
+  /// `<id>.json`), keyed by filename. Values are base64-encoded inside the
+  /// sync service — they are NOT decoded/encoded as text so binary configs
+  /// (`.yaml`, images, etc.) survive the round-trip intact.
+  Future<Map<String, List<int>>> _readConfigFiles() async {
+    final out = <String, List<int>>{};
     try {
       final cfgDir = await _storage.configDir;
       if (cfgDir.existsSync()) {
-        for (final entity in cfgDir.listSync()) {
-          if (entity is! File || !entity.path.endsWith('.json')) continue;
-          final name = p.basename(entity.path);
+        for (final entity in cfgDir.listSync(
+          recursive: true,
+          followLinks: false,
+        )) {
+          if (entity is! File) continue;
+          final name = p.relative(entity.path, from: cfgDir.path);
           // Skip per-note metadata files (numeric-id.json) — frontmatter
           // in the .md file already covers them on GitHub.
           if (RegExp(r'^\d+\.json$').hasMatch(name)) continue;
-          out[name] = entity.readAsStringSync();
+          try {
+            out[name] = entity.readAsBytesSync();
+          } catch (_) {
+            // skip unreadable files
+          }
         }
       }
     } catch (_) {}
@@ -175,8 +184,8 @@ class AppProvider extends ChangeNotifier
 
   /// Scan the entire local notes folder (recursively, including all
   /// subdirectories) for files that are NOT managed as [Note] objects and
-  /// NOT config files. Returns a map of relative-path → raw file bytes
-  /// (base64 happens inside the sync service).
+  /// NOT in `.config/` (handled separately). Returns a map of relative-path →
+  /// raw file bytes (base64 happens inside the sync service).
   Future<Map<String, List<int>>> _readExtraFiles() async {
     final out = <String, List<int>>{};
     if (!_storage.hasFolder) return out;

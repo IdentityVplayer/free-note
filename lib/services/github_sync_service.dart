@@ -56,12 +56,17 @@ class GitHubSyncService {
   /// single-file `notes/notes.json` is cleaned up if it still exists.
   Future<SyncResult> syncNotes(
     List<Note> notes, {
-    Map<String, String>? configFiles,
+
+    /// Config files to upload under `notes/.config/`. The map is
+    /// `relative-path → raw bytes` (read by the app as a binary blob, not as
+    /// text) so non-text configs (`.yaml`, `.gitignore`, etc.) survive the
+    /// round-trip unchanged.
+    Map<String, List<int>>? configFiles,
 
     /// Additional files to upload under `notes/` (map of relative-path → raw
     /// file bytes). These are files in the local notes folder that are not
-    /// managed as [Note] objects (e.g. images, PDFs, or any non-`.md` files).
-    /// The raw bytes are base64-encoded inside the service.
+    /// managed as [Note] objects and not inside `.config/` (handled by
+    /// [configFiles]). The raw bytes are base64-encoded inside the service.
     Map<String, List<int>>? extraFiles,
   }) async {
     if (!isConfigured) {
@@ -93,14 +98,13 @@ class GitHubSyncService {
         await _deleteFile('notes/notes.json', remoteFiles['notes/notes.json']!);
       }
 
-      // 5. Upload every config file (.json) to notes/.config/.
+      // 5. Upload every config file (.json or other) to notes/.config/.
+      // Reads bytes directly (no UTF-8 roundtrip) so binary configs survive.
       if (configFiles != null) {
         for (final entry in configFiles.entries) {
           final cfgPath = 'notes/.config/${entry.key}';
           localPaths.add(cfgPath);
-          final encoded = base64Encode(
-            utf8.encode(entry.value),
-          ).replaceAll('\n', '');
+          final encoded = base64Encode(entry.value).replaceAll('\n', '');
           await _putFile(cfgPath, encoded, remoteFiles[cfgPath]);
         }
       }

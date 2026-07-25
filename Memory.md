@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **281**（三语一致，截至 v1.15.0） |
-| 当前稳定版本 | `1.15.0+45`（已发布，tag `v1.15.0`） |
+| i18n key 总数 | **274**（三语一致，截至 v1.15.5） |
+| 当前稳定版本 | `1.15.5+50`（已发布，tag `v1.15.5`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -203,6 +203,11 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 6. ✅ **change：新建笔记流程** — 点击添加笔记后弹出对话框输入文件名和选择所属文件夹；编辑页面的文件夹栏目已删除；长按笔记弹出重命名/移动/复制/删除菜单。新增 `noteNameHint`/`rename`/`move`/`copy` 四组三语 key（274 → 278）。
 7. ✅ `flutter analyze` 0 issues + `flutter test` 56 passed。
 8. ✅ bump `pubspec.yaml` 版本 `1.13.11+43` → `1.14.0+44`；更新 `Memory.md` / `Features.md`；最终 commit / tag / push。
+
+### v1.15.5 最终化（已完成 ✅，2026-07-25）
+1. ✅ **fix：GitHub Sync 二进制文件和配置文件无法上传** — `_readConfigFiles` 由 `Map<String, String>` + 仅 `.json` 改为 `Map<String, List<int>>` + 递归读 `.config/` 下全部文件；`syncNotes` 改为按字节直接 base64 编码（去掉 `utf8.encode` 往返）；`_readExtraFiles` 保持递归扫描 BASE 目录全部非笔记/非配置文件。`.config/preferences.yaml`、`.gitignore` 等二进制和文本混合格式现在都能正确上传到 `notes/.config/`。
+2. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
+3. ✅ bump `pubspec.yaml` 版本 `1.15.4+49` → `1.15.5+50`；最终 commit / tag / push。
 
 ---
 
