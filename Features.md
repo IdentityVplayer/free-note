@@ -1,5 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.15.8
+
+### Fixed
+- **Android CI 构建失败（v1.15.7 release Action 报错）** — `MainActivity.installApk()` 引用了 `androidx.core.content.FileProvider`，但 `app/build.gradle.kts` 没显式声明 androidx.core。AGP 不会把 plugin 的 `implementation` 依赖传染给 app。修复：`implementation("androidx.core:core:1.13.1")`。
+
 ## 1.15.7
 
 ### Added

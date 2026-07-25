@@ -86,6 +86,11 @@ dependencies {
     // flutter_local_notifications and other modern plugins. Must match the
     // version expected by the installed AGP.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.0")
+    // androidx.core.content.FileProvider (used by MainActivity.installApk)
+    // is NOT auto-promoted from plugin `implementation` deps — we declare it
+    // explicitly here so the Kotlin compile and the FileProvider URI work
+    // inside the APK.
+    implementation("androidx.core:core:1.13.1")
 }
 
 kotlin {

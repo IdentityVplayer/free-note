@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **274**（三语一致，截至 v1.15.7） |
-| 当前稳定版本 | `1.15.7+52`（已发布，tag `v1.15.7`） |
+| i18n key 总数 | **274**（三语一致，截至 v1.15.8） |
+| 当前稳定版本 | `1.15.8+53`（已发布，tag `v1.15.8`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -233,6 +233,13 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 4. ✅ 新增 `android/app/src/main/res/xml/file_provider_paths.xml` 和 AndroidManifest FileProvider 声明。
 5. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
 6. ✅ bump `pubspec.yaml` 版本 `1.15.6+51` → `1.15.7+52`；最终 commit / tag / push。
+
+### v1.15.8 最终化（已完成 ✅，2026-07-25）
+1. ✅ **fix：Android CI 构建失败** — v1.15.7 在 MainActivity 中引用 `androidx.core.content.FileProvider`，但 `app/build.gradle.kts` 没显式声明 androidx.core 依赖（虽然 `flutter_local_notifications` 间接带 `androidx.core:core:1.3.0`，AGP 不会把 plugin implementation 传染给 app），导致 `Build App Bundle` 步骤 exit code 1。修复：`implementation("androidx.core:core:1.13.1")`。
+2. ✅ 删除多余的 `.github/workflows/auto_build.yml`（与 `build_release.yml` 重复）。
+3. ✅ `build_release.yml` 简化：删除 `flutter build appbundle` 步骤（与 APK 重复）；windows/web 加 `continue-on-error: true`（编译失败不阻塞 Android release）。
+4. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
+5. ✅ bump `pubspec.yaml` 版本 `1.15.7+52` → `1.15.8+53`；最终 commit / tag / push。
 
 ---
 
