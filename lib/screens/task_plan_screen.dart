@@ -486,6 +486,21 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
     List<Task> subtasksOf(String id) =>
         _tasks.where((t) => t.parentId == id).toList();
 
+    // Group main tasks by priority for sectioned display.
+    final highTasks = mainTasks
+        .where((t) => t.priority == Task.priorityHigh)
+        .toList();
+    final normalTasks = mainTasks
+        .where((t) => t.priority == Task.priorityNormal)
+        .toList();
+    final lowTasks = mainTasks
+        .where(
+          (t) =>
+              t.priority != Task.priorityHigh &&
+              t.priority != Task.priorityNormal,
+        )
+        .toList();
+
     final content = _loading
         ? const Center(child: CircularProgressIndicator())
         : _tasks.isEmpty
@@ -506,10 +521,29 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
         : ListView(
             padding: const EdgeInsets.all(8),
             children: [
-              for (final main in mainTasks) ...[
-                _buildMainCard(main, l10n, theme),
-                for (final sub in subtasksOf(main.id))
-                  _buildSubCard(sub, l10n, theme),
+              if (highTasks.isNotEmpty) ...[
+                _priorityHeader(l10n, Task.priorityHigh, highTasks.length),
+                for (final main in highTasks) ...[
+                  _buildMainCard(main, l10n, theme),
+                  for (final sub in subtasksOf(main.id))
+                    _buildSubCard(sub, l10n, theme),
+                ],
+              ],
+              if (normalTasks.isNotEmpty) ...[
+                _priorityHeader(l10n, Task.priorityNormal, normalTasks.length),
+                for (final main in normalTasks) ...[
+                  _buildMainCard(main, l10n, theme),
+                  for (final sub in subtasksOf(main.id))
+                    _buildSubCard(sub, l10n, theme),
+                ],
+              ],
+              if (lowTasks.isNotEmpty) ...[
+                _priorityHeader(l10n, Task.priorityLow, lowTasks.length),
+                for (final main in lowTasks) ...[
+                  _buildMainCard(main, l10n, theme),
+                  for (final sub in subtasksOf(main.id))
+                    _buildSubCard(sub, l10n, theme),
+                ],
               ],
             ],
           );
@@ -524,6 +558,40 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
         tooltip: l10n.t('newTask'),
         onPressed: () => _showTaskDialog(),
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  /// Section header for a priority group: icon + label + task count.
+  Widget _priorityHeader(AppLocalizations l10n, String priority, int count) {
+    final color = switch (priority) {
+      Task.priorityHigh => Colors.red.shade700,
+      Task.priorityNormal => Colors.orange.shade700,
+      _ => Colors.green.shade700,
+    };
+    final label = switch (priority) {
+      Task.priorityHigh => l10n.t('priorityHigh'),
+      Task.priorityNormal => l10n.t('priorityNormal'),
+      _ => l10n.t('priorityLow'),
+    };
+    final icon = switch (priority) {
+      Task.priorityHigh => Icons.flag,
+      Task.priorityNormal => Icons.flag_outlined,
+      _ => Icons.flag,
+    };
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 16, 8, 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(fontWeight: FontWeight.bold, color: color),
+          ),
+          const SizedBox(width: 6),
+          Text('($count)', style: TextStyle(color: color, fontSize: 12)),
+        ],
       ),
     );
   }
@@ -635,20 +703,30 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: _buildMetaRow(task, l10n, theme),
-          trailing: PopupMenuButton<String>(
-            onSelected: (v) {
-              switch (v) {
-                case 'edit':
-                  _showTaskDialog(existing: task);
-                  break;
-                case 'delete':
-                  _confirmDelete(task);
-                  break;
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(value: 'edit', child: Text(l10n.t('edit'))),
-              PopupMenuItem(value: 'delete', child: Text(l10n.t('delete'))),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                tooltip: l10n.t('delete'),
+                onPressed: () => _confirmDelete(task),
+              ),
+              PopupMenuButton<String>(
+                onSelected: (v) {
+                  switch (v) {
+                    case 'edit':
+                      _showTaskDialog(existing: task);
+                      break;
+                    case 'delete':
+                      _confirmDelete(task);
+                      break;
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'edit', child: Text(l10n.t('edit'))),
+                  PopupMenuItem(value: 'delete', child: Text(l10n.t('delete'))),
+                ],
+              ),
             ],
           ),
         ),
