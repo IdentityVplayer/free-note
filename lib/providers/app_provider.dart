@@ -244,9 +244,15 @@ class AppProvider extends ChangeNotifier
         extraFiles: extraFiles,
       );
       _statusMessage = result.message;
-      if (result.success) _refreshSyncedIds();
+      if (result.success) {
+        _refreshSyncedIds();
+        NotificationService.instance.showSync('GitHub 同步成功', result.message);
+      } else {
+        NotificationService.instance.showSync('GitHub 同步失败', result.message);
+      }
     } catch (e) {
       _statusMessage = '同步失败: $e';
+      NotificationService.instance.showSync('GitHub 同步失败', '$e');
     } finally {
       _isSyncing = false;
     }

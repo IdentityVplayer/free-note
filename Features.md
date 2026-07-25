@@ -1,5 +1,13 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.15.6
+
+### Added
+- **应用通知系统全面实现** — 新增多通道（任务/番茄钟/同步/更新）+ 设备时区自动配置 + iOS 详细参数 + Android 精确闹钟权限申请。番茄钟 phase 完成、GitHub 同步成功/失败、检查更新发现新版本，都会通过系统通知推送，即使应用在后台也能收到。
+
+### Fixed
+- **应用通知没有实现** — 之前只有 task reminder 路径，且 `_scheduleIfNeeded` 是 fire-and-forget，tz.local 默认 UTC 导致任务在错误时间触发。修复：scheduleReminder 在所有任务 CRUD 操作里 await，update/remove 时取消旧 schedule，TZDateTime 使用设备 offset 校正。
+
 ## 1.15.5
 
 ### Fixed

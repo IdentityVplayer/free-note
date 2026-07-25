@@ -72,18 +72,22 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
   Future<void> _addTask(Task task) async {
     _tasks.add(task);
     await _persist();
-    _scheduleIfNeeded(task);
+    await _scheduleIfNeeded(task);
   }
 
   Future<void> _updateTask(Task task) async {
     final idx = _tasks.indexWhere((t) => t.id == task.id);
     if (idx >= 0) _tasks[idx] = task;
     await _persist();
-    _scheduleIfNeeded(task);
+    // Cancel any prior schedule for this task before re-scheduling (covers
+    // the case where the reminder time was edited).
+    await NotificationService.instance.cancelTaskReminder(task.id);
+    await _scheduleIfNeeded(task);
   }
 
   Future<void> _removeTask(String id) async {
     _tasks.removeWhere((t) => t.id == id);
+    await NotificationService.instance.cancelTaskReminder(id);
     await _persist();
   }
 
@@ -91,13 +95,12 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
     await _updateTask(task.copyWith(done: !task.done));
   }
 
-  void _scheduleIfNeeded(Task task) {
-    if (task.reminder != null) {
-      NotificationService.instance.scheduleReminder(
-        task,
-        title: AppLocalizations.of(context)?.t('reminder') ?? 'Reminder',
-      );
-    }
+  Future<void> _scheduleIfNeeded(Task task) async {
+    if (task.reminder == null) return;
+    await NotificationService.instance.scheduleReminder(
+      task,
+      title: AppLocalizations.of(context)?.t('reminder') ?? 'Reminder',
+    );
   }
 
   // ── Dialogs ──

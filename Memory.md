@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **274**（三语一致，截至 v1.15.5） |
-| 当前稳定版本 | `1.15.5+50`（已发布，tag `v1.15.5`） |
+| i18n key 总数 | **274**（三语一致，截至 v1.15.6） |
+| 当前稳定版本 | `1.15.6+51`（已发布，tag `v1.15.6`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -208,6 +208,17 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 1. ✅ **fix：GitHub Sync 二进制文件和配置文件无法上传** — `_readConfigFiles` 由 `Map<String, String>` + 仅 `.json` 改为 `Map<String, List<int>>` + 递归读 `.config/` 下全部文件；`syncNotes` 改为按字节直接 base64 编码（去掉 `utf8.encode` 往返）；`_readExtraFiles` 保持递归扫描 BASE 目录全部非笔记/非配置文件。`.config/preferences.yaml`、`.gitignore` 等二进制和文本混合格式现在都能正确上传到 `notes/.config/`。
 2. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
 3. ✅ bump `pubspec.yaml` 版本 `1.15.4+49` → `1.15.5+50`；最终 commit / tag / push。
+
+### v1.15.6 最终化（已完成 ✅，2026-07-25）
+1. ✅ **add：应用通知系统** — 之前只有任务 reminder，且 `_scheduleIfNeeded` 是 fire-and-forget + tz.local 默认 UTC。重写：
+   - 新增 `lib/utils/notification_timezone.dart` 从设备 offset 合成 `tz.local`
+   - `NotificationService` 增加多 channel（`tasks`/`pomodoro`/`sync`/`updates`）+ `requestExactAlarmsPermission()` + `cancelTaskReminder()` + iOS `DarwinNotificationDetails` 显式启用 alert/sound
+   - `_addTask`/`_updateTask`/`_removeTask` 都 await scheduleReminder，并在 update/remove 时取消旧 schedule
+   - 番茄钟 phase 完成 → 系统通知
+   - GitHub Sync 成功/失败 → 系统通知
+   - 检查更新有新版 → 系统通知
+2. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
+3. ✅ bump `pubspec.yaml` 版本 `1.15.5+50` → `1.15.6+51`；最终 commit / tag / push。
 
 ---
 

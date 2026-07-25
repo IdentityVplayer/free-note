@@ -8,6 +8,7 @@ import '../models/pomodoro_profile.dart';
 import '../models/pomodoro_session.dart';
 import '../services/pomodoro_service.dart';
 import '../services/storage_service.dart';
+import '../services/notification_service.dart';
 import '../l10n/app_localizations.dart';
 
 /// Pomodoro timer screen.
@@ -134,14 +135,25 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
     _timer?.cancel();
     _timer = null;
     if (l10n != null && mounted) {
-      final msg = _phase == PomodoroProfile.phaseWork
+      final finished = _phase == PomodoroProfile.phaseWork
           ? l10n.t('pomodoroFocus')
           : (_phase == PomodoroProfile.phaseLong
                 ? l10n.t('pomodoroLongBreak')
                 : l10n.t('pomodoroShortBreak'));
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('${l10n.t('pomodoro')}: $msg')));
+      final nextLabel = next == PomodoroProfile.phaseWork
+          ? l10n.t('pomodoroFocus')
+          : (next == PomodoroProfile.phaseLong
+                ? l10n.t('pomodoroLongBreak')
+                : l10n.t('pomodoroShortBreak'));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${l10n.t('pomodoro')}: $nextLabel')),
+      );
+      // System notification so the user is alerted even when the app is
+      // backgrounded.
+      NotificationService.instance.showPomodoroDone(
+        l10n.t('pomodoro'),
+        '$finished → $nextLabel',
+      );
     }
   }
 

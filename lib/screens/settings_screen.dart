@@ -13,6 +13,7 @@ import '../utils/app_arch.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../services/github_sync_service.dart';
+import '../services/notification_service.dart';
 import '../markdown/math_markdown.dart';
 import '../l10n/app_localizations.dart';
 import '../models/settings.dart';
@@ -191,6 +192,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final info = await PackageInfo.fromPlatform();
     final latest = release.tagName.replaceAll(RegExp(r'^v'), '');
     if (GitHubRelease.isNewer(latest, info.version)) {
+      NotificationService.instance.showUpdate(
+        l10n.t('updateAvailable'),
+        'v$latest 现已可用 — 当前版本 v${info.version}',
+      );
       _showUpdateDialog(release);
     } else {
       _toast(l10n.t('upToDate'));
