@@ -1,5 +1,12 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.16.1
+
+### Added
+- **任务提醒 Important 通知 + 动作按钮** — 之前的提醒只是普通通知，用户只能点开查看。现在升级为 `Importance.max` / `Priority.max`（绕过免打扰、弹出横幅、触发全屏意图），并在通知底部出现两个动作按钮：
+  - **完成**：标记任务为已完成，自动取消 reminder，写回 `tasks.json`
+  - **忽略**：仅关闭通知，不动任务数据
+
 ## 1.16.0
 
 ### Changed

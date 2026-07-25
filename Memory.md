@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **277**（三语一致，截至 v1.16.0） |
-| 当前稳定版本 | `1.16.0+55`（已发布，tag `v1.16.0`） |
+| i18n key 总数 | **277**（三语一致，截至 v1.16.1） |
+| 当前稳定版本 | `1.16.1+56`（已发布，tag `v1.16.1`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -252,6 +252,16 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 3. ✅ **add：Markdown `./` `../` 图片路径解析** — `safeMarkdown` 新增 `relativeBaseDir` 参数 + `sizedImageBuilder`；编辑器计算当前笔记所在目录（`base/relativePath 的父目录`），传给 `safeMarkdown`；相对路径 `./name.jpg`、`../name.jpg` 都解析为绝对路径后渲染 `Image.file`。
 4. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
 5. ✅ bump `pubspec.yaml` 版本 `1.15.9+54` → `1.16.0+55`；最终 commit / tag / push。
+
+### v1.16.1 最终化（已完成 ✅，2026-07-25）
+1. ✅ **add：任务提醒 Important 通知 + 动作按钮** — 之前 `importance: high` + 无 action，用户只能点开查看。改造：
+   - `AndroidNotificationDetails` 升级 `Importance.max` / `Priority.max` + `fullScreenIntent: true` + `category: reminder`（绕过免打扰，触发横幅）
+   - `DarwinNotificationCategory("task_reminder", actions: [完成, 忽略])`（iOS/macOS action 按钮）
+   - 两个 `AndroidNotificationAction`：`actionOk="完成"`（showsUserInterface）+ `actionIgnore="忽略"`（cancelNotification: true）
+   - `payload: task.id` 通过 `_onNotificationResponse` 回调路由到 `NotificationService.onTaskAction`
+   - `AppProvider._handleTaskAction` 区分 `actionOk`（标记 done + 取消 reminder + 保存 tasks.json）和 `actionIgnore`（仅取消 reminder）
+2. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
+3. ✅ bump `pubspec.yaml` 版本 `1.16.0+55` → `1.16.1+56`；最终 commit / tag / push。
 
 ---
 

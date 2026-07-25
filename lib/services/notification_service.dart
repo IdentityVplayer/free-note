@@ -9,10 +9,11 @@ import 'windows_notifications.dart';
 /// Real OS notifications.
 ///
 /// Channels:
-/// - `tasks`     (Android): scheduled task reminders
-/// - `pomodoro`  (Android): pomodoro phase complete (immediate)
-/// - `sync`      (Android): GitHub sync success / failure
-/// - `updates`   (Android): new release available
+/// - `tasks`     (Android, IMPORTANCE max): scheduled task reminders with
+///               interactive "OK" / "Ignore" buttons.
+/// - `pomodoro`  (Android): pomodoro phase complete (immediate).
+/// - `sync`      (Android): GitHub sync success / failure.
+/// - `updates`   (Android): new release available.
 ///
 /// Backends:
 /// - Android / iOS / macOS / Linux: [FlutterLocalNotificationsPlugin].
@@ -26,9 +27,23 @@ class NotificationService {
   static const _channelSync = 'sync';
   static const _channelUpdates = 'updates';
 
+  /// Darwin category identifier for task reminders (lets iOS present action
+  /// buttons in the notification).
+  static const _categoryTask = 'task_reminder';
+
+  /// Action IDs used by both Android and iOS. The payload of every task
+  /// reminder is the task's id, so [onTaskAction] can locate the task.
+  static const actionOk = 'task_ok';
+  static const actionIgnore = 'task_ignore';
+
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   bool _ready = false;
+
+  /// Registered by [AppProvider] (or any other handler). Fires when the user
+  /// taps an action button on a task reminder. The action is one of
+  /// [actionOk] / [actionIgnore] / `''` (a tap on the notification body).
+  void Function(String taskId, String actionId)? onTaskAction;
 
   Future<void> init() async {
     if (Platform.isWindows) {
@@ -36,16 +51,37 @@ class NotificationService {
       return;
     }
     initLocalTimezone();
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const darwin = DarwinInitializationSettings();
-    const settings = InitializationSettings(
+    final android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    final darwin = DarwinInitializationSettings(
+      notificationCategories: [
+        DarwinNotificationCategory(
+          _categoryTask,
+          actions: [
+            DarwinNotificationAction.plain(
+              actionOk,
+              '完成',
+              options: {DarwinNotificationActionOption.foreground},
+            ),
+            DarwinNotificationAction.plain(
+              actionIgnore,
+              '忽略',
+              options: {DarwinNotificationActionOption.destructive},
+            ),
+          ],
+        ),
+      ],
+    );
+    final settings = InitializationSettings(
       android: android,
       iOS: darwin,
       macOS: darwin,
       linux: LinuxInitializationSettings(defaultActionName: 'Free Note'),
     );
     try {
-      await _plugin.initialize(settings);
+      await _plugin.initialize(
+        settings,
+        onDidReceiveNotificationResponse: _onNotificationResponse,
+      );
       _ready = true;
       await _requestPermission();
     } catch (_) {
@@ -63,6 +99,13 @@ class NotificationService {
     await androidImpl?.requestExactAlarmsPermission();
   }
 
+  void _onNotificationResponse(NotificationResponse response) {
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) return;
+    final action = response.actionId ?? '';
+    onTaskAction?.call(payload, action);
+  }
+
   /// Cancel any existing notifications for the given task id.
   Future<void> cancelTaskReminder(String taskId) async {
     if (!_ready) return;
@@ -71,8 +114,10 @@ class NotificationService {
     } catch (_) {}
   }
 
-  /// Schedule a notification at the task's [Task.reminder]. [title] is the
-  /// localized reminder label.
+  /// Schedule a notification at the task's [Task.reminder]. Posted as an
+  /// IMPORTANT reminder with two action buttons:
+  ///   - `OK` (`actionOk`)        — mark the task as done
+  ///   - `Ignore` (`actionIgnore`) — dismiss without action
   Future<void> scheduleReminder(Task task, {required String title}) async {
     if (task.reminder == null) return;
     if (Platform.isWindows) {
@@ -87,30 +132,38 @@ class NotificationService {
     if (!_ready) return;
     final when = tz.TZDateTime.from(task.reminder!, tz.local);
     if (when.isBefore(tz.TZDateTime.now(tz.local))) return;
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        _channelTasks,
-        '任务提醒',
-        channelDescription: 'Plan tasks with reminders',
-        importance: Importance.high,
-        priority: Priority.high,
-      ),
-      iOS: DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      ),
+
+    const androidDetails = AndroidNotificationDetails(
+      _channelTasks,
+      '任务提醒',
+      channelDescription: 'Plan tasks with reminders',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.reminder,
+      fullScreenIntent: true,
+      actions: <AndroidNotificationAction>[
+        AndroidNotificationAction(actionOk, '完成', showsUserInterface: true),
+        AndroidNotificationAction(actionIgnore, '忽略', cancelNotification: true),
+      ],
     );
+    const darwinDetails = DarwinNotificationDetails(
+      categoryIdentifier: _categoryTask,
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
     try {
       await _plugin.zonedSchedule(
         task.id.hashCode,
         title,
         task.title,
         when,
-        details,
+        NotificationDetails(android: androidDetails, iOS: darwinDetails),
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: task.id,
       );
     } catch (_) {
       // Best-effort: SCHEDULE_EXACT_ALARM may be denied on some Android
@@ -133,21 +186,6 @@ class NotificationService {
     }
     if (!_ready) return;
     final (channelName, channelDesc) = _channelMeta(channel);
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        _channelSync,
-        '应用通知',
-        channelDescription: 'General app notifications',
-        importance: Importance.high,
-        priority: Priority.high,
-      ),
-      iOS: DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      ),
-    );
-    // Per-channel details.
     final androidDetails = AndroidNotificationDetails(
       channel,
       channelName,
@@ -155,12 +193,18 @@ class NotificationService {
       importance: Importance.high,
       priority: Priority.high,
     );
-    final fullDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: details.iOS,
+    const darwinDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
     );
     try {
-      await _plugin.show(notifId, title, body, fullDetails);
+      await _plugin.show(
+        notifId,
+        title,
+        body,
+        NotificationDetails(android: androidDetails, iOS: darwinDetails),
+      );
     } catch (_) {}
   }
 

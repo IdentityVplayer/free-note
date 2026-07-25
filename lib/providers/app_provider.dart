@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:permission_handler/permission_handler.dart';
 import '../models/note.dart';
+import '../models/task.dart';
 import '../models/settings.dart';
 import '../models/plugin.dart';
 import '../services/storage_service.dart';
@@ -282,6 +283,8 @@ class AppProvider extends ChangeNotifier
 
   Future<void> _initNotifications() async {
     await NotificationService.instance.init();
+    // Hook the "OK" / "Ignore" action buttons on task reminders.
+    NotificationService.instance.onTaskAction = _handleTaskAction;
     await TaskService.instance.respawnDueRepeats();
     final tasks = await TaskService.instance.loadTasks();
     for (final t in tasks) {
@@ -291,6 +294,26 @@ class AppProvider extends ChangeNotifier
           title: 'Reminder',
         );
       }
+    }
+  }
+
+  /// Callback for task reminder notification action buttons.
+  Future<void> _handleTaskAction(String taskId, String actionId) async {
+    if (actionId == NotificationService.actionIgnore) {
+      await NotificationService.instance.cancelTaskReminder(taskId);
+      return;
+    }
+    if (actionId == NotificationService.actionOk) {
+      // Mark the task done on disk and cancel the reminder.
+      final tasks = await TaskService.instance.loadTasks();
+      final idx = tasks.indexWhere((t) => t.id == taskId);
+      if (idx < 0) return;
+      final updated = tasks[idx].copyWith(done: true);
+      final newList = List<Task>.from(tasks)..[idx] = updated;
+      await TaskService.instance.saveTasks(newList);
+      await NotificationService.instance.cancelTaskReminder(taskId);
+      // Tell the rest of the app (e.g. task plan screen) to refresh.
+      _notes = List.of(_notes); // trigger notifyListeners if needed
     }
   }
 
