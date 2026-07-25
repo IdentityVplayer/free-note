@@ -32,6 +32,12 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
   bool _busy = false;
   String? _status;
 
+  /// Sync progress: true while a push or pull is in-flight.
+  bool _syncing = false;
+
+  /// Activity log entries, each a human-readable line.
+  final List<String> _syncLog = [];
+
   /// GitHub Sync login mode: 'device' (OAuth Device flow) or 'token'
   /// (paste a Personal Access Token). Mirrors [AppSettings.githubSyncMode].
   String _syncMode = 'device';
@@ -242,13 +248,54 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
   }
 
   Future<void> _syncNow() async {
-    final msg = await widget.host.syncToGitHub();
-    if (mounted) setState(() => _status = msg);
+    if (_syncing) return;
+    setState(() {
+      _syncing = true;
+      _syncLog.add('${_now()} — 开始推送同步…');
+      _status = null;
+    });
+    try {
+      final msg = await widget.host.syncToGitHub();
+      if (mounted) {
+        setState(() {
+          _syncLog.add('${_now()} — $msg');
+          _status = msg;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _syncLog.add('${_now()} — 同步失败: $e'));
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
   }
 
   Future<void> _pullNow() async {
-    final msg = await widget.host.pullFromGitHub();
-    if (mounted) setState(() => _status = msg);
+    if (_syncing) return;
+    setState(() {
+      _syncing = true;
+      _syncLog.add('${_now()} — 开始拉取…');
+      _status = null;
+    });
+    try {
+      final msg = await widget.host.pullFromGitHub();
+      if (mounted) {
+        setState(() {
+          _syncLog.add('${_now()} — $msg');
+          _status = msg;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _syncLog.add('${_now()} — 拉取失败: $e'));
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
+  }
+
+  /// Current time as a compact log prefix.
+  String _now() {
+    final d = DateTime.now();
+    String pad(int x) => x.toString().padLeft(2, '0');
+    return '${pad(d.hour)}:${pad(d.minute)}:${pad(d.second)}';
   }
 
   // ── UI ────────────────────────────────────────────────────────────
@@ -493,6 +540,11 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
           ),
 
           // ── Manual sync actions ──
+          if (_syncing)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: LinearProgressIndicator(),
+            ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -501,7 +553,7 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.upload),
                     label: Text(l10n.t('syncNow')),
-                    onPressed: _syncNow,
+                    onPressed: _syncing ? null : _syncNow,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -509,7 +561,7 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.download),
                     label: Text(l10n.t('pullFromGitHub')),
-                    onPressed: _pullNow,
+                    onPressed: _syncing ? null : _pullNow,
                   ),
                 ),
               ],
@@ -524,6 +576,42 @@ class _GitHubSyncSettingsScreenState extends State<GitHubSyncSettingsScreen> {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.primary,
                 ),
+              ),
+            ),
+          ],
+          if (_syncLog.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                l10n.t('syncLog'),
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 200),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(8),
+                  children: _syncLog
+                      .map((l) => Text(l, style: const TextStyle(fontSize: 12)))
+                      .toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Center(
+              child: TextButton.icon(
+                icon: const Icon(Icons.clear, size: 16),
+                label: Text(l10n.t('clear')),
+                onPressed: () => setState(() => _syncLog.clear()),
               ),
             ),
           ],

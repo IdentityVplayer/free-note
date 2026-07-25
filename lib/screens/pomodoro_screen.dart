@@ -624,70 +624,102 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
     final stats = PomodoroService.instance.stats();
     final (label, color) = _phaseLabelColor(l10n, theme);
     final progress = _total > 0 ? 1 - (_remaining / _total) : 0.0;
+    final activeBg =
+        _active.backgroundPath != null &&
+            File(_active.backgroundPath!).existsSync()
+        ? File(_active.backgroundPath!)
+        : null;
 
     final timer = Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text(_profileName(_active), style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
+      clipBehavior: activeBg != null ? Clip.antiAlias : Clip.none,
+      child: Stack(
+        children: [
+          if (activeBg != null)
+            Positioned.fill(
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Image.file(activeBg, fit: BoxFit.cover),
               ),
             ),
-            const SizedBox(height: 16),
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                SizedBox(
-                  width: 180,
-                  height: 180,
-                  child: CircularProgressIndicator(
-                    value: progress,
-                    strokeWidth: 10,
-                    color: color,
+          if (activeBg != null)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      theme.colorScheme.surface.withValues(alpha: 0.85),
+                      theme.colorScheme.surface.withValues(alpha: 0.60),
+                    ],
                   ),
                 ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Text(_profileName(_active), style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
                 Text(
-                  _format(_remaining),
-                  style: theme.textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  label,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
+                const SizedBox(height: 16),
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 180,
+                      height: 180,
+                      child: CircularProgressIndicator(
+                        value: progress,
+                        strokeWidth: 10,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      _format(_remaining),
+                      style: theme.textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _running ? _pause : _start,
+                      icon: Icon(_running ? Icons.pause : Icons.play_arrow),
+                      label: Text(
+                        _running
+                            ? l10n.t('pomodoroPause')
+                            : l10n.t('pomodoroStart'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    OutlinedButton.icon(
+                      onPressed: _reset,
+                      icon: const Icon(Icons.refresh),
+                      label: Text(l10n.t('pomodoroReset')),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.tArgs('pomodoroSessions', ['$_completed']),
+                  style: theme.textTheme.bodyMedium,
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FilledButton.icon(
-                  onPressed: _running ? _pause : _start,
-                  icon: Icon(_running ? Icons.pause : Icons.play_arrow),
-                  label: Text(
-                    _running
-                        ? l10n.t('pomodoroPause')
-                        : l10n.t('pomodoroStart'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                OutlinedButton.icon(
-                  onPressed: _reset,
-                  icon: const Icon(Icons.refresh),
-                  label: Text(l10n.t('pomodoroReset')),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.tArgs('pomodoroSessions', ['$_completed']),
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
 
@@ -848,6 +880,13 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
                       label: Text(l10n.t('pomodoroStart')),
                     ),
                     const Spacer(),
+                    // Delete button: hidden for the last remaining profile.
+                    if (_profiles.length > 1)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: l10n.t('delete'),
+                        onPressed: () => _confirmDeleteProfile(p),
+                      ),
                     IconButton(
                       icon: const Icon(Icons.edit),
                       tooltip: l10n.t('edit'),

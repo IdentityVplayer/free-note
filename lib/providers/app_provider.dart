@@ -31,6 +31,10 @@ class AppProvider extends ChangeNotifier
   bool _isSyncing = false;
   String? _statusMessage;
 
+  /// IDs of notes that were successfully synced in the last sync operation.
+  Set<String> _syncedNoteIds = {};
+  Set<String> get syncedNoteIds => Set.unmodifiable(_syncedNoteIds);
+
   // Services
   late final AIService aiService;
   @override
@@ -200,6 +204,7 @@ class AppProvider extends ChangeNotifier
         configFiles: configFiles,
       );
       _statusMessage = result.message;
+      if (result.success) _refreshSyncedIds();
     } catch (e) {
       _statusMessage = '同步失败: $e';
     } finally {
@@ -522,6 +527,7 @@ class AppProvider extends ChangeNotifier
     );
     _statusMessage = result.message;
     _setLoading(false);
+    if (result.success) _refreshSyncedIds();
     notifyListeners();
     return result.message;
   }
@@ -545,6 +551,7 @@ class AppProvider extends ChangeNotifier
         } catch (_) {}
       }
       await _persist();
+      _refreshSyncedIds();
       _statusMessage = '已从 GitHub 拉取 ${pullResult.notes.length} 篇笔记';
     } else {
       _statusMessage = '从 GitHub 拉取失败';
@@ -559,6 +566,12 @@ class AppProvider extends ChangeNotifier
   }
 
   // ---- Private helpers ----
+
+  /// Populate [_syncedNoteIds] with all current note IDs after a successful
+  /// sync, so the UI can show a ✓ badge on synced files.
+  void _refreshSyncedIds() {
+    _syncedNoteIds = _notes.map((n) => n.id).toSet();
+  }
 
   Future<void> _persist() async {
     try {

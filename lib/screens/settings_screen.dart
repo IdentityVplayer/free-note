@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -191,31 +192,106 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showUpdateDialog(GitHubRelease release) {
     final l10n = AppLocalizations.of(context)!;
+    // Find the APK asset URL (arm64-v8a recommended).
+    final apkUrl = release.assetUrls
+        .where((u) => u.contains('arm64-v8a') && u.endsWith('.apk'))
+        .firstOrNull;
+    String? downloadState; // null / "downloading" / "done:path"
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('${l10n.t('updateAvailable')} (${release.tagName})'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: safeMarkdown(
-              data: release.body.isEmpty ? release.tagName : release.body,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: Text('${l10n.t('updateAvailable')} (${release.tagName})'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (downloadState == null)
+                    safeMarkdown(
+                      data: release.body.isEmpty
+                          ? release.tagName
+                          : release.body,
+                    ),
+                  if (downloadState == 'downloading')
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: Column(
+                        children: [
+                          LinearProgressIndicator(),
+                          SizedBox(height: 8),
+                          Text('正在下载 APK…'),
+                        ],
+                      ),
+                    ),
+                  if (downloadState != null &&
+                      downloadState!.startsWith('done:'))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        'APK 已保存到: ${downloadState!.substring(5)}',
+                        style: const TextStyle(color: Colors.green),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.t('updateLater')),
+            ),
+            if (apkUrl != null && downloadState == null)
+              FilledButton.icon(
+                icon: const Icon(Icons.download, size: 18),
+                label: Text(l10n.t('updateDownload')),
+                onPressed: () async {
+                  setInner(() => downloadState = 'downloading');
+                  try {
+                    final response = await http.get(Uri.parse(apkUrl));
+                    if (response.statusCode == 200) {
+                      final path = await FilePicker.saveFile(
+                        dialogTitle: l10n.t('updateDownload'),
+                        fileName: p.basename(Uri.parse(apkUrl).path),
+                        bytes: response.bodyBytes,
+                      );
+                      if (path != null) {
+                        setInner(() => downloadState = 'done:$path');
+                      } else {
+                        setInner(() => downloadState = null);
+                      }
+                    } else {
+                      setInner(() => downloadState = null);
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(
+                            content: Text('下载失败 (${response.statusCode})'),
+                          ),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    setInner(() => downloadState = null);
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
+                    }
+                  }
+                },
+              ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _openUrl(release.downloadUrl);
+              },
+              child: Text(l10n.t('updateBrowser')),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.t('updateLater')),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _openUrl(release.downloadUrl);
-            },
-            child: Text(l10n.t('updateDownload')),
-          ),
-        ],
       ),
     );
   }

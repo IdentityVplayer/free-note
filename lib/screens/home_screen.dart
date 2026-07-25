@@ -704,6 +704,15 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (provider.syncedNoteIds.contains(note.id))
+                const Padding(
+                  padding: EdgeInsets.only(left: 4),
+                  child: Icon(
+                    Icons.check_circle,
+                    size: 16,
+                    color: Colors.green,
+                  ),
+                ),
             ],
           ),
           subtitle: Column(

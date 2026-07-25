@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **278**（三语一致，截至 v1.14.0） |
-| 当前稳定版本 | `1.14.0+44`（已发布，tag `v1.14.0`） |
+| i18n key 总数 | **281**（三语一致，截至 v1.15.0） |
+| 当前稳定版本 | `1.15.0+45`（已发布，tag `v1.15.0`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。

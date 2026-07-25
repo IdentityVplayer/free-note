@@ -60,26 +60,14 @@ class TaskPlanScreenState extends State<TaskPlanScreen> {
     if (widget.autoAdd && mounted) _showTaskDialog();
   }
 
-  /// Persist the current [\_tasks] to disk. Guards: never writes an empty list
-  /// when the on-disk file already has data (to prevent the "completing a
-  /// subtask clears all tasks" bug). Always calls setState so the UI refreshes.
+  /// Persist the current [\_tasks] to disk. Trust the in-memory state as the
+  /// user's intent — including an empty list (which means "delete all"). The
+  /// previous empty-guard used to silently reload from disk, which actually
+  /// **undid** deletions of the last task; that's the bug we just removed.
   Future<void> _persist() async {
-    if (_tasks.isEmpty) {
-      try {
-        final existing = await TaskService.instance.loadTasks();
-        if (existing.isNotEmpty) {
-          // Block the empty save, but reload from disk to fix UI.
-          _tasks
-            ..clear()
-            ..addAll(existing);
-        }
-      } catch (_) {}
-    }
     _tasks.sort(Task.compareForDisplay);
     await TaskService.instance.saveTasks(_tasks);
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _addTask(Task task) async {
