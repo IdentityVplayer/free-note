@@ -1,5 +1,10 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.15.9
+
+### Fixed
+- **v1.15.8 Android CI 仍失败（真实根因）** — 不是 androidx.core 缺失，而是 `MainActivity.kt` lambda 里的裸 `return` 报错（Kotlin 不允许非 inline lambda 用裸 return）。修复：lambda 加 `handler@` 标签，`return` → `return@handler`；清理未使用 import。
+
 ## 1.15.8
 
 ### Fixed

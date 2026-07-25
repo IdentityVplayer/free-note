@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **274**（三语一致，截至 v1.15.8） |
-| 当前稳定版本 | `1.15.8+53`（已发布，tag `v1.15.8`） |
+| i18n key 总数 | **274**（三语一致，截至 v1.15.9） |
+| 当前稳定版本 | `1.15.9+54`（已发布，tag `v1.15.9`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -240,6 +240,11 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 3. ✅ `build_release.yml` 简化：删除 `flutter build appbundle` 步骤（与 APK 重复）；windows/web 加 `continue-on-error: true`（编译失败不阻塞 Android release）。
 4. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
 5. ✅ bump `pubspec.yaml` 版本 `1.15.7+52` → `1.15.8+53`；最终 commit / tag / push。
+
+### v1.15.9 最终化（已完成 ✅，2026-07-25）
+1. ✅ **fix：v1.15.8 Android CI 仍然失败** — 根因不是 androidx.core 缺失，而是 `MainActivity.kt` 里 `setMethodCallHandler { ... }` lambda 中的 `return`（line 36）。Kotlin 编译器不允许非 inline lambda 中使用裸 `return`。修复：lambda 加 `handler@` 标签，`return` → `return@handler`；同时删除未使用的 import（DownloadManager/BroadcastReceiver/Context/IntentFilter）。
+2. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
+3. ✅ bump `pubspec.yaml` 版本 `1.15.8+53` → `1.15.9+54`；最终 commit / tag / push。
 
 ---
 

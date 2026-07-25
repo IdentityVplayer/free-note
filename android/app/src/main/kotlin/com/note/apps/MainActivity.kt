@@ -1,10 +1,6 @@
 package com.note.apps
 
-import android.app.DownloadManager
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -19,7 +15,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
-            .setMethodCallHandler { call, result ->
+            .setMethodCallHandler handler@{ call, result ->
                 when (call.method) {
                     "getPrimaryAbi" -> {
                         val abi = if (Build.SUPPORTED_ABIS.isNotEmpty()) {
@@ -33,7 +29,7 @@ class MainActivity : FlutterActivity() {
                         val path = call.argument<String>("path")
                         if (path == null) {
                             result.error("bad_args", "path missing", null)
-                            return
+                            return@handler
                         }
                         try {
                             installApk(path)
