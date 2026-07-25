@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Expose the public Downloads directory so MainActivity.installApk()
+         can hand an APK URI to the system package installer. -->
+    <external-path
+        name="downloads"
+        path="Download/" />
+    <external-files-path
+        name="external_files"
+        path="." />
+    <files-path
+        name="internal_files"
+        path="." />
+</paths>

@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
-import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,11 +7,12 @@ import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../providers/app_provider.dart';
-import '../utils/app_arch.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../services/github_sync_service.dart';
 import '../services/notification_service.dart';
+import '../utils/app_arch.dart';
+import '../utils/curl_downloader.dart';
 import '../markdown/math_markdown.dart';
 import '../l10n/app_localizations.dart';
 import '../models/settings.dart';
@@ -241,12 +240,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         : 'https://xget.xi-xu.me/gh/IdentityVplayer/free-note/releases/download/'
               '${Uri.encodeComponent(release.tagName)}/'
               '${Uri.encodeComponent(p.basename(Uri.parse(apkAsset).path))}';
-    String?
-    downloadState; // null / "downloading:X%" / "done:path" / "error:msg"
+    int pct = -1; // -1 = idle, 0..100 = progress, 101 = done
+    String? errorMsg;
     final cancelled = ValueNotifier<bool>(false);
+    // Default save path: <repo>/download/free-note-<current_version>.apk
+    final info = await PackageInfo.fromPlatform();
+    final saveDir = await _defaultDownloadDir();
+    final savePath = p.join(saveDir, 'free-note-${info.version}.apk');
+    final ctx = context;
+    if (!mounted) return;
 
     showDialog(
-      context: context,
+      // ignore: use_build_context_synchronously
+      context: ctx,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setInner) => AlertDialog(
           title: Text('${l10n.t('updateAvailable')} (${release.tagName})'),
@@ -257,7 +264,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (downloadState == null)
+                  if (pct < 0)
                     safeMarkdown(
                       data: release.body.isEmpty
                           ? release.tagName
@@ -271,40 +278,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: const TextStyle(color: Colors.red),
                       ),
                     ),
-                  if (downloadState != null &&
-                      downloadState!.startsWith('downloading:'))
-                    Builder(
-                      builder: (_) {
-                        final pct =
-                            int.tryParse(downloadState!.substring(11)) ?? 0;
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              LinearProgressIndicator(value: pct / 100),
-                              const SizedBox(height: 6),
-                              Text('正在下载 APK… $pct%'),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  if (downloadState != null &&
-                      downloadState!.startsWith('done:'))
+                  if (pct >= 0 && pct < 101)
                     Padding(
                       padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        'APK 已保存到: ${downloadState!.substring(5)}',
-                        style: const TextStyle(color: Colors.green),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          LinearProgressIndicator(
+                            value: pct.clamp(0, 100) / 100,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(pct == 0 ? '正在连接…' : '下载中… $pct%'),
+                        ],
                       ),
                     ),
-                  if (downloadState != null &&
-                      downloadState!.startsWith('error:'))
+                  if (pct >= 101)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.check_circle, color: Colors.green),
+                          SizedBox(width: 8),
+                          Text('下载完成'),
+                        ],
+                      ),
+                    ),
+                  if (errorMsg != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: Text(
-                        '下载失败: ${downloadState!.substring(6)}',
+                        '下载失败: $errorMsg',
                         style: const TextStyle(color: Colors.red),
                       ),
                     ),
@@ -313,67 +316,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () {
-                cancelled.value = true;
-                Navigator.pop(ctx);
-              },
-              child: Text(l10n.t('updateLater')),
-            ),
-            if (apkUrl != null &&
-                (downloadState == null || downloadState!.startsWith('error:')))
+            if (pct < 101 && errorMsg == null)
+              TextButton(
+                onPressed: () {
+                  cancelled.value = true;
+                  Navigator.pop(ctx);
+                },
+                child: Text(l10n.t('updateLater')),
+              ),
+            if (apkUrl != null && pct < 0)
               FilledButton.icon(
                 icon: const Icon(Icons.download, size: 18),
                 label: Text(l10n.t('updateDownload')),
                 onPressed: () async {
-                  setInner(() => downloadState = 'downloading:0');
-                  try {
-                    final info = await PackageInfo.fromPlatform();
-                    final req = http.Request('GET', Uri.parse(apkUrl));
-                    final stream = await http.Client().send(req);
-                    final total = stream.contentLength ?? 0;
-                    final bytes = <int>[];
-                    var received = 0;
-                    await for (final chunk in stream.stream) {
-                      if (cancelled.value) break;
-                      bytes.addAll(chunk);
-                      received += chunk.length;
-                      final pct = total > 0
-                          ? ((received / total) * 100).clamp(0, 100).toInt()
-                          : 0;
-                      setInner(() => downloadState = 'downloading:$pct');
-                    }
-                    if (cancelled.value) return;
-                    if (received == 0) {
-                      setInner(() => downloadState = 'error:0 bytes');
-                      return;
-                    }
-                    final path = await FilePicker.saveFile(
-                      dialogTitle: l10n.t('updateDownload'),
-                      fileName: 'free-note-${info.version}.apk',
-                      bytes: Uint8List.fromList(bytes),
-                    );
-                    if (path != null) {
-                      setInner(() => downloadState = 'done:$path');
-                    } else {
-                      setInner(() => downloadState = null);
-                    }
-                  } catch (e) {
-                    setInner(() => downloadState = 'error:$e');
+                  setInner(() => pct = 0);
+                  final ok = await CurlDownloader.download(
+                    apkUrl,
+                    savePath,
+                    onProgress: (p) {
+                      if (cancelled.value) return;
+                      setInner(() => pct = p);
+                    },
+                  );
+                  if (cancelled.value) return;
+                  if (!ok) {
+                    setInner(() {
+                      errorMsg = '下载失败（curl/HTTP 错误）';
+                      pct = -1;
+                    });
+                    return;
                   }
+                  setInner(() => pct = 101);
+                  // Auto-install via the OS default installer.
+                  try {
+                    await CurlDownloader.installApk(savePath);
+                  } catch (_) {}
                 },
               ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _openUrl(release.downloadUrl);
-              },
-              child: Text(l10n.t('updateBrowser')),
-            ),
+            if (pct >= 101)
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('完成'),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  /// Default directory for downloads: `<notes folder>/download/`.
+  Future<String> _defaultDownloadDir() async {
+    final storage = StorageService.instance;
+    if (storage.hasFolder) {
+      return p.join(storage.currentFolder!, 'download');
+    }
+    // Fall back to a directory inside the app config dir.
+    final cfgDir = await storage.configDir;
+    return p.join(cfgDir.path, 'download');
   }
 
   Future<void> _exportData() async {

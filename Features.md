@@ -1,5 +1,16 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.15.7
+
+### Added
+- **APK 下载：curl + 实时进度条** — 新增 `curl_downloader.dart`：桌面平台调 `Process.start('curl')`，解析 stderr 上的 `\r` 进度行填充到 `LinearProgressIndicator`；Android 走 `HttpClient` 字节流 + 文件大小轮询兜底。
+- **默认下载目录 `<repo>/download/`** — 文件名 `free-note-{version}.apk`。
+- **下载完成自动调用系统默认安装器** — Android 通过新增的 MethodChannel `installApk`（MainActivity 复制 APK 到公共 Downloads 后用 FileProvider 触发 `ACTION_VIEW`）；桌面平台用 `xdg-open` / `open` / `cmd start`。
+- **Android FileProvider 声明** + `res/xml/file_provider_paths.xml`。
+
+### Fixed
+- **APK 下载进度条始终 0%** — 之前 http stream 的 `contentLength` 经常 -1（chunked 或无 Content-Length 头），导致百分比永远算为 0。现在用 curl 实时捕获 stderr 上的百分比。
+
 ## 1.15.6
 
 ### Added
