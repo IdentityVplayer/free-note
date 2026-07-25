@@ -173,10 +173,10 @@ class AppProvider extends ChangeNotifier
     return out;
   }
 
-  /// Scan the entire local notes folder for files that are NOT managed as
-  /// [Note] objects and NOT config files — e.g. images, PDFs, or any other
-  /// non-`.md` files placed by the user. Returns a map of relative-path →
-  /// raw text content.
+  /// Scan the entire local notes folder (recursively, including all
+  /// subdirectories) for files that are NOT managed as [Note] objects and
+  /// NOT config files. Returns a map of relative-path → raw file bytes
+  /// (base64 happens inside the sync service).
   Future<Map<String, List<int>>> _readExtraFiles() async {
     final out = <String, List<int>>{};
     if (!_storage.hasFolder) return out;
@@ -192,8 +192,6 @@ class AppProvider extends ChangeNotifier
         final rel = p.relative(entity.path, from: base);
         // Skip note files and config files — they are handled separately.
         if (rel.startsWith('.config/') || rel.endsWith('.md')) continue;
-        // Skip hidden files (starting with dot).
-        if (rel.split('/').any((s) => s.startsWith('.'))) continue;
         try {
           out[rel] = entity.readAsBytesSync();
         } catch (_) {

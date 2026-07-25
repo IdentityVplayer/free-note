@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../providers/app_provider.dart';
+import '../utils/app_arch.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../services/github_sync_service.dart';
@@ -172,6 +174,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<({String version, String arch})> _loadAppInfo() async {
+    final info = await PackageInfo.fromPlatform();
+    final arch = await AppArch.detect();
+    return (version: info.version, arch: arch);
+  }
+
   Future<void> _checkUpdate() async {
     final l10n = AppLocalizations.of(context)!;
     final release = await fetchLatestRelease('IdentityVplayer/free-note');
@@ -189,13 +197,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _showUpdateDialog(GitHubRelease release) {
+  /// Choose the APK asset URL that matches the current app's CPU arch. Falls
+  /// back to a sensible default (arm64-v8a / x64) when not found.
+  String? _pickApkForArch(GitHubRelease release, String arch) {
+    final filtered = release.assetUrls
+        .where((u) => u.endsWith('.apk'))
+        .toList();
+    if (filtered.isEmpty) return null;
+    String? pick;
+    String? fallback;
+    for (final url in filtered) {
+      final lower = url.toLowerCase();
+      if (lower.contains(arch.toLowerCase())) {
+        pick = url;
+        break;
+      }
+      if (arch.contains('arm64') && lower.contains('arm64-v8a')) {
+        fallback ??= url;
+      } else if ((arch.contains('x86_64') || arch.contains('x64')) &&
+          (lower.contains('x86_64') || lower.contains('x64'))) {
+        fallback ??= url;
+      }
+    }
+    return pick ?? fallback ?? filtered.first;
+  }
+
+  void _showUpdateDialog(GitHubRelease release) async {
     final l10n = AppLocalizations.of(context)!;
-    // Find the APK asset URL (arm64-v8a recommended).
-    final apkUrl = release.assetUrls
-        .where((u) => u.contains('arm64-v8a') && u.endsWith('.apk'))
-        .firstOrNull;
-    String? downloadState; // null / "downloading" / "done:path"
+    final arch = await AppArch.detect();
+    if (!mounted) return;
+    // Pick the APK matching the running app's architecture; fall back to
+    // arm64-v8a (most common on Android) / x64 (Windows) if not present.
+    final apkAsset = _pickApkForArch(release, arch);
+    // Rewrite to the xget mirror so we don't need GitHub network access
+    // (xget is the XGet CDN proxy used by some Chinese free-note users).
+    final apkUrl = apkAsset == null
+        ? null
+        : 'https://xget.xi-xu.me/gh/IdentityVplayer/free-note/releases/download/'
+              '${Uri.encodeComponent(release.tagName)}/'
+              '${Uri.encodeComponent(p.basename(Uri.parse(apkAsset).path))}';
+    String?
+    downloadState; // null / "downloading:X%" / "done:path" / "error:msg"
+    final cancelled = ValueNotifier<bool>(false);
 
     showDialog(
       context: context,
@@ -207,6 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (downloadState == null)
                     safeMarkdown(
@@ -214,16 +258,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ? release.tagName
                           : release.body,
                     ),
-                  if (downloadState == 'downloading')
-                    const Padding(
-                      padding: EdgeInsets.only(top: 12),
-                      child: Column(
-                        children: [
-                          LinearProgressIndicator(),
-                          SizedBox(height: 8),
-                          Text('正在下载 APK…'),
-                        ],
+                  if (apkUrl == null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        '未找到匹配当前架构 ($arch) 的 APK',
+                        style: const TextStyle(color: Colors.red),
                       ),
+                    ),
+                  if (downloadState != null &&
+                      downloadState!.startsWith('downloading:'))
+                    Builder(
+                      builder: (_) {
+                        final pct =
+                            int.tryParse(downloadState!.substring(11)) ?? 0;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              LinearProgressIndicator(value: pct / 100),
+                              const SizedBox(height: 6),
+                              Text('正在下载 APK… $pct%'),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   if (downloadState != null &&
                       downloadState!.startsWith('done:'))
@@ -234,51 +294,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: const TextStyle(color: Colors.green),
                       ),
                     ),
+                  if (downloadState != null &&
+                      downloadState!.startsWith('error:'))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        '下载失败: ${downloadState!.substring(6)}',
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: () {
+                cancelled.value = true;
+                Navigator.pop(ctx);
+              },
               child: Text(l10n.t('updateLater')),
             ),
-            if (apkUrl != null && downloadState == null)
+            if (apkUrl != null &&
+                (downloadState == null || downloadState!.startsWith('error:')))
               FilledButton.icon(
                 icon: const Icon(Icons.download, size: 18),
                 label: Text(l10n.t('updateDownload')),
                 onPressed: () async {
-                  setInner(() => downloadState = 'downloading');
+                  setInner(() => downloadState = 'downloading:0');
                   try {
-                    final response = await http.get(Uri.parse(apkUrl));
-                    if (response.statusCode == 200) {
-                      final path = await FilePicker.saveFile(
-                        dialogTitle: l10n.t('updateDownload'),
-                        fileName: p.basename(Uri.parse(apkUrl).path),
-                        bytes: response.bodyBytes,
-                      );
-                      if (path != null) {
-                        setInner(() => downloadState = 'done:$path');
-                      } else {
-                        setInner(() => downloadState = null);
-                      }
+                    final info = await PackageInfo.fromPlatform();
+                    final req = http.Request('GET', Uri.parse(apkUrl));
+                    final stream = await http.Client().send(req);
+                    final total = stream.contentLength ?? 0;
+                    final bytes = <int>[];
+                    var received = 0;
+                    await for (final chunk in stream.stream) {
+                      if (cancelled.value) break;
+                      bytes.addAll(chunk);
+                      received += chunk.length;
+                      final pct = total > 0
+                          ? ((received / total) * 100).clamp(0, 100).toInt()
+                          : 0;
+                      setInner(() => downloadState = 'downloading:$pct');
+                    }
+                    if (cancelled.value) return;
+                    if (received == 0) {
+                      setInner(() => downloadState = 'error:0 bytes');
+                      return;
+                    }
+                    final path = await FilePicker.saveFile(
+                      dialogTitle: l10n.t('updateDownload'),
+                      fileName: 'free-note-${info.version}.apk',
+                      bytes: Uint8List.fromList(bytes),
+                    );
+                    if (path != null) {
+                      setInner(() => downloadState = 'done:$path');
                     } else {
                       setInner(() => downloadState = null);
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(
-                            content: Text('下载失败 (${response.statusCode})'),
-                          ),
-                        );
-                      }
                     }
                   } catch (e) {
-                    setInner(() => downloadState = null);
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(
-                        ctx,
-                      ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
-                    }
+                    setInner(() => downloadState = 'error:$e');
                   }
                 },
               ),
@@ -664,6 +740,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.system_update),
             title: Text(l10n.t('checkUpdate')),
             onTap: _checkUpdate,
+          ),
+          // App info footer — version and CPU architecture.
+          const SizedBox(height: 16),
+          FutureBuilder<({String version, String arch})>(
+            future: _loadAppInfo(),
+            builder: (ctx, snap) {
+              final v = snap.data?.version ?? '?';
+              final arch = snap.data?.arch ?? '?';
+              return Center(
+                child: Text(
+                  'v$v · $arch',
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(ctx).colorScheme.outline,
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 32),
         ],
