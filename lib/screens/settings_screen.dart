@@ -27,7 +27,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late TextEditingController _aiApiKeyController;
+  late List<TextEditingController> _aiKeyControllers;
   late TextEditingController _aiModelController;
   late TextEditingController _aiBaseUrlController;
   late String _language;
@@ -37,7 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _aiModelAddController = TextEditingController();
   String? _themeColorHex;
 
-  /// Whether the (obscured by default) AI API key field is revealed.
+  /// Whether the (obscured by default) AI API key fields are revealed.
   bool _showApiKey = false;
 
   static const List<Color> _themeColors = [
@@ -53,27 +53,90 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     final s = context.read<AppProvider>().settings;
-    _aiApiKeyController = TextEditingController(text: s.aiApiKey ?? '');
+    _aiKeyControllers = s.currentEndpoint.keys
+        .map((k) => TextEditingController(text: k))
+        .toList();
     _aiModelController = TextEditingController(text: s.aiModel);
-    _aiBaseUrlController = TextEditingController(text: s.aiBaseUrl ?? '');
+    _aiBaseUrlController = TextEditingController(
+      text: s.currentEndpoint.baseUrl ?? '',
+    );
     _language = s.languageCode;
     _darkMode = s.isDarkMode;
-    _aiProvider = s.aiProvider;
+    _aiProvider = s.currentAiId.startsWith('custom:')
+        ? 'custom'
+        : s.currentAiId; // show 'custom' in dropdown for any custom endpoint
     _aiModels = List<String>.from(s.aiModels);
     _themeColorHex = s.themeColorHex;
   }
 
   @override
   void dispose() {
-    _aiApiKeyController.dispose();
+    for (final c in _aiKeyControllers) {
+      c.dispose();
+    }
     _aiModelController.dispose();
     _aiBaseUrlController.dispose();
     _aiModelAddController.dispose();
     super.dispose();
   }
 
+  /// Add an empty API key row (used as fallback if key [i] hits a 401/403/429).
+  void _addAiKey() {
+    setState(() {
+      _aiKeyControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeAiKey(int i) {
+    setState(() {
+      final c = _aiKeyControllers.removeAt(i);
+      c.dispose();
+    });
+  }
+
+  /// Re-load the current provider's saved keys into the editor controllers.
+  /// Called when the user changes the provider dropdown so they always edit
+  /// the right set of keys.
+  void _syncKeysToProvider() {
+    final endpoint = context.read<AppProvider>().settings.currentEndpoint;
+    final newKeys = endpoint.keys;
+    // Preserve current edits if the user is still on the same endpoint.
+    if (endpoint.id.startsWith('custom:') &&
+        _aiProvider == 'custom' &&
+        newKeys.length != _aiKeyControllers.length) {
+      // user typed a new key list; skip sync
+    }
+    for (final c in _aiKeyControllers) {
+      c.dispose();
+    }
+    _aiKeyControllers = newKeys
+        .map((k) => TextEditingController(text: k))
+        .toList();
+    // Refresh baseUrl for custom provider too.
+    _aiBaseUrlController.text = endpoint.baseUrl ?? '';
+  }
+
   void _save() {
     final provider = context.read<AppProvider>();
+    // Build the new endpoint list with the user's current edits on the
+    // selected endpoint, plus the unchanged entries for the others.
+    final endpoints = [
+      for (final e in provider.settings.aiEndpoints)
+        if (e.id == provider.settings.currentAiId)
+          e.copyWith(
+            baseUrl: _aiProvider == 'custom'
+                ? (_aiBaseUrlController.text.trim().isEmpty
+                      ? null
+                      : _aiBaseUrlController.text.trim())
+                : null,
+            keys: _aiKeyControllers
+                .map((c) => c.text.trim())
+                .where((k) => k.isNotEmpty)
+                .toList(),
+          )
+        else
+          e,
+    ];
     provider.updateSettings(
       AppSettings(
         languageCode: _language,
@@ -82,14 +145,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         githubRepo: provider.settings.githubRepo,
         githubClientId: provider.settings.githubClientId,
         githubUsername: provider.settings.githubUsername,
-        aiApiKey: _aiApiKeyController.text.trim(),
         aiModel: _aiModelController.text.trim(),
         autoSync: provider.settings.autoSync,
         enableAI: true,
-        aiProvider: _aiProvider,
-        aiBaseUrl: _aiBaseUrlController.text.trim().isEmpty
-            ? null
-            : _aiBaseUrlController.text.trim(),
+        aiEndpoints: endpoints,
+        currentAiId: _aiProvider == 'custom'
+            ? 'custom:${DateTime.now().microsecondsSinceEpoch}'
+            : _aiProvider,
         themeColorHex: _themeColorHex,
         notesFolderPath: provider.settings.notesFolderPath,
         repositories: provider.settings.repositories,
@@ -588,6 +650,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   if (_aiModels.isEmpty) {
                     _aiModels = [AIService.defaultModelFor(v)];
                   }
+                  // Reset key list to the chosen provider's existing keys.
+                  _syncKeysToProvider();
                 });
               },
             ),
@@ -606,43 +670,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          // AI API keys — multi-key with fallback. The first row is what the
+          // app tries first; subsequent rows are tried when the previous one
+          // fails (auth / rate-limit). Empty rows are ignored.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              controller: _aiApiKeyController,
-              decoration: InputDecoration(
-                labelText: l10n.t('aiApiKey'),
-                border: const OutlineInputBorder(),
-                hintText: 'sk-...',
-                // Eye toggle: the key stays hidden by default so it is never
-                // leaked on screen. The built-in key is never shown here.
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _showApiKey ? Icons.visibility : Icons.visibility_off,
-                  ),
-                  tooltip: _showApiKey ? l10n.t('hide') : l10n.t('show'),
-                  onPressed: () => setState(() => _showApiKey = !_showApiKey),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${l10n.t('aiApiKey')}（多 Key 自动 fallback）',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: _showApiKey ? l10n.t('hide') : l10n.t('show'),
+                      icon: Icon(
+                        _showApiKey ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () =>
+                          setState(() => _showApiKey = !_showApiKey),
+                    ),
+                  ],
                 ),
-              ),
-              obscureText: !_showApiKey,
-            ),
-          ),
-          // When the user hasn't set their own key, the app falls back to the
-          // built-in key — but we never print that key, only a neutral hint.
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _aiApiKeyController,
-            builder: (ctx, val, _) => val.text.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                const SizedBox(height: 4),
+                for (var i = 0; i < _aiKeyControllers.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _aiKeyControllers[i],
+                            obscureText: !_showApiKey,
+                            decoration: InputDecoration(
+                              labelText: i == 0 ? 'Key 1（主）' : 'Key ${i + 1}',
+                              border: const OutlineInputBorder(),
+                              hintText: 'sk-...',
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '删除',
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _removeAiKey(i),
+                        ),
+                      ],
+                    ),
+                  ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('添加 Key'),
+                    onPressed: _addAiKey,
+                  ),
+                ),
+                if (_aiKeyControllers.every((c) => c.text.trim().isEmpty))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 6, 0, 0),
                     child: Text(
                       l10n.t('aiBuiltInHint'),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontStyle: FontStyle.italic,
                       ),
                     ),
-                  )
-                : const SizedBox.shrink(),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           Padding(
@@ -784,6 +883,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Sealos AIProxy';
       case 'openrouter':
         return 'OpenRouter';
+      case 'huggingface':
+        return 'Hugging Face';
       case 'custom':
         return l10n.t('customProvider');
       default:

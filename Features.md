@@ -1,5 +1,15 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.17.0
+
+### Added
+- **HuggingFace AI Provider** — `AIProviderPresets.order` 新增 `huggingface`，默认模型 `meta-llama/Meta-Llama-3-8B-Instruct`，端点 `https://router.huggingface.co/v1`（OpenAI 兼容路由）。
+- **AI 多 Key 顺序 fallback** — 之前每个 provider 只能配一把 key。新版用 `AiEndpoint` 模型，每个 provider 维护一个有序 `keys` 列表；`AIService` 在 401/403/429/网络错误时自动切换下一把 key 用。
+- **AI 设置页：多 Key UI** — 同一 provider 下可添加/删除任意数量的 API Key；列表渲染带显示/隐藏切换 + 每行删除按钮 + 底部"+ 添加 Key"。
+
+### Changed
+- **编辑器手感** — 按 Enter 时键盘不再闪烁收起/展开（autofocus + 不主动 requestFocus）。预览支持跨行选择复制（包了 `SelectionArea` + MarkdownBody 改 `selectable: true`）。活动行内按 ↑/↓ 在行首/末可一键跳到上一/下一行（FocusNode.onKeyEvent 拦截 arrow keys）。
+
 ## 1.16.1
 
 ### Added

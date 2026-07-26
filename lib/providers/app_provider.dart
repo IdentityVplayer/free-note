@@ -464,20 +464,20 @@ class AppProvider extends ChangeNotifier
   /// Whether the user has supplied their own API key (vs. relying on the
   /// built-in fallback).
   static bool _hasOwnKey(AppSettings s) =>
-      s.aiApiKey != null && s.aiApiKey!.isNotEmpty;
+      s.currentEndpoint.keys.any((k) => k.isNotEmpty);
 
   /// Configure an [AIService] from user settings. When the user has set their
-  /// own key, their chosen provider + model + baseUrl are respected. When there
-  /// is no user key, the built-in OpenRouter key is used and the endpoint +
-  /// model are forced to OpenRouter — otherwise the built-in PAT would be sent
-  /// to the wrong API and silently fail.
+  /// own key(s), their chosen provider + model + baseUrl are respected. When
+  /// there are no user keys, the built-in OpenRouter key is used and the
+  /// endpoint + model are forced to OpenRouter — otherwise the built-in PAT
+  /// would be sent to the wrong API and silently fail.
   void _configureAiService(AIService ai, AppSettings s) {
     if (_hasOwnKey(s)) {
-      ai.apiKey = s.aiApiKey;
+      ai.apiKeys = s.currentEndpoint.keys;
       ai.baseUrl = s.resolvedAiBaseUrl;
       ai.model = s.aiModel;
     } else {
-      ai.apiKey = AIService.builtInKey;
+      ai.apiKeys = [AIService.builtInKey];
       ai.baseUrl = AIProviderPresets.baseUrlFor('openrouter');
       ai.model = AIService.defaultModelFor('openrouter');
     }

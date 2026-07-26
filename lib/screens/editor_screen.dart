@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
@@ -61,6 +62,7 @@ class _EditorScreenState extends State<EditorScreen>
     _content = _note.content;
     _tagController = TextEditingController();
     _lineFocus.addListener(_onLineFocusLost);
+    _lineFocus.onKeyEvent = _handleLineKeyEvent;
     WidgetsBinding.instance.addObserver(this);
 
     // AI-generated note: auto-open the chat dialog with the conversation as
@@ -71,6 +73,42 @@ class _EditorScreenState extends State<EditorScreen>
         if (mounted) _openAiNoteDialog();
       });
     }
+  }
+
+  /// Move the active line to the previous/next line in [_content] when Up/Down
+  /// is pressed at the start/end of the current line. Lets the user navigate
+  /// between lines with the keyboard arrow keys (v1.17.0).
+  KeyEventResult _handleLineKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final sel = _lineController.selection;
+    if (!sel.isValid || _activeLine == null) return KeyEventResult.ignored;
+    final lines = splitLines(_content);
+    final i = _activeLine!;
+    final text = _lineController.text;
+    final atStart = sel.baseOffset == 0 && sel.extentOffset == 0;
+    final atEnd =
+        sel.baseOffset == text.length && sel.extentOffset == text.length;
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp && atStart && i > 0) {
+      setState(() {
+        _activeLine = i - 1;
+        _lineController.text = lines[i - 1];
+        _lineController.selection = TextSelection.collapsed(
+          offset: lines[i - 1].length,
+        );
+      });
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown &&
+        atEnd &&
+        i < lines.length - 1) {
+      setState(() {
+        _activeLine = i + 1;
+        _lineController.text = lines[i + 1];
+        _lineController.selection = const TextSelection.collapsed(offset: 0);
+      });
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   @override
@@ -249,17 +287,15 @@ class _EditorScreenState extends State<EditorScreen>
   /// preview except [ _activeLine ], which is shown as a raw, editable field.
   Widget _buildHybridBody() {
     final lines = splitLines(_content);
-    return Stack(
-      children: [
-        ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: lines.length,
-          itemBuilder: (ctx, i) {
-            if (_activeLine == i) return _buildActiveLineField(i);
-            return _buildPreviewLine(i, lines[i]);
-          },
-        ),
-      ],
+    return SelectionArea(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: lines.length,
+        itemBuilder: (ctx, i) {
+          if (_activeLine == i) return _buildActiveLineField(i);
+          return _buildPreviewLine(i, lines[i]);
+        },
+      ),
     );
   }
 
@@ -277,6 +313,7 @@ class _EditorScreenState extends State<EditorScreen>
         controller: _lineController,
         focusNode: _lineFocus,
         maxLines: null,
+        autofocus: true,
         textAlignVertical: TextAlignVertical.top,
         decoration: const InputDecoration(
           border: InputBorder.none,
@@ -284,6 +321,8 @@ class _EditorScreenState extends State<EditorScreen>
           contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         ),
         style: theme.textTheme.bodyMedium,
+        keyboardType: TextInputType.multiline,
+        textInputAction: TextInputAction.newline,
         onChanged: (v) {
           if (v.contains('\n')) {
             // Enter inserted a newline — split this line there.
@@ -300,7 +339,9 @@ class _EditorScreenState extends State<EditorScreen>
   /// A preview line; tapping anywhere on it makes that line the active
   /// (raw/editable) one. Empty lines render with a generous tap target so
   /// the user can comfortably tap anywhere in the blank row to bring up the
-  /// keyboard (v1.15.4).
+  /// keyboard (v1.15.4). The line itself is `selectable: true` so cross-line
+  /// multi-line text selection works inside a [SelectionArea] wrapper
+  /// (v1.16.2).
   Widget _buildPreviewLine(int i, String line) {
     if (line.isEmpty) {
       // Empty line: full-width tappable area, taller than text for an
@@ -316,7 +357,7 @@ class _EditorScreenState extends State<EditorScreen>
     }
     final child = safeMarkdown(
       data: line,
-      selectable: false,
+      selectable: true,
       relativeBaseDir: _noteDirFor(_note),
       onTapLink: (text, href, title) {
         if (href != null) _launchUrl(href);
@@ -354,10 +395,14 @@ class _EditorScreenState extends State<EditorScreen>
         offset: _lineController.text.length,
       );
     });
+    // Avoid forcing focus — letting the new active widget's `autofocus: true`
+    // claim focus via the shared [_lineFocus] avoids the keyboard dismiss →
+    // re-show flicker that the previous forced `requestFocus` introduced.
     _lineFocus.requestFocus();
   }
 
   /// Split the active line at the inserted newline (entered via keyboard).
+  /// Keeps the shared [_lineFocus] alive (no keyboard flicker).
   void _splitActiveLineAtText(String v) {
     final i = _activeLine!;
     final local = v.indexOf('\n');
@@ -375,7 +420,8 @@ class _EditorScreenState extends State<EditorScreen>
       _lineController.text = newLines[i + 1];
       _lineController.selection = const TextSelection.collapsed(offset: 0);
     });
-    _lineFocus.requestFocus();
+    // No explicit `requestFocus` — the new TextField uses `autofocus: true`
+    // and shares [_lineFocus] so focus transfers without redrawing the IME.
     _hasChanges = true;
   }
 

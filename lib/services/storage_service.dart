@@ -262,14 +262,13 @@ class StorageService {
     // Merge secrets from the dedicated secrets file. Fall back to any legacy
     // secrets still embedded in settings.json for backward compatibility.
     final secrets = await _loadSecrets();
-    final key = secrets.aiApiKey ?? settings.aiApiKey;
-    final token = secrets.githubToken ?? settings.githubToken;
-    settings = settings.copyWith(aiApiKey: key, githubToken: token);
+    settings = settings.copyWith(
+      currentAiId: settings.currentAiId,
+      githubToken: secrets.githubToken ?? settings.githubToken,
+    );
 
-    // If secrets.json had nothing but the legacy settings still carried them,
-    // persist them into secrets.json (and rewrite settings.json without them).
-    if ((secrets.aiApiKey == null || secrets.githubToken == null) &&
-        (settings.aiApiKey != null || settings.githubToken != null)) {
+    // Persist secrets (githubToken) back if migrated from legacy.
+    if (secrets.githubToken == null && settings.githubToken != null) {
       await saveSettings(settings);
     }
     return settings;
@@ -282,25 +281,29 @@ class StorageService {
   }
 
   /// Load secrets from the dedicated `.config/secrets.json` (with `.bak`
-  /// fallback). Returns nulls when absent or unreadable.
-  Future<({String? aiApiKey, String? githubToken})> _loadSecrets() async {
+  /// fallback). Only [githubToken] is stored here in v1.17.0+; AI API keys
+  /// are persisted as base64 entries inside the endpoints themselves in
+  /// settings.json (so they remain bound to the right endpoint even when the
+  /// user reorders the list).
+  Future<({String? githubToken})> _loadSecrets() async {
     final json = await readJsonWithBackup('secrets.json');
-    if (json == null) return (aiApiKey: null, githubToken: null);
+    if (json == null) return (githubToken: null);
     try {
       final map = json as Map<String, dynamic>;
+      // Tolerate the v1.16 `aiApiKey` field as legacy; ignore it here, the
+      // AppSettings migration code reads it from settings.json.
       return (
-        aiApiKey: AppSettings.decodeSecret(map['aiApiKey'] as String?),
         githubToken: AppSettings.decodeSecret(map['githubToken'] as String?),
       );
     } catch (_) {
-      return (aiApiKey: null, githubToken: null);
+      return (githubToken: null);
     }
   }
 
-  /// Persist secrets to the dedicated `.config/secrets.json`.
+  /// Persist only [githubToken] to `.config/secrets.json`. AI keys live in
+  /// settings.json (inside their endpoint's `keys` list, base64-encoded).
   Future<void> _saveSecrets(AppSettings settings) async {
     await writeJsonAtomic('secrets.json', {
-      'aiApiKey': AppSettings.encodeSecret(settings.aiApiKey),
       'githubToken': AppSettings.encodeSecret(settings.githubToken),
     });
   }

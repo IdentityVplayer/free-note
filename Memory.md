@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **277**（三语一致，截至 v1.16.1） |
-| 当前稳定版本 | `1.16.1+56`（已发布，tag `v1.16.1`） |
+| i18n key 总数 | **277**（三语一致，截至 v1.17.0） |
+| 当前稳定版本 | `1.17.0+57`（已发布，tag `v1.17.0`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -262,6 +262,22 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
    - `AppProvider._handleTaskAction` 区分 `actionOk`（标记 done + 取消 reminder + 保存 tasks.json）和 `actionIgnore`（仅取消 reminder）
 2. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
 3. ✅ bump `pubspec.yaml` 版本 `1.16.0+55` → `1.16.1+56`；最终 commit / tag / push。
+
+### v1.17.0 最终化（已完成 ✅，2026-07-25）
+1. ✅ **fix：编辑器手感优化** — 之前编辑器按 Enter 时键盘因 `setState` 重建而短暂收起/再次弹出；预览无法跨行选择。改造：
+   - 活动行 TextField：`maxLines: null` + `autofocus: true` + `keyboardType: multiline` + `textInputAction: newline`
+   - `_splitActiveLineAtText` 移除 `_lineFocus.requestFocus()` 显式调用，让 FocusNode + autofocus 隐式保持键盘
+   - `_buildHybridBody` 用 `SelectionArea` 包裹整个 ListView → 跨行多选支持
+   - `_buildPreviewLine` 改用 `safeMarkdown(selectable: true)` → MarkdownBody 文本可选中复制
+   - `_lineFocus.onKeyEvent` 监听 `LogicalKeyboardKey.arrowUp/arrowDown` 在行首/末时切换 `_activeLine`（向上/向下时移动活动行）
+2. ✅ **add：HuggingFace AI Provider** — `AIProviderPresets` 增加 `huggingface = https://router.huggingface.co/v1`，默认模型 `meta-llama/Meta-Llama-3-8B-Instruct`。
+3. ✅ **add：AI 多 Key 顺序 fallback + 自定义 Provider 模型** — 之前 `aiApiKey: String?` 限制单 key；新版引入 `AiEndpoint` class（id / label / baseUrl / keys / builtinKey）和 `aiEndpoints: List<AiEndpoint>`，每个 endpoint 持有一个有序 key 列表：
+   - `AIService._askWithFallback()` 按 `apiKeys` 顺序尝试调用，401/403/429 → 自动 next key，直到用完或成功
+   - `AppProvider._configureAiService()` 从 `currentEndpoint.keys` 加载 keys
+   - `StorageService` 新格式：settings.json 存 endpoints，secrets.json 仅存 `githubToken`；旧 `aiApiKey` 单字符串在 `AppSettings.fromJson` 中 migrate 到 endpoint.keys[0]
+   - 设置页 AI 区块：多 Key 列表 + "+ 添加 Key" + 各 key 的"删除"按钮 + 整体 Key 显示/隐藏切换
+4. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
+5. ✅ bump `pubspec.yaml` 版本 `1.16.1+56` → `1.17.0+57`；最终 commit / tag / push。
 
 ---
 

@@ -12,17 +12,28 @@ class AIException implements Exception {
 }
 
 /// AI service for writing assistance and Q&A.
-/// Supports OpenAI-compatible API endpoints.
+/// Supports OpenAI-compatible API endpoints and a fallback chain of API keys
+/// (v1.17.0): the first non-empty key is used first; if the call returns
+/// 401 / 403 / 429, the next key is tried until one succeeds or all are
+/// exhausted.
 class AIService {
-  String? apiKey;
+  /// Ordered list of API keys to try. Index 0 is used first; on auth /
+  /// rate-limit errors the next one is used automatically.
+  List<String> apiKeys;
   String model;
   String baseUrl;
 
   AIService({
-    this.apiKey,
+    List<String>? apiKeys,
     this.model = 'gpt-3.5-turbo',
     this.baseUrl = 'https://api.openai.com/v1',
-  });
+  }) : apiKeys = apiKeys ?? <String>[];
+
+  bool get isConfigured => apiKeys.any((k) => k.isNotEmpty);
+
+  /// Convenience: the first non-empty key.
+  String? get primaryKey =>
+      apiKeys.firstWhere((k) => k.isNotEmpty, orElse: () => '');
 
   /// Built-in fallback API key so AI works out of the box without the user
   /// supplying their own. Resolved by [AppProvider] when no key is set. It is
@@ -31,13 +42,10 @@ class AIService {
   /// The key is stored base64-encoded in source to avoid GitHub secret-scanning
   /// false-positive matches on push.
   static String get builtInKey {
-    // c2stb3ItdjEtNjY3Y2ZmOWIxOTQ2Mjg3ZTEyZTRkOGE2MTA3ZjZkMjJkZTJhM2JkNzgxZTk1NDA1NTJmN2EwNjI3OTAwMWYwMw==
     const encoded =
         'c2stb3ItdjEtNjY3Y2ZmOWIxOTQ2Mjg3ZTEyZTRkOGE2MTA3ZjZkMjJkZTJhM2JkNzgxZTk1NDA1NTJmN2EwNjI3OTAwMWYwMw==';
     return utf8.decode(base64Decode(encoded));
   }
-
-  bool get isConfigured => apiKey != null && apiKey!.isNotEmpty;
 
   /// Sensible default model per provider so the feature works out of the box
   /// once the user fills in a key.
@@ -49,6 +57,7 @@ class AIService {
     'ollama': 'llama3',
     'sealos': 'gpt-4o-mini',
     'openrouter': 'openrouter/free',
+    'huggingface': 'meta-llama/Meta-Llama-3-8B-Instruct',
     'custom': 'gpt-3.5-turbo',
   };
 
@@ -61,15 +70,9 @@ class AIService {
   static bool isKnownDefaultModel(String model) =>
       defaultModel.values.contains(model);
 
-  /// Ask AI a question and get a response.
-  ///
-  /// [model] optionally overrides the service's configured model for this
-  /// single call — used by the in-conversation model switcher.
-  ///
-  /// [history] carries the prior conversation turns (each `{'role','content'}`)
-  /// so a resumed AI chat note is sent back to the model as context —
-  /// without it, only the latest question reaches the API and the model
-  /// loses the conversation stored in the .md file.
+  /// Ask AI a question and get a response. Tries each [apiKeys] entry in
+  /// order; on 401 / 403 / 429 fall back to the next key. Returns the first
+  /// successful response or throws once all keys are exhausted.
   Future<String> ask(
     String question, {
     String? context,
@@ -80,58 +83,34 @@ class AIService {
       throw const AIException('AI 未配置：请先在「设置 → AI」中填写 API Key。');
     }
     final effectiveModel = model ?? this.model;
-    try {
-      final messages = <Map<String, String>>[
-        {
-          'role': 'system',
-          'content':
-              'You are a helpful writing assistant integrated into a note-taking app. '
-              'Provide clear, concise, and useful responses. Support markdown formatting.',
-        },
-      ];
-      // Prior conversation turns (resuming a saved chat). Sent back so the
-      // model keeps the context of the .md chat file.
-      if (history != null && history.isNotEmpty) {
-        messages.addAll(history);
-      }
-      if (context != null && context.isNotEmpty) {
-        messages.add({'role': 'user', 'content': 'Context:\n$context'});
-      }
-      messages.add({'role': 'user', 'content': question});
-
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/chat/completions'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $apiKey',
-            },
-            body: jsonEncode({
-              'model': effectiveModel,
-              'messages': messages,
-              'max_tokens': 2048,
-              'temperature': 0.7,
-            }),
-          )
-          .timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final choices = data['choices'] as List<dynamic>;
-        if (choices.isNotEmpty) {
-          return choices[0]['message']['content'] as String;
-        }
-        throw AIException('AI 返回了空结果。');
-      }
-
-      // Surface the real error from the provider instead of masking it.
-      final detail = _extractError(response);
-      throw AIException('AI 请求失败 (HTTP ${response.statusCode})$detail');
-    } on AIException {
-      rethrow;
-    } catch (e) {
-      throw AIException('AI 请求出错：$e');
+    final messages = <Map<String, String>>[
+      {
+        'role': 'system',
+        'content':
+            'You are a helpful writing assistant integrated into a note-taking app. '
+            'Provide clear, concise, and useful responses. Support markdown formatting.',
+      },
+    ];
+    if (history != null && history.isNotEmpty) {
+      messages.addAll(history);
     }
+    if (context != null && context.isNotEmpty) {
+      messages.add({'role': 'user', 'content': 'Context:\n$context'});
+    }
+    messages.add({'role': 'user', 'content': question});
+
+    final body = jsonEncode({
+      'model': effectiveModel,
+      'messages': messages,
+      'max_tokens': 2048,
+      'temperature': 0.7,
+    });
+
+    return _askWithFallback(
+      body: body,
+      label: '问',
+      noKeysMessage: 'AI 未配置：请先在「设置 → AI」中填写 API Key。',
+    );
   }
 
   /// AI-assisted writing: continue, improve, summarize, translate, or expand.
@@ -140,9 +119,6 @@ class AIService {
     WritingMode mode = WritingMode.continue_,
     String? model,
   }) async {
-    if (!isConfigured) {
-      throw const AIException('AI 未配置：请先在「设置 → AI」中填写 API Key。');
-    }
     final prompt = switch (mode) {
       WritingMode.continue_ =>
         'Continue writing the following text naturally:\n\n$text',
@@ -159,6 +135,67 @@ class AIService {
     return ask(prompt, model: model);
   }
 
+  /// Make a chat-completions call, walking [apiKeys] from index 0 upward on
+  /// 401 / 403 / 429 (authentication / rate-limit issues). 4xx / 5xx errors
+  /// that aren't auth / rate-limit are surfaced immediately. Network errors are
+  /// retried against the next key as well.
+  Future<String> _askWithFallback({
+    required String body,
+    required String label,
+    required String noKeysMessage,
+  }) async {
+    if (!isConfigured) {
+      throw AIException(noKeysMessage);
+    }
+    final triedErrors = <String>[];
+    for (var i = 0; i < apiKeys.length; i++) {
+      final key = apiKeys[i];
+      if (key.isEmpty) continue;
+      try {
+        final response = await http
+            .post(
+              Uri.parse('$baseUrl/chat/completions'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $key',
+              },
+              body: body,
+            )
+            .timeout(const Duration(seconds: 30));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final choices = data['choices'] as List<dynamic>;
+          if (choices.isNotEmpty) {
+            return choices[0]['message']['content'] as String;
+          }
+          throw AIException('AI 返回了空结果。');
+        }
+
+        final detail = _extractError(response);
+        final message = 'AI $label 失败 (HTTP ${response.statusCode})$detail';
+
+        // 401 / 403 / 429 → try the next key. Everything else bubbles up.
+        if (response.statusCode == 401 ||
+            response.statusCode == 403 ||
+            response.statusCode == 429) {
+          triedErrors.add(message);
+          continue;
+        }
+        throw AIException(message);
+      } on AIException {
+        rethrow;
+      } catch (e) {
+        // Network / timeout / etc. — try the next key.
+        triedErrors.add('AI $label 出错：$e');
+        continue;
+      }
+    }
+    throw AIException(
+      '所有可用 Key 均失败（${triedErrors.length}）。最后一次错误：${triedErrors.last}',
+    );
+  }
+
   /// Pull a human-readable message out of a non-200 API response body.
   String _extractError(http.Response response) {
     try {
@@ -167,13 +204,11 @@ class AIService {
       if (msg != null && msg.toString().isNotEmpty) {
         return '：$msg';
       }
-    } catch (_) {
-      // Ignore — fall through to raw body snippet.
-    }
-    final snippet = response.body.length > 300
-        ? '${response.body.substring(0, 300)}…'
+    } catch (_) {}
+    final snippet = response.body.length > 200
+        ? '${response.body.substring(0, 200)}...'
         : response.body;
-    return snippet.isNotEmpty ? '：$snippet' : '';
+    return '：$snippet';
   }
 }
 
