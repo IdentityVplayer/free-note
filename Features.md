@@ -1,5 +1,13 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.17.1
+
+### Added
+- **自定义 Provider 多 baseurl / 多 key** — 设置页 dropdown 列出全部 `aiEndpoints`（built-in + 已有自定义）。选中非 built-in 显示 label + baseUrl 输入框；底部 "+ 添加自定义 Provider" 即时创建空端点并切换；"删除当前 Provider" 仅出现在非 built-in；切换 provider 自动 sync 三个 controller。
+
+### Fixed
+- **编辑器多行粘贴** — 之前 `_splitActiveLineAtText` 只识别第一个 `\n`，粘贴 `"A\nB\nC"` 后两行被吞。现在按 `\n` 切所有 piece 一次插入，controller 显示最后 piece、光标位于首。
+
 ## 1.17.0
 
 ### Added

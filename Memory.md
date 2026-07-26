@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **277**（三语一致，截至 v1.17.0） |
-| 当前稳定版本 | `1.17.0+57`（已发布，tag `v1.17.0`） |
+| i18n key 总数 | **277**（三语一致，截至 v1.17.1） |
+| 当前稳定版本 | `1.17.1+58`（已发布，tag `v1.17.1`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -278,6 +278,17 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
    - 设置页 AI 区块：多 Key 列表 + "+ 添加 Key" + 各 key 的"删除"按钮 + 整体 Key 显示/隐藏切换
 4. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
 5. ✅ bump `pubspec.yaml` 版本 `1.16.1+56` → `1.17.0+57`；最终 commit / tag / push。
+
+### v1.17.1 最终化（已完成 ✅，2026-07-26）
+1. ✅ **fix：编辑器多行粘贴** — 之前 `_splitActiveLineAtText` 只在第一个 `\n` 切分，粘贴 `"A\nB\nC"` 时只识别 `A`，后两行被吞。新版按 `\n` 切出所有 piece，依次插入 `_content`；controller 显示最后 piece，光标置于首。
+2. ✅ **add：自定义 Provider 多 baseurl / 多 key UI** — 之前设置页对自定义只有一个 `if (_aiProvider == 'custom')` 块，单 URL 单 key 流。新版：
+   - dropdown 列出 `aiEndpoints` 全部项（built-in + 已有自定义）
+   - 选中非 built-in 才显示 label + baseUrl 输入框
+   - 底部 "+ 添加自定义 Provider" 立即写入 `aiEndpoints`（生成 `custom:<microseconds>` id）
+   - "删除当前 Provider" 仅当非 built-in 出现
+   - 选中 provider 后 baseUrl/label/keys 三个 controller 自动 sync
+3. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
+4. ✅ bump `pubspec.yaml` 版本 `1.17.0+57` → `1.17.1+58`；最终 commit / tag / push。
 
 ---
 

@@ -30,6 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late List<TextEditingController> _aiKeyControllers;
   late TextEditingController _aiModelController;
   late TextEditingController _aiBaseUrlController;
+  late TextEditingController _aiLabelController;
   late String _language;
   late bool _darkMode;
   late String _aiProvider;
@@ -39,6 +40,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Whether the (obscured by default) AI API key fields are revealed.
   bool _showApiKey = false;
+
+  /// Set of endpoints that are built-in (so we can decide whether to render
+  /// label / baseUrl as read-only or editable). Cached at init from
+  /// [AIProviderPresets.order].
+  late Set<String> _builtinIds;
 
   static const List<Color> _themeColors = [
     Color(0xFF6750A4),
@@ -52,19 +58,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _builtinIds = AIProviderPresets.order.toSet();
     final s = context.read<AppProvider>().settings;
     _aiKeyControllers = s.currentEndpoint.keys
         .map((k) => TextEditingController(text: k))
         .toList();
+    final ep = s.currentEndpoint;
     _aiModelController = TextEditingController(text: s.aiModel);
-    _aiBaseUrlController = TextEditingController(
-      text: s.currentEndpoint.baseUrl ?? '',
-    );
+    _aiBaseUrlController = TextEditingController(text: ep.baseUrl ?? '');
+    _aiLabelController = TextEditingController(text: ep.label);
     _language = s.languageCode;
     _darkMode = s.isDarkMode;
-    _aiProvider = s.currentAiId.startsWith('custom:')
-        ? 'custom'
-        : s.currentAiId; // show 'custom' in dropdown for any custom endpoint
+    _aiProvider = s.currentAiId.isEmpty
+        ? 'openrouter'
+        : s.currentAiId; // custom:<id> preserved as-is, built-ins stay keys
     _aiModels = List<String>.from(s.aiModels);
     _themeColorHex = s.themeColorHex;
   }
@@ -76,6 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     _aiModelController.dispose();
     _aiBaseUrlController.dispose();
+    _aiLabelController.dispose();
     _aiModelAddController.dispose();
     super.dispose();
   }
@@ -98,45 +106,118 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Called when the user changes the provider dropdown so they always edit
   /// the right set of keys.
   void _syncKeysToProvider() {
-    final endpoint = context.read<AppProvider>().settings.currentEndpoint;
-    final newKeys = endpoint.keys;
-    // Preserve current edits if the user is still on the same endpoint.
-    if (endpoint.id.startsWith('custom:') &&
-        _aiProvider == 'custom' &&
-        newKeys.length != _aiKeyControllers.length) {
-      // user typed a new key list; skip sync
-    }
+    final settings = context.read<AppProvider>().settings;
+    final endpoints = settings.aiEndpoints;
+    final ep = endpoints.firstWhere(
+      (e) => e.id == _aiProvider,
+      orElse: () => endpoints.first,
+    );
     for (final c in _aiKeyControllers) {
       c.dispose();
     }
-    _aiKeyControllers = newKeys
+    _aiKeyControllers = ep.keys
         .map((k) => TextEditingController(text: k))
         .toList();
-    // Refresh baseUrl for custom provider too.
-    _aiBaseUrlController.text = endpoint.baseUrl ?? '';
+    _aiBaseUrlController.text = ep.baseUrl ?? '';
+    _aiLabelController.text = ep.label;
+  }
+
+  /// Add a fresh user-defined AI endpoint and switch the editor to it. The
+  /// new endpoint is created empty (no keys, default URL) so the user can
+  /// fill it in.
+  void _addCustomAiEndpoint() {
+    final provider = context.read<AppProvider>();
+    final id = 'custom:${DateTime.now().microsecondsSinceEpoch}';
+    final existingCustom = provider.settings.aiEndpoints
+        .where((e) => e.id.startsWith('custom:'))
+        .length;
+    final newEp = AiEndpoint(
+      id: id,
+      label: '自定义 ${existingCustom + 1}',
+      baseUrl: 'https://',
+    );
+    setState(() {
+      for (final c in _aiKeyControllers) {
+        c.dispose();
+      }
+      _aiKeyControllers = <TextEditingController>[TextEditingController()];
+      _aiBaseUrlController.text = newEp.baseUrl!;
+      _aiLabelController.text = newEp.label;
+      _aiProvider = id;
+    });
+    provider.updateSettings(
+      provider.settings.copyWith(
+        aiEndpoints: [...provider.settings.aiEndpoints, newEp],
+        currentAiId: id,
+      ),
+    );
+  }
+
+  /// Drop the currently-selected custom endpoint and switch back to a built-in
+  /// (openrouter if available). Built-ins cannot be deleted.
+  void _deleteCurrentCustomAiEndpoint() {
+    if (_builtinIds.contains(_aiProvider)) return;
+    final provider = context.read<AppProvider>();
+    final remaining = provider.settings.aiEndpoints
+        .where((e) => e.id != _aiProvider)
+        .toList();
+    if (remaining.isEmpty) return;
+    final fallbackId = remaining.first.id;
+    setState(() {
+      for (final c in _aiKeyControllers) {
+        c.dispose();
+      }
+      _aiKeyControllers = remaining.first.keys
+          .map((k) => TextEditingController(text: k))
+          .toList();
+      _aiBaseUrlController.text = remaining.first.baseUrl ?? '';
+      _aiLabelController.text = remaining.first.label;
+      _aiProvider = fallbackId;
+    });
+    provider.updateSettings(
+      provider.settings.copyWith(
+        aiEndpoints: remaining,
+        currentAiId: fallbackId,
+      ),
+    );
+  }
+
+  /// Display label for an [AiEndpoint] in the provider dropdown — uses the
+  /// built-in preset name when applicable.
+  String _endpointLabel(AiEndpoint e) {
+    if (e.builtinKey != null) {
+      return AIProviderPresets.labelFor(e.builtinKey!);
+    }
+    return e.label;
   }
 
   void _save() {
     final provider = context.read<AppProvider>();
     // Build the new endpoint list with the user's current edits on the
     // selected endpoint, plus the unchanged entries for the others.
-    final endpoints = [
-      for (final e in provider.settings.aiEndpoints)
-        if (e.id == provider.settings.currentAiId)
+    final isCustom = !_builtinIds.contains(_aiProvider);
+    final baseUrl = _aiBaseUrlController.text.trim();
+    final label = _aiLabelController.text.trim().isEmpty
+        ? '自定义'
+        : _aiLabelController.text.trim();
+    final newKeys = _aiKeyControllers
+        .map((c) => c.text.trim())
+        .where((k) => k.isNotEmpty)
+        .toList();
+    final endpoints = <AiEndpoint>[];
+    for (final e in provider.settings.aiEndpoints) {
+      if (e.id == _aiProvider) {
+        endpoints.add(
           e.copyWith(
-            baseUrl: _aiProvider == 'custom'
-                ? (_aiBaseUrlController.text.trim().isEmpty
-                      ? null
-                      : _aiBaseUrlController.text.trim())
-                : null,
-            keys: _aiKeyControllers
-                .map((c) => c.text.trim())
-                .where((k) => k.isNotEmpty)
-                .toList(),
-          )
-        else
-          e,
-    ];
+            label: label,
+            baseUrl: isCustom ? (baseUrl.isEmpty ? null : baseUrl) : null,
+            keys: newKeys,
+          ),
+        );
+      } else {
+        endpoints.add(e);
+      }
+    }
     provider.updateSettings(
       AppSettings(
         languageCode: _language,
@@ -149,9 +230,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         autoSync: provider.settings.autoSync,
         enableAI: true,
         aiEndpoints: endpoints,
-        currentAiId: _aiProvider == 'custom'
-            ? 'custom:${DateTime.now().microsecondsSinceEpoch}'
-            : _aiProvider,
+        currentAiId: _aiProvider,
         themeColorHex: _themeColorHex,
         notesFolderPath: provider.settings.notesFolderPath,
         repositories: provider.settings.repositories,
@@ -621,15 +700,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: DropdownButtonFormField<String>(
               initialValue: _aiProvider,
+              isExpanded: true,
               decoration: InputDecoration(
                 labelText: l10n.t('aiProvider'),
                 border: const OutlineInputBorder(),
               ),
-              items: AIProviderPresets.order
+              items: context
+                  .read<AppProvider>()
+                  .settings
+                  .aiEndpoints
                   .map(
-                    (p) => DropdownMenuItem(
-                      value: p,
-                      child: Text(_providerLabel(p, l10n)),
+                    (e) => DropdownMenuItem(
+                      value: e.id,
+                      child: Text(_endpointLabel(e)),
                     ),
                   )
                   .toList(),
@@ -637,26 +720,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (v == null) return;
                 setState(() {
                   _aiProvider = v;
-                  // Pick a sensible default model for the chosen provider so
-                  // the feature works right after the user enters a key. Only
-                  // overwrite when the current model is empty or one of the
-                  // built-in defaults (don't clobber a model the user typed).
-                  final current = _aiModelController.text.trim();
-                  if (current.isEmpty ||
-                      AIService.isKnownDefaultModel(current)) {
-                    _aiModelController.text = AIService.defaultModelFor(v);
-                  }
-                  // Seed the model list with the provider default when empty.
-                  if (_aiModels.isEmpty) {
-                    _aiModels = [AIService.defaultModelFor(v)];
-                  }
-                  // Reset key list to the chosen provider's existing keys.
                   _syncKeysToProvider();
+                  final ep = context
+                      .read<AppProvider>()
+                      .settings
+                      .aiEndpoints
+                      .firstWhere(
+                        (e) => e.id == v,
+                        orElse: () => context
+                            .read<AppProvider>()
+                            .settings
+                            .aiEndpoints
+                            .first,
+                      );
+                  final builtin = ep.builtinKey;
+                  if (builtin != null) {
+                    final current = _aiModelController.text.trim();
+                    if (current.isEmpty ||
+                        AIService.isKnownDefaultModel(current)) {
+                      _aiModelController.text = AIService.defaultModelFor(
+                        builtin,
+                      );
+                    }
+                    if (_aiModels.isEmpty) {
+                      _aiModels = [AIService.defaultModelFor(builtin)];
+                    }
+                  }
                 });
               },
             ),
           ),
-          if (_aiProvider == 'custom') ...[
+          if (!_builtinIds.contains(_aiProvider)) ...[
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -739,6 +833,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         fontStyle: FontStyle.italic,
                       ),
                     ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Add / delete custom endpoints. Each call updates the persistent
+          // endpoints list immediately so the dropdown always reflects the
+          // current state.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('添加自定义 Provider'),
+                  onPressed: _addCustomAiEndpoint,
+                ),
+                if (!_builtinIds.contains(_aiProvider))
+                  TextButton.icon(
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('删除当前 Provider'),
+                    onPressed: _deleteCurrentCustomAiEndpoint,
                   ),
               ],
             ),
@@ -865,31 +982,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-  }
-
-  String _providerLabel(String p, dynamic l10n) {
-    switch (p) {
-      case 'openai':
-        return 'OpenAI';
-      case 'deepseek':
-        return 'DeepSeek';
-      case 'moonshot':
-        return 'Moonshot (Kimi)';
-      case 'google':
-        return 'Google Gemini';
-      case 'ollama':
-        return 'Ollama (local)';
-      case 'sealos':
-        return 'Sealos AIProxy';
-      case 'openrouter':
-        return 'OpenRouter';
-      case 'huggingface':
-        return 'Hugging Face';
-      case 'custom':
-        return l10n.t('customProvider');
-      default:
-        return p;
-    }
   }
 
   Widget _colorCircle(

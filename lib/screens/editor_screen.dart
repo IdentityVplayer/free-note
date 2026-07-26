@@ -401,27 +401,32 @@ class _EditorScreenState extends State<EditorScreen>
     _lineFocus.requestFocus();
   }
 
-  /// Split the active line at the inserted newline (entered via keyboard).
+  /// Split the active line at every newline present in [v] — covers both
+  /// a single Enter press *and* a multi-line clipboard paste in one go.
   /// Keeps the shared [_lineFocus] alive (no keyboard flicker).
   void _splitActiveLineAtText(String v) {
     final i = _activeLine!;
-    final local = v.indexOf('\n');
-    int global = 0;
+    // Split the controller text on every '\n'. The first piece replaces the
+    // current active line; each subsequent piece becomes a new line; the last
+    // piece becomes the new active-line content (caret at offset 0).
+    final pieces = v.split('\n');
+    if (pieces.length <= 1) return;
+
+    // Splice into _content at the global offset of the active line.
     final lines = splitLines(_content);
-    for (var k = 0; k < i; k++) {
-      global += lines[k].length + 1;
-    }
-    global += local;
-    final (newContent, _) = insertLineBreak(_content, global);
-    _content = newContent;
-    final newLines = splitLines(_content);
+    final newLines = <String>[
+      ...lines.sublist(0, i),
+      ...pieces,
+      ...lines.sublist(i + 1),
+    ];
+    _content = newLines.join('\n');
+    final newActive = i + pieces.length - 1;
+
     setState(() {
-      _activeLine = i + 1;
-      _lineController.text = newLines[i + 1];
+      _activeLine = newActive;
+      _lineController.text = pieces.last;
       _lineController.selection = const TextSelection.collapsed(offset: 0);
     });
-    // No explicit `requestFocus` — the new TextField uses `autofocus: true`
-    // and shares [_lineFocus] so focus transfers without redrawing the IME.
     _hasChanges = true;
   }
 
