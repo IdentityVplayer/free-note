@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/note.dart';
 import '../models/task.dart';
@@ -52,6 +53,23 @@ class AppProvider extends ChangeNotifier
   bool get isDarkMode => _settings.isDarkMode;
   bool get needsFolderSelection => !_storage.hasFolder;
 
+  /// True once the first-run onboarding guide has been shown (v1.18.1).
+  /// Persisted via SharedPreferences so it only appears on a fresh install.
+  bool _onboardingDone = false;
+  bool get onboardingDone => _onboardingDone;
+
+  /// Mark the onboarding guide as seen and persist it.
+  Future<void> markOnboardingDone() async {
+    _onboardingDone = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('fn_onboarding_done', true);
+    } catch (_) {
+      // best-effort persistence
+    }
+    notifyListeners();
+  }
+
   /// Resolved theme color from settings, or null for default.
   Color? get themeColor {
     final hex = _settings.themeColorHex;
@@ -98,6 +116,14 @@ class AppProvider extends ChangeNotifier
       await _storage.setFolder(_settings.notesFolderPath!);
     }
     _notes = await _storage.loadNotes();
+
+    // First-run onboarding flag (v1.18.1) — only shown on a fresh install.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _onboardingDone = prefs.getBool('fn_onboarding_done') ?? false;
+    } catch (_) {
+      _onboardingDone = false;
+    }
 
     // Start the clipboard manager (polls the system clipboard, persists the
     // history to the config dir). Safe before any repo is chosen — the config
@@ -208,8 +234,9 @@ class AppProvider extends ChangeNotifier
         final rel = p.relative(entity.path, from: base);
         // Skip note files and config files — they are handled separately.
         if (rel.startsWith('.config/') || rel.endsWith('.md')) continue;
-        // Never upload the private folder (and its attachments).
-        if (rel.startsWith('$privateNotesFolderName/')) continue;
+        // Never upload the private folder (and its attachments). Uses the
+        // shared [isPathPrivate] rule so it stays consistent with [Note.isPrivate].
+        if (isPathPrivate(rel)) continue;
         try {
           out[rel] = entity.readAsBytesSync();
         } catch (_) {

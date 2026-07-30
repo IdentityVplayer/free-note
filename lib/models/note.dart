@@ -5,6 +5,14 @@ import 'package:yaml/yaml.dart';
 /// subfolders) are NEVER uploaded to GitHub — they stay local only (v1.18.0).
 const String privateNotesFolderName = '私人笔记';
 
+/// True if [relativePath] lives inside the private folder (`私人笔记/`) or any
+/// of its subfolders. This is the single, shared exclusion rule used by both
+/// sync layers (the note upload loop in [GitHubSyncService] and the
+/// extra-files scan in [AppProvider._readExtraFiles]) so they can never drift
+/// apart (v1.18.0).
+bool isPathPrivate(String relativePath) =>
+    relativePath.split('/').contains(privateNotesFolderName);
+
 /// Sanitize an arbitrary string into a safe, cross-platform file name.
 ///
 /// Strips characters that are illegal on common file systems, collapses runs
@@ -212,10 +220,7 @@ class Note {
 
   /// True if this note lives inside the private folder (`私人笔记/`) or any of
   /// its subfolders. Private notes are never uploaded to GitHub.
-  bool get isPrivate {
-    final rel = relativePath ?? fileName;
-    return rel.split('/').contains(privateNotesFolderName);
-  }
+  bool get isPrivate => isPathPrivate(relativePath ?? fileName);
 
   /// Build a simple YAML frontmatter block from a map.
   static String _frontmatterYaml(Map<String, dynamic> meta) {

@@ -81,10 +81,12 @@ class GitHubSyncService {
       final localPaths = <String>{};
       for (final note in notes) {
         final path = _notePath(note);
-        // Private notes (inside 私人笔记/) stay local-only: keep their remote
-        // path in [localPaths] so it is never deleted, but don't upload it.
+        // Private notes must never live on GitHub. By NOT adding their path to
+        // [localPaths], step 3 (remotePaths.difference(localPaths)) below
+        // deletes any stale remote copy — whether it came from an older build
+        // or a manual push — so the folder and its contents stay strictly
+        // local-only (privacy guarantee, v1.18.0).
         if (note.isPrivate) {
-          localPaths.add(path);
           continue;
         }
         localPaths.add(path);
@@ -125,9 +127,11 @@ class GitHubSyncService {
         }
       }
 
+      final uploaded = notes.where((n) => !n.isPrivate).length;
       return SyncResult(
         success: true,
-        message: '已同步 ${notes.length} 篇笔记到 GitHub',
+        message: '已同步 $uploaded 篇笔记到 GitHub'
+            '${uploaded < notes.length ? '（${notes.length - uploaded} 篇私人笔记已跳过）' : ''}',
       );
     } catch (e) {
       return SyncResult(success: false, message: '同步失败: $e');
@@ -146,6 +150,15 @@ class GitHubSyncService {
       for (final entry in remoteFiles.entries) {
         final path = entry.key;
         if (path.endsWith('.md')) {
+          final relativePath = path.startsWith('notes/')
+              ? path.substring(6)
+              : path;
+          // Private notes must never be pulled from GitHub — they stay
+          // local-only. Skip them so a stale remote copy can't be resurrected
+          // into local state (privacy guarantee, v1.18.0).
+          if (relativePath.split('/').contains(privateNotesFolderName)) {
+            continue;
+          }
           final res = await http
               .get(
                 Uri.parse('$_apiBase/contents/${_encPath(path)}'),
@@ -156,9 +169,6 @@ class GitHubSyncService {
           final data = jsonDecode(res.body) as Map<String, dynamic>;
           final raw = data['content'] as String;
           final decoded = utf8.decode(base64Decode(raw.replaceAll('\n', '')));
-          final relativePath = path.startsWith('notes/')
-              ? path.substring(6)
-              : path;
           final note = Note.fromMarkdownFile(decoded, relativePath);
           if (note != null) notes.add(note);
         } else if (path.startsWith('notes/.config/') &&

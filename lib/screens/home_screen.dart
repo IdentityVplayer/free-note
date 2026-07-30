@@ -15,6 +15,8 @@ import 'ai_assistant_screen.dart';
 import 'task_plan_screen.dart';
 import 'pomodoro_screen.dart';
 import '../widgets/clipboard_widget.dart';
+import '../widgets/folder_chip.dart';
+import 'folder_picker_screen.dart';
 import '../plugins/ai_context_plugin.dart';
 import '../route_observer.dart';
 
@@ -149,6 +151,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.t('appTitle')),
+        leading: FolderChip(
+          folderPath: StorageService.instance.currentFolder,
+          compact: true,
+          onTap: _openFolderPicker,
+          onLongPress: _showFolderName,
+          onDoubleTap: _openFolderPicker,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.auto_awesome),
@@ -1098,6 +1107,38 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final msg = await provider.syncToGitHub();
     final success = !msg.startsWith('同步失败') && !msg.startsWith('GitHub 未配置');
     NotificationService.instance.showSync(success ? '上传成功' : '上传失败', msg);
+  }
+
+  /// Open the folder picker to choose / re-choose the notes folder.
+  Future<void> _openFolderPicker() async {
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FolderPickerScreen()),
+    );
+  }
+
+  /// Reveal the full notes-folder path (the chip may truncate the name).
+  void _showFolderName() {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    final path = StorageService.instance.currentFolder;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t('folderFullName')),
+        content: SelectableText(
+          path ?? l10n.t('notSet'),
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('ok')),
+          ),
+        ],
+      ),
+    );
   }
 
   void _confirmDelete(

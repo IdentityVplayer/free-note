@@ -315,6 +315,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// Long-press handler for the "当前仓库" tile: reveal the full folder path
+  /// (the tile subtitle may truncate a long path).
+  void _showFullName(String folder) {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t('folderFullName')),
+        content: SelectableText(
+          folder,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('ok')),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _toast(String message) {
     if (mounted) {
       ScaffoldMessenger.of(
@@ -520,8 +542,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Default directory for downloads: `<notes folder>/download/`.
+  /// Default directory for downloaded updates.
+  ///
+  /// On Android we save to the system Download directory (`/sdcard/Download`)
+  /// so the APK lands somewhere the user (and the package installer) can
+  /// easily reach — v1.18.1. On other platforms we fall back to the app's
+  /// notes-folder `download/` subfolder, or the config dir if no folder is set.
   Future<String> _defaultDownloadDir() async {
+    if (Platform.isAndroid) {
+      final dir = Directory('/sdcard/Download');
+      try {
+        if (!dir.existsSync()) dir.createSync(recursive: true);
+      } catch (_) {
+        // If /sdcard/Download isn't writable (locked-down device), fall
+        // through to the app-local fallback below.
+      }
+      if (dir.existsSync()) return dir.path;
+    }
     final storage = StorageService.instance;
     if (storage.hasFolder) {
       return p.join(storage.currentFolder!, 'download');
@@ -643,16 +680,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           // Repository (notes folder)
           _sectionHeader(l10n.t('repository')),
-          ListTile(
-            leading: const Icon(Icons.folder_special),
-            title: Text(l10n.t('currentRepository')),
-            subtitle: Text(
-              folder,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            trailing: TextButton(
-              onPressed: _changeRepository,
-              child: Text(l10n.t('changeRepository')),
+          GestureDetector(
+            onLongPress: () => _showFullName(folder),
+            onDoubleTap: _changeFolder,
+            child: ListTile(
+              leading: const Icon(Icons.folder_special),
+              title: Text(l10n.t('currentRepository')),
+              subtitle: Text(
+                folder,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              trailing: TextButton(
+                onPressed: _changeRepository,
+                child: Text(l10n.t('changeRepository')),
+              ),
             ),
           ),
           // Appearance

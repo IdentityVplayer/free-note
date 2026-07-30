@@ -6,6 +6,7 @@ import 'providers/app_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
 import 'screens/folder_picker_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'route_observer.dart';
 
 /// Borderless Notes (无边记) — A multifunctional cross-platform note-taking app.
@@ -49,6 +50,8 @@ class FreeNoteApp extends StatelessWidget {
                 ? const Scaffold(
                     body: Center(child: CircularProgressIndicator()),
                   )
+                : !provider.onboardingDone
+                ? const OnboardingScreen()
                 : provider.needsFolderSelection
                 ? const FolderPickerScreen()
                 : const HomeScreen(),
