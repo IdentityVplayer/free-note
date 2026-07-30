@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 四标签（任务 / 笔记 / 番茄钟 / 剪切板） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **287**（三语一致，截至 v1.18.0） |
-| 当前稳定版本 | `1.18.0+59`（已发布，tag `v1.18.0`） |
+| i18n key 总数 | **297**（三语一致，截至 v1.18.1） |
+| 当前稳定版本 | `1.18.1+60`（已发布，tag `v1.18.1`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -304,6 +304,22 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 6. ✅ 三语新增 10 key（addFile / selectRepoFirst / fileMustBeInRepo / fileReadFailed / clipboard / clipboardEmpty / copiedToClipboard / clear / widgets / clipboardMax）。
 7. ✅ `flutter analyze` 0 issues + `flutter test` 56 passed（含新增 `test/v118_test.dart`：sanitizeFileName / fileName·isPrivate / 标题改名移文件 / 同名去重 / 私人文件夹自动创建）。
 8. ✅ bump `pubspec.yaml` 版本 `1.17.1+58` → `1.18.0+59`；最终 commit / tag / push。
+
+---
+
+## 三·六、v1.18.1 开发上下文（已落地并发布 ✅）
+
+用户两条需求（1 变更 + 1 新增）：
+
+1. ✅ **(change) 下载目录移到系统下载目录** — `settings_screen._defaultDownloadDir()` 重写：Android 直接落 `/sdcard/Download`（manifest 已有 `WRITE_EXTERNAL_STORAGE` + `requestLegacyExternalStorage="true"`，可写）；其余平台回退到「工作目录/download」。依赖 `path_provider` 已存在，无需新增 pubspec 依赖。
+2. ✅ **(new) 首次启动引导** — 新增 `OnboardingScreen`（`lib/screens/onboarding_screen.dart`）：欢迎语 + 3 步说明（选文件夹 / 长按看路径 / 双击重选），「选择文件夹」按钮 `markOnboardingDone()` 后跳 `FolderPickerScreen`，「稍后设置」直接标记完成。
+   - `AppProvider` 新增 `onboardingDone` 标志（`SharedPreferences` 持久化键 `fn_onboarding_done`），仅全新安装显示一次；`init()` 中读取。
+   - `main.dart` 路由：`!onboardingDone → OnboardingScreen → needsFolderSelection → FolderPickerScreen → HomeScreen`。
+   - 文件夹/当前仓库按钮统一走新 `FolderChip`（`lib/widgets/folder_chip.dart`，`GestureDetector` 封装 `onTap/onLongPress/onDoubleTap`）；Home AppBar leading 与设置页「当前仓库」均支持长按看全名（`SelectableText` 弹窗）、双击重选。
+3. ✅ **(chore) 私人笔记同步加固（自 v1.18.0 延续）** — 排除规则统一为共享 `isPathPrivate()`，`pullNotes` 跳过私密副本（不再复活远程私密笔记），同步成功文案区分公开/私密篇数。
+4. ✅ 三语新增 9 key（folderFullName / ok / onboardingTitle / onboardingDesc / onboardingStep1–3 / onboardingStart / onboardingSkip）；i18n 总数 288 → 297。
+5. ✅ `flutter analyze` 0 issues + `flutter test` 62 passed（用自定义 `_MockClient extends http.BaseClient` 重写私人笔记测试，删除会真实触网的旧 `github_sync_private_test.dart` 重复文件）。
+6. ✅ bump `pubspec.yaml` 版本 `1.18.0+59` → `1.18.1+60`；最终 commit / tag / push。
 
 ---
 
