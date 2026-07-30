@@ -103,6 +103,10 @@ class AppSettings {
   /// [aiModel] to build the model picker shown in the AI chat screen.
   List<String> aiModels;
 
+  /// Max number of clipboard items kept by the clipboard widget (1..99999).
+  /// Configurable in Settings; the clipboard history is capped at this count.
+  int clipboardMax;
+
   // ── New in 1.9.8 ──
   /// Plugins the user added at runtime from the Plugins screen's "+" button.
   /// Persisted as [PluginInfo] so they can be re-registered on next launch.
@@ -126,6 +130,7 @@ class AppSettings {
     this.repositories = const [],
     this.aiModels = const [],
     this.userPlugins = const [],
+    this.clipboardMax = 100,
   }) : aiEndpoints = aiEndpoints ?? _defaultEndpoints();
 
   /// Sensible default if no endpoints have been configured yet (first launch
@@ -175,6 +180,7 @@ class AppSettings {
     'repositories': repositories,
     'aiModels': aiModels,
     'userPlugins': userPlugins.map((p) => p.toJson()).toList(),
+    'clipboardMax': clipboardMax,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -265,6 +271,7 @@ class AppSettings {
               ?.map((e) => PluginInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      clipboardMax: (json['clipboardMax'] as int?) ?? 100,
     );
   }
 
@@ -287,6 +294,7 @@ class AppSettings {
     List<String>? repositories,
     List<String>? aiModels,
     List<PluginInfo>? userPlugins,
+    int? clipboardMax,
   }) => AppSettings(
     languageCode: languageCode ?? this.languageCode,
     isDarkMode: isDarkMode ?? this.isDarkMode,
@@ -305,6 +313,7 @@ class AppSettings {
     repositories: repositories ?? this.repositories,
     aiModels: aiModels ?? this.aiModels,
     userPlugins: userPlugins ?? this.userPlugins,
+    clipboardMax: clipboardMax ?? this.clipboardMax,
   );
 
   /// The currently-active [AiEndpoint].

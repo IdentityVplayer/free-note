@@ -14,6 +14,7 @@ import 'plugins_screen.dart';
 import 'ai_assistant_screen.dart';
 import 'task_plan_screen.dart';
 import 'pomodoro_screen.dart';
+import '../widgets/clipboard_widget.dart';
 import '../plugins/ai_context_plugin.dart';
 import '../route_observer.dart';
 
@@ -237,6 +238,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             )
           : _bottomIndex == 0
           ? _buildTasksDock(l10n)
+          : _bottomIndex == 3
+          ? _buildClipboardDock(l10n)
           : _buildPomodoroDock(l10n),
       floatingActionButton: _bottomIndex == 1
           ? Column(
@@ -304,6 +307,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           NavigationDestination(
             icon: const Icon(Icons.timer),
             label: l10n.t('pomodoro'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.content_paste),
+            label: l10n.t('clipboard'),
           ),
         ],
       ),
@@ -471,6 +478,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 
+  /// Clipboard view (right dock tab): the in-app 剪切板 widget (v1.18.0).
+  Widget _buildClipboardDock(AppLocalizations l10n) {
+    return const ClipboardWidget();
+  }
+
   /// Task Planning view (left dock tab): the full planner, embedded without
   /// its own AppBar/FAB. The home FAB (when this tab is active) handles
   /// "new task", and the app-bar checklist icon opens it standalone.
@@ -573,10 +585,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   /// Collapsible folder header; tap to reveal/hide the notes inside it.
   Widget _buildFolderHeader(BuildContext context, String folderKey) {
     final open = _expanded.contains(folderKey);
+    final isPrivate = folderKey == privateNotesFolderName;
     return Card(
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: ListTile(
-        leading: const Icon(Icons.folder),
+        leading: Icon(isPrivate ? Icons.lock_outline : Icons.folder),
         title: Text(
           folderKey,
           style: const TextStyle(fontWeight: FontWeight.w600),

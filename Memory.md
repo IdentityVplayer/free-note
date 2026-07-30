@@ -30,10 +30,10 @@
 | 应用名 | free-note（无边记） |
 | 技术栈 | Flutter 3.44.6 / Dart 3.12.2，Material 3 |
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
-| 导航形态 | 底部 `NavigationBar` 三标签（任务 / 笔记 / 番茄钟） |
+| 导航形态 | 底部 `NavigationBar` 四标签（任务 / 笔记 / 番茄钟 / 剪切板） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **277**（三语一致，截至 v1.17.1） |
-| 当前稳定版本 | `1.17.1+58`（已发布，tag `v1.17.1`） |
+| i18n key 总数 | **287**（三语一致，截至 v1.18.0） |
+| 当前稳定版本 | `1.18.0+59`（已发布，tag `v1.18.0`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -289,6 +289,21 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
    - 选中 provider 后 baseUrl/label/keys 三个 controller 自动 sync
 3. ✅ `flutter analyze` 0 issues + `flutter test` 46 passed。
 4. ✅ bump `pubspec.yaml` 版本 `1.17.0+57` → `1.17.1+58`；最终 commit / tag / push。
+
+---
+
+## 三·五、v1.18.0 开发上下文（已落地并发布 ✅）
+
+用户三条需求 + 编辑器两点修正（/new 出发 后追加「工具栏移到底部」「文件名即标题」）：
+
+1. ✅ **文件名 = 标题联动** — `Note.fileName` 由 `$id.md` 改为 `sanitizeFileName(title).md`；`StorageService._writeNoteContent` 以「目录保留 + 基名跟随标题」为唯一规则派生内容路径，标题变化时自动 rename 磁盘文件（含 ` (n)` 冲突后缀、`$id.md` 旧文件迁移）。`Note` 新增顶层 `sanitizeFileName()` 与 `privateNotesFolderName = '私人笔记'`。
+2. ✅ **私人笔记文件夹** — `StorageService.setFolder` 打开/新建仓库时自动建 `私人笔记/` 目录；`Note.isPrivate`（路径含 `私人笔记`）；GitHub 同步 `syncNotes` 上传循环跳过私人笔记（仅占位防误删），`_readExtraFiles` 也跳过该目录；首页文件夹头显示锁图标。
+3. ✅ **添加文件按钮** — 编辑器底部工具栏新增「添加文件」（`file_picker` v11 `FilePicker.pickFiles`）：选仓库内文件后自动填充 `relativePath`、加载内容、标题取文件名（契合文件名=标题）。
+4. ✅ **工具栏移到底部** — 编辑器 Markdown 工具栏 + 字数状态栏移入 `Scaffold.bottomNavigationBar`（新 `_buildBottomBar`），标题/标签留在顶部。
+5. ✅ **剪切板小组件** — `AppSettings.clipboardMax`（默认 100，1–99999，设置页「小组件」可调）；`ClipboardService` 单例轮询系统剪切板、去重、落盘 `clipboard.json`；首页新增第四底部标签「剪切板」（`ClipboardWidget`：列表/点按复制回剪切板/单条删除/清空）。
+6. ✅ 三语新增 10 key（addFile / selectRepoFirst / fileMustBeInRepo / fileReadFailed / clipboard / clipboardEmpty / copiedToClipboard / clear / widgets / clipboardMax）。
+7. ✅ `flutter analyze` 0 issues + `flutter test` 56 passed（含新增 `test/v118_test.dart`：sanitizeFileName / fileName·isPrivate / 标题改名移文件 / 同名去重 / 私人文件夹自动创建）。
+8. ✅ bump `pubspec.yaml` 版本 `1.17.1+58` → `1.18.0+59`；最终 commit / tag / push。
 
 ---
 

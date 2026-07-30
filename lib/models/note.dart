@@ -1,6 +1,28 @@
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
+/// Name of the auto-created "private" folder. Notes inside it (and any of its
+/// subfolders) are NEVER uploaded to GitHub — they stay local only (v1.18.0).
+const String privateNotesFolderName = '私人笔记';
+
+/// Sanitize an arbitrary string into a safe, cross-platform file name.
+///
+/// Strips characters that are illegal on common file systems, collapses runs
+/// of whitespace, trims, and caps length. Returns `'Untitled'` for empty
+/// input. Used so a note's [Note.title] can become its on-disk file name.
+String sanitizeFileName(String s) {
+  var out = s.trim();
+  // Illegal on Windows / macOS / Linux file systems.
+  out = out.replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1f]'), '');
+  // Collapse whitespace runs into a single space, then trim again.
+  out = out.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (out.isEmpty) return 'Untitled';
+  // Cap length so deep paths stay within filesystem limits.
+  if (out.length > 80) out = out.substring(0, 80).trim();
+  if (out.isEmpty) return 'Untitled';
+  return out;
+}
+
 /// Note data model for Borderless Notes app.
 class Note {
   final String id;
@@ -181,8 +203,19 @@ class Note {
   static String _stableId(String relativePath) =>
       'adopted_${relativePath.hashCode.abs().toRadixString(36)}';
 
-  /// Safe file name for this note (uses id to avoid collisions).
-  String get fileName => '$id.md';
+  /// Safe file name for this note, derived from its [title] (title → file
+  /// name). The actual on-disk path is [relativePath], which prefixes this
+  /// with a subfolder when the note lives inside one. Two notes sharing a
+  /// title collide on disk only if they live in the same folder — the storage
+  /// layer appends a ` (n)` suffix to keep files unique (v1.18.0).
+  String get fileName => '${sanitizeFileName(title)}.md';
+
+  /// True if this note lives inside the private folder (`私人笔记/`) or any of
+  /// its subfolders. Private notes are never uploaded to GitHub.
+  bool get isPrivate {
+    final rel = relativePath ?? fileName;
+    return rel.split('/').contains(privateNotesFolderName);
+  }
 
   /// Build a simple YAML frontmatter block from a map.
   static String _frontmatterYaml(Map<String, dynamic> meta) {

@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../l10n/app_localizations.dart';
@@ -208,6 +210,60 @@ class _EditorScreenState extends State<EditorScreen>
         ),
       );
     }
+  }
+
+  /// Pick an existing file inside the current repository and bind this note
+  /// to it: the relative path is auto-filled, the file's text becomes the
+  /// note body, and the title follows the file name (v1.18.0).
+  Future<void> _addFile() async {
+    final l10n = AppLocalizations.of(context)!;
+    final base = StorageService.instance.currentFolder;
+    if (base == null || base.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.t('selectRepoFirst'))));
+      }
+      return;
+    }
+    final result = await FilePicker.pickFiles(allowMultiple: false);
+    if (result == null || result.files.isEmpty) return;
+    final picked = result.files.single.path;
+    if (picked == null || picked.isEmpty) return;
+    // The chosen file MUST live inside the selected repository.
+    if (!p.isWithin(base, picked)) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.t('fileMustBeInRepo'))));
+      }
+      return;
+    }
+    final file = File(picked);
+    final rel = p.relative(picked, from: base);
+    String content;
+    try {
+      content = file.readAsStringSync();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.t('fileReadFailed'))));
+      }
+      return;
+    }
+    final name = p.basenameWithoutExtension(rel);
+    setState(() {
+      _note = _note.copyWith(
+        title: name.isEmpty ? 'Untitled' : name,
+        content: content,
+        relativePath: rel,
+      );
+      _content = content;
+      _titleController.text = _note.title;
+      _activeLine = null;
+      _hasChanges = true;
+    });
   }
 
   /// Open the AI assistant as an in-file dialog, with this note's content as
@@ -491,7 +547,7 @@ class _EditorScreenState extends State<EditorScreen>
         ),
         body: Column(
           children: [
-            // Title field
+            // Title field — the file name tracks the title (v1.18.0).
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: TextField(
@@ -503,7 +559,26 @@ class _EditorScreenState extends State<EditorScreen>
                   hintText: l10n.t('title'),
                   border: InputBorder.none,
                 ),
-                onChanged: (_) => setState(() => _hasChanges = true),
+                onChanged: (v) {
+                  final newTitle = v.trim().isEmpty ? 'Untitled' : v.trim();
+                  // Keep the content file's relative path in sync with the
+                  // title: same folder, new base name. StorageService renames
+                  // the on-disk file on save when this changes.
+                  final dir = _note.relativePath != null
+                      ? p.dirname(_note.relativePath!)
+                      : '.';
+                  final desiredName = '${sanitizeFileName(newTitle)}.md';
+                  final newRel = (dir == '.' || dir.isEmpty)
+                      ? desiredName
+                      : p.join(dir, desiredName);
+                  setState(() {
+                    _note = _note.copyWith(
+                      title: newTitle,
+                      relativePath: newRel,
+                    );
+                    _hasChanges = true;
+                  });
+                },
               ),
             ),
             // Tags
@@ -547,87 +622,16 @@ class _EditorScreenState extends State<EditorScreen>
               ),
             ),
             const Divider(),
-            // Markdown toolbar — always available; formats the active line.
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                children: [
-                  _toolbarBtn(
-                    Icons.title,
-                    () => _insertText('## '),
-                    hint: l10n.t('insertHeading'),
-                  ),
-                  _toolbarBtn(
-                    Icons.format_bold,
-                    () => _insertText('**'),
-                    hint: l10n.t('insertBold'),
-                  ),
-                  _toolbarBtn(
-                    Icons.format_italic,
-                    () => _insertText('*'),
-                    hint: l10n.t('insertItalic'),
-                  ),
-                  _toolbarBtn(
-                    Icons.code,
-                    () => _insertText('`'),
-                    hint: l10n.t('insertCode'),
-                  ),
-                  _toolbarBtn(
-                    Icons.link,
-                    () => _insertText('[', ']()'),
-                    hint: l10n.t('insertLink'),
-                  ),
-                  _toolbarBtn(
-                    Icons.list,
-                    () => _insertText('- '),
-                    hint: l10n.t('insertList'),
-                  ),
-                  _toolbarBtn(
-                    Icons.format_quote,
-                    () => _insertText('> '),
-                    hint: l10n.t('insertQuote'),
-                  ),
-                  _toolbarBtn(
-                    Icons.functions,
-                    () => _openMathPage(),
-                    hint: l10n.t('math'),
-                  ),
-                  // User "editor" plugins render their insert buttons here.
-                  ...provider.pluginManager.buildWidgets(context),
-                ],
-              ),
-            ),
-            const Divider(),
             // Hybrid editor: every line is preview; the active line is raw.
             Expanded(child: _buildHybridBody()),
-            // Status bar (only when the Word Count plugin is enabled)
-            if (wordCountEnabled)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${l10n.t('words')}: ${counts['words']}  '
-                      '${l10n.t('characters')}: ${counts['chars']}  '
-                      '${l10n.t('lines')}: ${counts['lines']}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    Text(
-                      '${_note.updatedAt.day}/${_note.updatedAt.month}/${_note.updatedAt.year}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
           ],
+        ),
+        // Markdown toolbar + status bar now live at the bottom (v1.18.0).
+        bottomNavigationBar: _buildBottomBar(
+          l10n,
+          provider,
+          counts,
+          wordCountEnabled,
         ),
       ),
     );
@@ -643,6 +647,103 @@ class _EditorScreenState extends State<EditorScreen>
       tooltip: hint,
       onPressed: onTap,
       visualDensity: VisualDensity.compact,
+    );
+  }
+
+  /// Bottom bar: the Markdown formatting toolbar (now at the bottom, v1.18.0)
+  /// plus the optional Word Count status line. The "添加文件" button links the
+  /// note to an existing file inside the repository.
+  Widget _buildBottomBar(
+    AppLocalizations l10n,
+    AppProvider provider,
+    Map<String, int> counts,
+    bool wordCountEnabled,
+  ) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Divider(height: 1),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              children: [
+                _toolbarBtn(
+                  Icons.attach_file,
+                  _addFile,
+                  hint: l10n.t('addFile'),
+                ),
+                _toolbarBtn(
+                  Icons.title,
+                  () => _insertText('## '),
+                  hint: l10n.t('insertHeading'),
+                ),
+                _toolbarBtn(
+                  Icons.format_bold,
+                  () => _insertText('**'),
+                  hint: l10n.t('insertBold'),
+                ),
+                _toolbarBtn(
+                  Icons.format_italic,
+                  () => _insertText('*'),
+                  hint: l10n.t('insertItalic'),
+                ),
+                _toolbarBtn(
+                  Icons.code,
+                  () => _insertText('`'),
+                  hint: l10n.t('insertCode'),
+                ),
+                _toolbarBtn(
+                  Icons.link,
+                  () => _insertText('[', ']()'),
+                  hint: l10n.t('insertLink'),
+                ),
+                _toolbarBtn(
+                  Icons.list,
+                  () => _insertText('- '),
+                  hint: l10n.t('insertList'),
+                ),
+                _toolbarBtn(
+                  Icons.format_quote,
+                  () => _insertText('> '),
+                  hint: l10n.t('insertQuote'),
+                ),
+                _toolbarBtn(
+                  Icons.functions,
+                  () => _openMathPage(),
+                  hint: l10n.t('math'),
+                ),
+                // User "editor" plugins render their insert buttons here.
+                ...provider.pluginManager.buildWidgets(context),
+              ],
+            ),
+          ),
+          if (wordCountEnabled)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${l10n.t('words')}: ${counts['words']}  '
+                    '${l10n.t('characters')}: ${counts['chars']}  '
+                    '${l10n.t('lines')}: ${counts['lines']}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  Text(
+                    '${_note.updatedAt.day}/${_note.updatedAt.month}/${_note.updatedAt.year}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 

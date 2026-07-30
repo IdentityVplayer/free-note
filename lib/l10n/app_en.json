@@ -277,5 +277,15 @@
   "pomodoroMonth": "This month",
   "pomodoroYear": "This year",
   "pomodoroBreak": "Break",
+  "addFile": "Add file",
+  "selectRepoFirst": "Select a repository first",
+  "fileMustBeInRepo": "The file must be inside the current repository",
+  "fileReadFailed": "Failed to read file",
+  "clipboard": "Clipboard",
+  "clipboardEmpty": "No clipboard items yet",
+  "copiedToClipboard": "Copied to clipboard",
+  "clear": "Clear",
+  "widgets": "Widgets",
+  "clipboardMax": "Clipboard history limit",
   "close": "Close"
 }

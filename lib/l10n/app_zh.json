@@ -277,5 +277,15 @@
   "pomodoroMonth": "本月",
   "pomodoroYear": "本年",
   "pomodoroBreak": "休息",
+  "addFile": "添加文件",
+  "selectRepoFirst": "请先选择仓库",
+  "fileMustBeInRepo": "文件必须在当前仓库内",
+  "fileReadFailed": "文件读取失败",
+  "clipboard": "剪切板",
+  "clipboardEmpty": "暂无剪切板内容",
+  "copiedToClipboard": "已复制到剪切板",
+  "clear": "清空",
+  "widgets": "小组件",
+  "clipboardMax": "剪切板历史条数上限",
   "close": "关闭"
 }

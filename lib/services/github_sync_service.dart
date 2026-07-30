@@ -81,6 +81,12 @@ class GitHubSyncService {
       final localPaths = <String>{};
       for (final note in notes) {
         final path = _notePath(note);
+        // Private notes (inside 私人笔记/) stay local-only: keep their remote
+        // path in [localPaths] so it is never deleted, but don't upload it.
+        if (note.isPrivate) {
+          localPaths.add(path);
+          continue;
+        }
         localPaths.add(path);
         final content = note.toMarkdownFile();
         final encoded = base64Encode(utf8.encode(content)).replaceAll('\n', '');

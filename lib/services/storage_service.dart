@@ -53,6 +53,16 @@ class StorageService {
     currentFolder = path;
     final dir = Directory(path);
     if (!dir.existsSync()) dir.createSync(recursive: true);
+    // Auto-create the "private" folder so every repository always has a
+    // local-only space whose contents are never uploaded to GitHub (v1.18.0).
+    final privateDir = Directory(p.join(path, privateNotesFolderName));
+    if (!privateDir.existsSync()) {
+      try {
+        privateDir.createSync(recursive: true);
+      } catch (_) {
+        // best-effort — the repo still works without it.
+      }
+    }
   }
 
   // ── Notes: markdown files in the user folder (recursive) ──
@@ -156,20 +166,10 @@ class StorageService {
     final written = <String>{};
     final writtenConfigs = <String>{};
     for (final note in notes) {
+      await _writeNoteContent(note);
       final rel = note.relativePath ?? note.fileName;
-      final file = File(p.join(dir.path, rel));
-      try {
-        file.parent.createSync(recursive: true);
-        // Content only — metadata goes to .config/<id>.json.
-        file.writeAsStringSync(note.content);
-        written.add(file.path);
-        final cfg = File(p.join(cfgDir.path, '${note.id}.json'));
-        cfg.writeAsStringSync(jsonEncode(note.toConfigJson()));
-        writtenConfigs.add(cfg.path);
-      } catch (_) {
-        // Skip notes we cannot write (e.g. permission revoked) rather than
-        // aborting the whole save and losing everything else.
-      }
+      written.add(File(p.join(dir.path, rel)).path);
+      writtenConfigs.add(File(p.join(cfgDir.path, '${note.id}.json')).path);
     }
     // Remove orphaned app-managed note files (those whose name matches the
     // generated numeric id pattern) that are no longer in the list. We only
@@ -200,12 +200,94 @@ class StorageService {
     if (!hasFolder) return;
     final dir = Directory(currentFolder!);
     if (!dir.existsSync()) dir.createSync(recursive: true);
-    final rel = note.relativePath ?? note.fileName;
-    final file = File(p.join(dir.path, rel));
-    file.parent.createSync(recursive: true);
-    file.writeAsStringSync(note.content); // content only
-    final cfg = File(p.join(await _configDirPath, '${note.id}.json'));
-    cfg.writeAsStringSync(jsonEncode(note.toConfigJson())); // metadata
+    await _writeNoteContent(note);
+  }
+
+  /// Write a single note's content file, renaming it when its (title-derived)
+  /// path changed, then refresh its `.config/<id>.json` metadata.
+  ///
+  /// Mutates [note.relativePath] to the final on-disk path so the config entry
+  /// is authoritative on the next load and subsequent saves are no-ops.
+  /// Collision-safe: if the title-derived name is taken by another note, a
+  /// ` (n)` suffix is appended (v1.18.0).
+  Future<void> _writeNoteContent(Note note) async {
+    final dir = Directory(currentFolder!);
+    final cfgDirPath = await _configDirPath;
+    // The content file name ALWAYS follows the title (title → file name);
+    // only the enclosing folder is preserved across renames/moves. This keeps
+    // the "filename = title" contract true for every caller (v1.18.0).
+    final dirOf = note.relativePath != null
+        ? p.dirname(note.relativePath!)
+        : '.';
+    final titleBase = '${sanitizeFileName(note.title)}.md';
+    final desired = (dirOf == '.' || dirOf.isEmpty)
+        ? titleBase
+        : p.join(dirOf, titleBase);
+    final oldRel = _oldContentRel(note, cfgDirPath);
+    final rel = _finalContentRel(dir, desired, oldRel);
+
+    if (oldRel != rel) {
+      final oldFile = File(p.join(dir.path, oldRel));
+      final newFile = File(p.join(dir.path, rel));
+      if (oldFile.existsSync()) {
+        try {
+          if (!newFile.existsSync()) {
+            oldFile.renameSync(newFile.path);
+          } else {
+            // Safety net: target already occupied — drop the stale old copy.
+            oldFile.deleteSync();
+          }
+        } catch (_) {
+          // rename failed (e.g. cross-device) — fall through to overwrite.
+        }
+      }
+    }
+
+    final target = File(p.join(dir.path, rel));
+    target.parent.createSync(recursive: true);
+    target.writeAsStringSync(note.content);
+    if (note.relativePath != rel) note.relativePath = rel;
+    final cfg = File(p.join(cfgDirPath, '${note.id}.json'));
+    cfg.writeAsStringSync(jsonEncode(note.toConfigJson()));
+  }
+
+  /// The on-disk path this note's content used to live at: read from the
+  /// saved `.config/<id>.json` (authoritative), else the legacy numeric-id
+  /// file name used before title-based naming (v1.18.0).
+  String _oldContentRel(Note note, String cfgDirPath) {
+    final cfg = File(p.join(cfgDirPath, '${note.id}.json'));
+    if (cfg.existsSync()) {
+      try {
+        final m = jsonDecode(cfg.readAsStringSync()) as Map<String, dynamic>;
+        final rel = m['relativePath'] as String?;
+        if (rel != null && rel.isNotEmpty) return rel;
+      } catch (_) {
+        // corrupt config — fall back to legacy name below.
+      }
+    }
+    return '${note.id}.md';
+  }
+
+  /// Resolve the final content path: [desired] unless it collides with a file
+  /// that is NOT this note's own [oldRel], in which case append ` (n)`.
+  String _finalContentRel(Directory dir, String desired, String oldRel) {
+    if (desired == oldRel) return desired;
+    if (!File(p.join(dir.path, desired)).existsSync()) return desired;
+    var i = 2;
+    while (true) {
+      final cand = _suffixedFileName(desired, i);
+      if (cand == oldRel) return cand;
+      if (!File(p.join(dir.path, cand)).existsSync()) return cand;
+      i++;
+      if (i > 9999) return cand;
+    }
+  }
+
+  /// Insert ` (n)` before the extension of [name] (e.g. `Note.md` → `Note (2).md`).
+  static String _suffixedFileName(String name, int n) {
+    final dot = name.lastIndexOf('.');
+    if (dot <= 0) return '$name ($n)';
+    return '${name.substring(0, dot)} ($n)${name.substring(dot)}';
   }
 
   /// Delete the note's `.md` file, using its relative path when known.

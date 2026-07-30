@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../providers/app_provider.dart';
 import '../services/ai_service.dart';
+import '../services/clipboard_service.dart';
 import '../services/storage_service.dart';
 import '../services/github_sync_service.dart';
 import '../services/notification_service.dart';
@@ -37,6 +38,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late List<String> _aiModels;
   final TextEditingController _aiModelAddController = TextEditingController();
   String? _themeColorHex;
+
+  /// Clipboard widget: max number of history items to keep (1..99999).
+  late TextEditingController _clipboardMaxController;
 
   /// Whether the (obscured by default) AI API key fields are revealed.
   bool _showApiKey = false;
@@ -74,6 +78,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         : s.currentAiId; // custom:<id> preserved as-is, built-ins stay keys
     _aiModels = List<String>.from(s.aiModels);
     _themeColorHex = s.themeColorHex;
+    _clipboardMaxController = TextEditingController(
+      text: s.clipboardMax.toString(),
+    );
   }
 
   @override
@@ -85,6 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _aiBaseUrlController.dispose();
     _aiLabelController.dispose();
     _aiModelAddController.dispose();
+    _clipboardMaxController.dispose();
     super.dispose();
   }
 
@@ -193,6 +201,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _save() {
     final provider = context.read<AppProvider>();
+    // Clipboard history cap — clamp to [1, 99999] so the widget stays sane.
+    final parsedMax = int.tryParse(_clipboardMaxController.text.trim());
+    final clipboardMax = (parsedMax == null || parsedMax < 1)
+        ? 100
+        : (parsedMax > 99999 ? 99999 : parsedMax);
+    ClipboardService.instance.setMax(clipboardMax);
     // Build the new endpoint list with the user's current edits on the
     // selected endpoint, plus the unchanged entries for the others.
     final isCustom = !_builtinIds.contains(_aiProvider);
@@ -235,6 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         notesFolderPath: provider.settings.notesFolderPath,
         repositories: provider.settings.repositories,
         aiModels: _aiModels.where((m) => m.trim().isNotEmpty).toList(),
+        clipboardMax: clipboardMax,
       ),
     );
     Navigator.pop(context);
@@ -692,6 +707,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const RadioListTile<String>(title: Text('中文'), value: 'zh'),
                 const RadioListTile<String>(title: Text('日本語'), value: 'ja'),
               ],
+            ),
+          ),
+          // Widgets (clipboard history cap)
+          _sectionHeader(l10n.t('widgets')),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _clipboardMaxController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: l10n.t('clipboardMax'),
+                hintText: '1 – 99999',
+                border: const OutlineInputBorder(),
+              ),
             ),
           ),
           // AI

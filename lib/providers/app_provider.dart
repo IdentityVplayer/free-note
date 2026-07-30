@@ -7,6 +7,7 @@ import '../models/task.dart';
 import '../models/settings.dart';
 import '../models/plugin.dart';
 import '../services/storage_service.dart';
+import '../services/clipboard_service.dart';
 import '../services/ai_service.dart';
 import '../services/github_sync_service.dart';
 import '../services/task_service.dart';
@@ -97,6 +98,11 @@ class AppProvider extends ChangeNotifier
       await _storage.setFolder(_settings.notesFolderPath!);
     }
     _notes = await _storage.loadNotes();
+
+    // Start the clipboard manager (polls the system clipboard, persists the
+    // history to the config dir). Safe before any repo is chosen — the config
+    // dir falls back to the private app dir.
+    await ClipboardService.instance.init(max: _settings.clipboardMax);
 
     // Initialize services with loaded settings. When the user hasn't supplied
     // their own key, fall back to the built-in OpenRouter key so AI works out
@@ -202,6 +208,8 @@ class AppProvider extends ChangeNotifier
         final rel = p.relative(entity.path, from: base);
         // Skip note files and config files — they are handled separately.
         if (rel.startsWith('.config/') || rel.endsWith('.md')) continue;
+        // Never upload the private folder (and its attachments).
+        if (rel.startsWith('$privateNotesFolderName/')) continue;
         try {
           out[rel] = entity.readAsBytesSync();
         } catch (_) {

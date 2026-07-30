@@ -277,5 +277,15 @@
   "pomodoroMonth": "今月",
   "pomodoroYear": "今年",
   "pomodoroBreak": "休憩",
+  "addFile": "ファイルを追加",
+  "selectRepoFirst": "まずリポジトリを選択してください",
+  "fileMustBeInRepo": "ファイルは現在のリポジトリ内にある必要があります",
+  "fileReadFailed": "ファイルの読み込みに失敗しました",
+  "clipboard": "クリップボード",
+  "clipboardEmpty": "クリップボードは空です",
+  "copiedToClipboard": "クリップボードにコピーしました",
+  "clear": "クリア",
+  "widgets": "ウィジェット",
+  "clipboardMax": "クリップボード履歴の上限",
   "close": "閉じる"
 }
