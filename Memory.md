@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 四标签（任务 / 笔记 / 番茄钟 / 剪切板） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **297**（三语一致，截至 v1.18.1） |
-| 当前稳定版本 | `1.18.1+60`（已发布，tag `v1.18.1`） |
+| i18n key 总数 | **300**（三语一致，截至 v1.18.2） |
+| 当前稳定版本 | `1.18.2+61`（已发布，tag `v1.18.2`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -320,6 +320,24 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 4. ✅ 三语新增 9 key（folderFullName / ok / onboardingTitle / onboardingDesc / onboardingStep1–3 / onboardingStart / onboardingSkip）；i18n 总数 288 → 297。
 5. ✅ `flutter analyze` 0 issues + `flutter test` 62 passed（用自定义 `_MockClient extends http.BaseClient` 重写私人笔记测试，删除会真实触网的旧 `github_sync_private_test.dart` 重复文件）。
 6. ✅ bump `pubspec.yaml` 版本 `1.18.0+59` → `1.18.1+60`；最终 commit / tag / push。
+
+---
+
+## 三·七、v1.18.2 开发上下文（已落地并发布 ✅）
+
+用户三条需求（2 功能 + 1 修复）：
+
+1. ✅ **(feat) 支持 HTML（含 HTML4/HTML5 的 `<font>`）** — 新增 `lib/markdown/html_markdown.dart`：
+   - `HtmlTagSyntax`（`md.InlineSyntax`）拦截行内白名单标签：`font`(color/face/size)、`b/strong`、`i/em`、`u`、`s/strike/del`、`code`、`mark`、`span style`、`a href`，生成 `htmlTag` 元素并解析属性。
+   - `HtmlTagBuilder`（`MarkdownElementBuilder`）把标签映射为 `TextStyle`：`<font color>` 支持 `#hex`/`rgb()`/命名色，`face`→fontFamily，`size`(1-7)→px；`<span style>` 解析 color/background/font-*/weight/style/decoration；`<a>` 可点击（复用 `safeMarkdown` 的 `onTapLink`）。
+   - `parseColor()` 支持 `#rgb`/`#rrggbb`/`#rrggbbaa`/`rgb()/rgba()`/命名色（注意：CSS 命名色与 Flutter Material 色不同，如 `red`=0xFFFF0000 ≠ `Colors.red`）。
+   - 关键点：`safeMarkdown` 改用自定义 `htmlFriendlyExtensionSet`（在 `gitHubFlavored` 基础上**剔除默认 `InlineHtmlSyntax`**），否则 `<font>` 会被当成字面文本；保留 strikethrough/emoji。三语新增 3 key（color/colorPicker/customColor），i18n 总数 297→300。
+2. ✅ **(feat) 工具栏颜色按钮** — 编辑器底部栏新增 `Icons.color_lens` 按钮，点击弹出颜色选择器（14 个预设色板 + 自定义 hex 输入 + 实时预览）；确认后在选区两侧插入 `<font color="#rrggbb">…</font>`（无选区则插入空标签并把光标置于中间），复用 `_insertText(before, after)`。
+3. ✅ **(fix) 移动端工具栏始终在键盘上方** — `Scaffold.resizeToAvoidBottomInset` 改为 `false`，底部栏外层 `Container` 按 `MediaQuery.of(context).viewInsets.bottom` 抬升并加 `surface` 背景；比依赖 resize 更稳（部分 Android 输入法会忽略 resize 让工具栏沉到键盘后）。激活行靠 Flutter 焦点自动滚入视野。
+
+### 验证
+- `flutter analyze` 0 issues；`flutter test` 62 → **75 passed**（新增 `test/html_markdown_test.dart`：parseColor / HtmlTagSyntax 解析 / HtmlTagBuilder 渲染红绿粗体 widget 测试）。
+- bump `1.18.1+60` → `1.18.2+61`；commit / tag `v1.18.2` / push。
 
 ---
 

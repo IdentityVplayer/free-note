@@ -5,6 +5,8 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import 'html_markdown.dart';
+
 /// Inline LaTeX: `$...$` (single line, no nested `$`).
 class InlineMathSyntax extends md.InlineSyntax {
   InlineMathSyntax() : super(r'\$([^$\n]+?)\$');
@@ -121,15 +123,19 @@ Widget safeMarkdown({
   bool selectable = true,
   String? relativeBaseDir,
 }) {
+  // Let `<a>` links reuse the same open handler as Markdown links.
+  HtmlTagBuilder.onTapLink = onTapLink;
   return Padding(
     padding: const EdgeInsets.all(16),
     child: MarkdownBody(
       data: data,
       selectable: selectable,
-      extensionSet: md.ExtensionSet.gitHubFlavored,
-      inlineSyntaxes: mathInlineSyntaxes,
+      // Excludes the default InlineHtmlSyntax so our HtmlTagSyntax owns
+      // inline-HTML parsing (v1.18.2).
+      extensionSet: htmlFriendlyExtensionSet,
+      inlineSyntaxes: [...mathInlineSyntaxes, ...htmlInlineSyntaxes],
       blockSyntaxes: mathBlockSyntaxes,
-      builders: mathBuilders,
+      builders: {...mathBuilders, ...htmlBuilders},
       sizedImageBuilder: relativeBaseDir == null
           ? null
           : (config) => _buildLocalImage(config.uri, relativeBaseDir),

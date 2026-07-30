@@ -1,5 +1,14 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.18.2
+
+### Added
+- **HTML 渲染支持** — 笔记预览现在可渲染行内 HTML：`<font color="..." face="..." size="...">`（兼容 HTML4/HTML5 的 `<font>`）、`<b>/<strong>`、`<i>/<em>`、`<u>`、`<s>/<strike>/<del>`、`<code>`、`<mark>`、`<span style="...">`、`<a href>`。颜色支持 `#rgb`/`#rrggbb`/`rgb()/rgba()` 与常见命名色。
+- **工具栏颜色按钮** — 编辑器底部工具栏新增调色按钮：点击弹出颜色选择器（预设色板 + 自定义十六进制 + 实时预览），确认后在选中文字两侧插入 `<font color="#rrggbb">…</font>`，让文字直接带颜色。
+
+### Fixed
+- **移动端工具栏常驻键盘上方** — 编辑笔记时，底部格式工具栏现在稳定地浮在软键盘之上（不再被部分 Android 输入法遮挡）。
+
 ## 1.18.1
 
 ### Changed

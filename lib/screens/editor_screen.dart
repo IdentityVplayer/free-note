@@ -318,6 +318,121 @@ class _EditorScreenState extends State<EditorScreen>
     }
   }
 
+  /// Open the color picker; on confirm, wrap the current selection (or insert
+  /// at the caret) with `<font color="#rrggbb">…</font>` so the user can color
+  /// text directly. Relies on the HTML renderer (v1.18.2).
+  Future<void> _showColorPicker(AppLocalizations l10n) async {
+    final presets = <String>[
+      '000000', 'FF0000', 'FF8C00', 'FFA500', 'FFFF00',
+      '00AA00', '00CCCC', '0000FF', '800080', 'FF00FF',
+      'FF69B4', '964B00', '808080', 'FFFFFF',
+    ];
+    String selected = 'FF0000';
+    final customCtrl = TextEditingController(text: '#$selected');
+    final result = await showDialog<String?>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text(l10n.t('colorPicker')),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: presets.map((hex) {
+                    final isSel =
+                        hex.toLowerCase() == selected.toLowerCase();
+                    return GestureDetector(
+                      onTap: () {
+                        selected = hex;
+                        customCtrl.text = '#$hex';
+                        setState(() {});
+                      },
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Color(int.parse('FF$hex', radix: 16)),
+                          border: Border.all(
+                            color: isSel
+                                ? Theme.of(ctx).colorScheme.primary
+                                : Colors.black26,
+                            width: isSel ? 3 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: customCtrl,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('customColor'),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onChanged: (v) {
+                    final hex = _normalizeHex(v);
+                    if (hex != null) {
+                      selected = hex;
+                      setState(() {});
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  height: 36,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Color(int.parse('FF$selected', radix: 16)),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.black26),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.t('cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, selected),
+              child: Text(l10n.t('ok')),
+            ),
+          ],
+        ),
+      ),
+    );
+    customCtrl.dispose();
+    if (result != null && result.isNotEmpty) {
+      _insertFontColor(result);
+    }
+  }
+
+  /// Normalize a user-entered color (with or without leading '#', 3 or 6 hex
+  /// digits) to a 6-digit lowercase hex string, or null if invalid.
+  String? _normalizeHex(String input) {
+    var v = input.trim().toLowerCase();
+    if (v.isEmpty) return null;
+    if (v.startsWith('#')) v = v.substring(1);
+    if (v.length == 3) v = v.split('').map((c) => c + c).join();
+    if (v.length != 6) return null;
+    return RegExp(r'^[0-9a-f]{6}$').hasMatch(v) ? v : null;
+  }
+
+  /// Insert `<font color="#hex">…</font>` around the selection (or at the
+  /// caret when nothing is selected).
+  void _insertFontColor(String hex) {
+    _insertText('<font color="#$hex">', '</font>');
+  }
+
   /// Insert [text] at the current caret (active line, else end of document),
   /// moving the caret to the end of the inserted text.
   void _insertAtCursor(String text) {
@@ -518,6 +633,11 @@ class _EditorScreenState extends State<EditorScreen>
         _provider.autoSyncIfEnabled();
       },
       child: Scaffold(
+        // Keep the body full-height and lift the bottom bar above the keyboard
+        // ourselves (see _buildBottomBar). This is more reliable across IMEs
+        // than relying on resizeToAvoidBottomInset, which some Android
+        // keyboards ignore and let the toolbar sink behind the keys (v1.18.2).
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           title: Text(
             _titleController.text.isEmpty
@@ -659,90 +779,110 @@ class _EditorScreenState extends State<EditorScreen>
     Map<String, int> counts,
     bool wordCountEnabled,
   ) {
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Divider(height: 1),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              children: [
-                _toolbarBtn(
-                  Icons.attach_file,
-                  _addFile,
-                  hint: l10n.t('addFile'),
-                ),
-                _toolbarBtn(
-                  Icons.title,
-                  () => _insertText('## '),
-                  hint: l10n.t('insertHeading'),
-                ),
-                _toolbarBtn(
-                  Icons.format_bold,
-                  () => _insertText('**'),
-                  hint: l10n.t('insertBold'),
-                ),
-                _toolbarBtn(
-                  Icons.format_italic,
-                  () => _insertText('*'),
-                  hint: l10n.t('insertItalic'),
-                ),
-                _toolbarBtn(
-                  Icons.code,
-                  () => _insertText('`'),
-                  hint: l10n.t('insertCode'),
-                ),
-                _toolbarBtn(
-                  Icons.link,
-                  () => _insertText('[', ']()'),
-                  hint: l10n.t('insertLink'),
-                ),
-                _toolbarBtn(
-                  Icons.list,
-                  () => _insertText('- '),
-                  hint: l10n.t('insertList'),
-                ),
-                _toolbarBtn(
-                  Icons.format_quote,
-                  () => _insertText('> '),
-                  hint: l10n.t('insertQuote'),
-                ),
-                _toolbarBtn(
-                  Icons.functions,
-                  () => _openMathPage(),
-                  hint: l10n.t('math'),
-                ),
-                // User "editor" plugins render their insert buttons here.
-                ...provider.pluginManager.buildWidgets(context),
-              ],
-            ),
-          ),
-          if (wordCountEnabled)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              ),
+    return Container(
+      // Lift the whole bar above the on-screen keyboard on every platform/IME.
+      // Combined with `resizeToAvoidBottomInset: false` on the Scaffold, this
+      // guarantees the toolbar never sinks behind the keys (v1.18.2).
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      color: Theme.of(context).colorScheme.surface,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Divider(height: 1),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '${l10n.t('words')}: ${counts['words']}  '
-                    '${l10n.t('characters')}: ${counts['chars']}  '
-                    '${l10n.t('lines')}: ${counts['lines']}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  _toolbarBtn(
+                    Icons.attach_file,
+                    _addFile,
+                    hint: l10n.t('addFile'),
                   ),
-                  Text(
-                    '${_note.updatedAt.day}/${_note.updatedAt.month}/${_note.updatedAt.year}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  _toolbarBtn(
+                    Icons.title,
+                    () => _insertText('## '),
+                    hint: l10n.t('insertHeading'),
                   ),
+                  _toolbarBtn(
+                    Icons.format_bold,
+                    () => _insertText('**'),
+                    hint: l10n.t('insertBold'),
+                  ),
+                  _toolbarBtn(
+                    Icons.format_italic,
+                    () => _insertText('*'),
+                    hint: l10n.t('insertItalic'),
+                  ),
+                  _toolbarBtn(
+                    Icons.code,
+                    () => _insertText('`'),
+                    hint: l10n.t('insertCode'),
+                  ),
+                  _toolbarBtn(
+                    Icons.link,
+                    () => _insertText('[', ']()'),
+                    hint: l10n.t('insertLink'),
+                  ),
+                  _toolbarBtn(
+                    Icons.list,
+                    () => _insertText('- '),
+                    hint: l10n.t('insertList'),
+                  ),
+                  _toolbarBtn(
+                    Icons.format_quote,
+                    () => _insertText('> '),
+                    hint: l10n.t('insertQuote'),
+                  ),
+                  _toolbarBtn(
+                    Icons.functions,
+                    () => _openMathPage(),
+                    hint: l10n.t('math'),
+                  ),
+                  // Color button: opens a picker and inserts a <font color>.
+                  _toolbarBtn(
+                    Icons.color_lens,
+                    () => _showColorPicker(l10n),
+                    hint: l10n.t('color'),
+                  ),
+                  // User "editor" plugins render their insert buttons here.
+                  ...provider.pluginManager.buildWidgets(context),
                 ],
               ),
             ),
-        ],
+            if (wordCountEnabled)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${l10n.t('words')}: ${counts['words']}  '
+                      '${l10n.t('characters')}: ${counts['chars']}  '
+                      '${l10n.t('lines')}: ${counts['lines']}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    Text(
+                      '${_note.updatedAt.day}/${_note.updatedAt.month}/${_note.updatedAt.year}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
