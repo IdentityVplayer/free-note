@@ -1,5 +1,13 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.18.3
+
+### Changed
+- **更新 APK 下载目录改为 app 私有数据目录** — 新版本 APK 现在保存在 app 私有数据目录下的 `download/`（`getApplicationDocumentsDirectory()/free_note/download`），不再写入系统 Download 目录或笔记仓库目录。安装时原生层会自行把 APK 复制到公共 Downloads 并用 FileProvider 调起安装，因此存放位置改为私有目录不影响安装。
+
+### Fixed
+- **启动自动清理下载缓存** — 每次启动 app 时自动删除 app 私有数据目录下 `download/` 文件夹内的全部文件与子目录（文件夹本身保留），仅清理 app 自身数据，绝不触碰用户的笔记仓库。
+
 ## 1.18.2
 
 ### Added

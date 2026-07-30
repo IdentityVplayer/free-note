@@ -421,7 +421,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     int pct = -1; // -1 = idle, 0..100 = progress, 101 = done
     String? errorMsg;
     final cancelled = ValueNotifier<bool>(false);
-    // Default save path: <repo>/download/free-note-<current_version>.apk
+    // Default save path: <appData>/download/free-note-<current_version>.apk
     final info = await PackageInfo.fromPlatform();
     final saveDir = await _defaultDownloadDir();
     final savePath = p.join(saveDir, 'free-note-${info.version}.apk');
@@ -542,30 +542,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Default directory for downloaded updates.
+  /// Default directory for downloaded updates (v1.18.3).
   ///
-  /// On Android we save to the system Download directory (`/sdcard/Download`)
-  /// so the APK lands somewhere the user (and the package installer) can
-  /// easily reach — v1.18.1. On other platforms we fall back to the app's
-  /// notes-folder `download/` subfolder, or the config dir if no folder is set.
+  /// Always lives under the app's private data directory
+  /// (`<appData>/download`) — **not** the notes repository and **not** the
+  /// system Download folder. The installer copies the APK out to public
+  /// Downloads at install time (see `MainActivity.installApk`), so keeping the
+  /// working copy private is safe; the folder is also wiped on every app
+  /// launch (see `AppProvider._cleanupDownloadDir`).
   Future<String> _defaultDownloadDir() async {
-    if (Platform.isAndroid) {
-      final dir = Directory('/sdcard/Download');
-      try {
-        if (!dir.existsSync()) dir.createSync(recursive: true);
-      } catch (_) {
-        // If /sdcard/Download isn't writable (locked-down device), fall
-        // through to the app-local fallback below.
-      }
-      if (dir.existsSync()) return dir.path;
-    }
     final storage = StorageService.instance;
-    if (storage.hasFolder) {
-      return p.join(storage.currentFolder!, 'download');
+    final base = await storage.appDataDir;
+    final dir = Directory(p.join(base.path, 'download'));
+    try {
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+    } catch (_) {
+      // best-effort — if creation fails the download step will surface it.
     }
-    // Fall back to a directory inside the app config dir.
-    final cfgDir = await storage.configDir;
-    return p.join(cfgDir.path, 'download');
+    return dir.path;
   }
 
   Future<void> _exportData() async {

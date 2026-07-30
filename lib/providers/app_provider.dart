@@ -99,6 +99,11 @@ class AppProvider extends ChangeNotifier
     _setLoading(true);
     WidgetsBinding.instance.addObserver(this);
 
+    // Wipe the app-data `download` folder's contents on every launch so stale
+    // update APKs never accumulate. Scoped to the app's private data dir — the
+    // user's notes repository is never touched (v1.18.3).
+    await _storage.clearDownloadFolder();
+
     // Restore the last opened repository BEFORE reading settings. Settings
     // live in <repo>/.config/settings.json, whose location depends on knowing
     // the repo first — so without this, settings would be read from the

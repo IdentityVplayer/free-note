@@ -89,6 +89,29 @@ class StorageService {
   /// repository (resides in `<repo>/.config`) and is portable.
   Future<Directory> get configDir async => Directory(await _configDirPath);
 
+  /// The app's private data directory (`<docs>/free_note`). Downloaded update
+  /// APKs and other transient app files live here (v1.18.3); its `download`
+  /// subfolder is wiped on every launch so stale files never accumulate.
+  Future<Directory> get appDataDir async => await _privateDir;
+
+  /// Delete every file/subfolder *inside* the app-data `download` directory
+  /// (v1.18.3). The folder itself is preserved. Best-effort and strictly scoped
+  /// to the app's private data dir — the user's notes repository is never
+  /// touched. Called on every launch from `AppProvider`.
+  Future<void> clearDownloadFolder() async {
+    try {
+      final base = await _privateDir;
+      final dir = Directory(p.join(base.path, 'download'));
+      if (dir.existsSync()) {
+        for (final entity in dir.listSync()) {
+          entity.deleteSync(recursive: true);
+        }
+      }
+    } catch (_) {
+      // best-effort — never block startup.
+    }
+  }
+
   /// One-time migration: move [fileName] from the legacy private app dir
   /// (`free_note/`) into the current config dir. No-op when already present
   /// in the config dir or absent from the private dir. Used so existing users

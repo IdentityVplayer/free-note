@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 四标签（任务 / 笔记 / 番茄钟 / 剪切板） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **300**（三语一致，截至 v1.18.2） |
-| 当前稳定版本 | `1.18.2+61`（已发布，tag `v1.18.2`） |
+| i18n key 总数 | **300**（三语一致，截至 v1.18.3） |
+| 当前稳定版本 | `1.18.3+62`（已发布，tag `v1.18.3`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -338,6 +338,20 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 ### 验证
 - `flutter analyze` 0 issues；`flutter test` 62 → **75 passed**（新增 `test/html_markdown_test.dart`：parseColor / HtmlTagSyntax 解析 / HtmlTagBuilder 渲染红绿粗体 widget 测试）。
 - bump `1.18.1+60` → `1.18.2+61`；commit / tag `v1.18.2` / push。
+
+---
+
+## 三·八、v1.18.3 开发上下文（已落地并发布 ✅）
+
+用户两条需求（均关于更新 APK 下载目录）：
+
+1. ✅ **APK 下载目录改为 app 私有数据目录** — `_defaultDownloadDir()`（settings_screen）不再写 `/sdcard/Download` 或仓库目录，统一改为 `<appDataDir>/download`，其中 `appDataDir` = `getApplicationDocumentsDirectory()/free_note`（`StorageService._privateDir`，app 私有数据根）。`StorageService` 新增 `appDataDir` getter 与 `clearDownloadFolder()` 方法。
+   - 安全性已确认：原生 `MainActivity.installApk` 会先把 APK **复制**到公共 Downloads 再用 FileProvider 安装（`file_provider_paths.xml` 含 `external-path`/files-path），所以下载源放私有目录不影响安装。
+2. ✅ **每次启动自动清空 app 数据目录下 download 文件夹内的文件** — `AppProvider.init()` 开头调用 `StorageService.clearDownloadFolder()`：删除 `<appDataDir>/download` 内所有文件与子目录（保留文件夹本身），仅作用于 app 私有数据目录，**绝不触碰用户笔记仓库**。best-effort（try/catch），失败不阻塞启动。
+
+### 验证
+- `flutter analyze` 0 issues；`flutter test` 75 → **78 passed**（新增 `test/download_dir_test.dart`：appDataDir 路径 / download 文件夹清理 / 文件夹不存在时安全）。
+- bump `1.18.2+61` → `1.18.3+62`；commit / tag `v1.18.3` / push。
 
 ---
 
