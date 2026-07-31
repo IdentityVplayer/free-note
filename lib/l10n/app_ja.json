@@ -213,6 +213,8 @@
   "pomodoroPause": "一時停止",
   "pomodoroResume": "再開",
   "pomodoroReset": "リセット",
+  "pomodoroStarted": "ポモドーロ開始",
+  "pomodoroRunning": "集中タイマー作動中 — 他のページに切り替え可能",
   "pomodoroSettings": "タイマー設定",
   "pomodoroWorkMinutes": "集中時間（分）",
   "pomodoroShortMinutes": "短い休憩（分）",

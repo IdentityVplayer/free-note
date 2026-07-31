@@ -60,10 +60,7 @@ void main() {
 
   group('HtmlTagSyntax — inline HTML parsing', () {
     test('<font color> keeps color attribute and inner text', () {
-      final el = _parseHtmlTag(
-        '<font color="red">hello</font>',
-        'font',
-      );
+      final el = _parseHtmlTag('<font color="red">hello</font>', 'font');
       expect(el.attributes['color'], equals('red'));
       expect(el.textContent, equals('hello'));
     });
@@ -79,30 +76,18 @@ void main() {
     });
 
     test('<b> and <i> parse as their semantic tags', () {
-      expect(
-        _parseHtmlTag('<b>bold</b>', 'b').textContent,
-        equals('bold'),
-      );
-      expect(
-        _parseHtmlTag('<i>italic</i>', 'i').textContent,
-        equals('italic'),
-      );
+      expect(_parseHtmlTag('<b>bold</b>', 'b').textContent, equals('bold'));
+      expect(_parseHtmlTag('<i>italic</i>', 'i').textContent, equals('italic'));
     });
 
     test('<span style> keeps the raw style string', () {
-      final el = _parseHtmlTag(
-        '<span style="color: blue">t</span>',
-        'span',
-      );
+      final el = _parseHtmlTag('<span style="color: blue">t</span>', 'span');
       expect(el.attributes['style'], equals('color: blue'));
       expect(el.textContent, equals('t'));
     });
 
     test('<a href> keeps the link target', () {
-      final el = _parseHtmlTag(
-        '<a href="https://example.com">link</a>',
-        'a',
-      );
+      final el = _parseHtmlTag('<a href="https://example.com">link</a>', 'a');
       expect(el.attributes['href'], equals('https://example.com'));
     });
 
@@ -129,27 +114,19 @@ void main() {
     Future<Text> renderText(WidgetTester tester, String data) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: safeMarkdown(data: data, selectable: false),
-          ),
+          home: Scaffold(body: safeMarkdown(data: data, selectable: false)),
         ),
       );
       return tester.widget<Text>(find.text('hi'));
     }
 
     testWidgets('<font color="red"> renders red Text', (tester) async {
-      final text = await renderText(
-        tester,
-        '<font color="red">hi</font>',
-      );
+      final text = await renderText(tester, '<font color="red">hi</font>');
       expect(text.style?.color, equals(const Color(0xFFFF0000)));
     });
 
     testWidgets('<font color="#00ff00"> renders green Text', (tester) async {
-      final text = await renderText(
-        tester,
-        '<font color="#00ff00">hi</font>',
-      );
+      final text = await renderText(tester, '<font color="#00ff00">hi</font>');
       expect(text.style?.color, equals(const Color(0xFF00FF00)));
     });
 

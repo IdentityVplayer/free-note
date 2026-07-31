@@ -7,8 +7,8 @@ import 'package:path/path.dart' as p;
 import '../models/pomodoro_profile.dart';
 import '../models/pomodoro_session.dart';
 import '../services/pomodoro_service.dart';
+import '../services/pomodoro_timer.dart';
 import '../services/storage_service.dart';
-import '../services/notification_service.dart';
 import '../l10n/app_localizations.dart';
 
 /// Pomodoro timer screen.
@@ -16,6 +16,10 @@ import '../l10n/app_localizations.dart';
 /// Supports multiple named profiles (presets). The active profile drives the
 /// timer; each profile may carry its own background image and an independent
 /// long-break toggle. The durations are persisted via [PomodoroService].
+///
+/// The live countdown lives in [PomodoroTimer] (a singleton), so it keeps
+/// running when the user navigates to other pages (e.g. opens a note) — only
+/// this screen's view is torn down (v1.18.4).
 class PomodoroScreen extends StatefulWidget {
   /// When true, opens the "new profile" dialog on first load (used by the
   /// home-screen FAB so a single tap creates a pomodoro).
@@ -36,12 +40,17 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
   ];
   String _activeId = PomodoroService.defaultId;
 
-  String _phase = PomodoroProfile.phaseWork;
-  int _remaining = 25 * 60;
-  int _total = 25 * 60;
-  int _completed = 0;
-  bool _running = false;
-  Timer? _timer;
+  /// Tracks the last phase so we can pop an in-app SnackBar when a phase
+  /// finishes (the OS notification is posted by [PomodoroTimer] itself).
+  String? _prevPhase;
+
+  PomodoroTimer get _timerState => PomodoroTimer.instance;
+
+  // Timer state is read from the singleton so it survives navigation.
+  String get _phase => _timerState.phase;
+  int get _remaining => _timerState.remaining;
+  int get _total => _timerState.total;
+  int get _completed => _timerState.completed;
 
   PomodoroProfile get _active => _profiles.firstWhere(
     (p) => p.id == _activeId,
@@ -51,13 +60,38 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
   @override
   void initState() {
     super.initState();
+    _timerState.addListener(_onTimerChanged);
     _load();
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _timerState.removeListener(_onTimerChanged);
     super.dispose();
+  }
+
+  /// Rebuild on every tick / phase change, and surface an in-app SnackBar when
+  /// a phase completes (the OS notification is handled by the singleton).
+  void _onTimerChanged() {
+    final phase = _timerState.phase;
+    if (_prevPhase != null && phase != _prevPhase && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final l10n = AppLocalizations.of(context);
+        if (l10n != null) {
+          final label = phase == PomodoroProfile.phaseWork
+              ? l10n.t('pomodoroFocus')
+              : (phase == PomodoroProfile.phaseLong
+                    ? l10n.t('pomodoroLongBreak')
+                    : l10n.t('pomodoroShortBreak'));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${l10n.t('pomodoro')}: $label')),
+          );
+        }
+      });
+    }
+    _prevPhase = phase;
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -66,104 +100,27 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
     setState(() {
       _profiles = profiles;
       _activeId = PomodoroService.instance.active.id;
-      _applyProfile(reset: true);
     });
+    // Sync the singleton to the active profile (no-op while a session runs).
+    _timerState.initFromActive();
+    _prevPhase = _timerState.phase;
     if (widget.autoAdd) _showProfileDialog();
   }
 
-  /// Recompute the active profile and (when [reset]) restart the timer at the
-  /// work phase with the new durations.
-  void _applyProfile({bool reset = false}) {
-    if (reset) {
-      _pause();
-      _phase = PomodoroProfile.phaseWork;
-      _completed = 0;
-      _total = _active.secondsForPhase(_phase);
-      _remaining = _total;
-    }
-  }
+  void _start() => _timerState.start();
 
-  void _tick() {
-    if (_remaining > 0) {
-      setState(() => _remaining--);
-    } else {
-      _onPhaseComplete();
-    }
-  }
+  void _pause() => _timerState.pause();
 
-  void _start() {
-    if (_running) return;
-    setState(() => _running = true);
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-  }
-
-  void _pause() {
-    _timer?.cancel();
-    _timer = null;
-    if (mounted) setState(() => _running = false);
-  }
-
-  void _reset() {
-    _pause();
-    if (mounted) {
-      setState(() {
-        _phase = PomodoroProfile.phaseWork;
-        _completed = 0;
-        _total = _active.secondsForPhase(_phase);
-        _remaining = _total;
-      });
-    }
-  }
-
-  void _onPhaseComplete() {
-    final l10n = AppLocalizations.of(context);
-    // Log the just-finished phase for the focus / break statistics.
-    PomodoroService.instance.recordSession(
-      _phase,
-      _active.secondsForPhase(_phase),
-    );
-    if (_phase == PomodoroProfile.phaseWork) _completed++;
-    final next = nextPomodoroPhase(_active, _phase, _completed);
-    if (mounted) {
-      setState(() {
-        _phase = next;
-        _total = _active.secondsForPhase(next);
-        _remaining = _total;
-        _running = false;
-      });
-    }
-    _timer?.cancel();
-    _timer = null;
-    if (l10n != null && mounted) {
-      final finished = _phase == PomodoroProfile.phaseWork
-          ? l10n.t('pomodoroFocus')
-          : (_phase == PomodoroProfile.phaseLong
-                ? l10n.t('pomodoroLongBreak')
-                : l10n.t('pomodoroShortBreak'));
-      final nextLabel = next == PomodoroProfile.phaseWork
-          ? l10n.t('pomodoroFocus')
-          : (next == PomodoroProfile.phaseLong
-                ? l10n.t('pomodoroLongBreak')
-                : l10n.t('pomodoroShortBreak'));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${l10n.t('pomodoro')}: $nextLabel')),
-      );
-      // System notification so the user is alerted even when the app is
-      // backgrounded.
-      NotificationService.instance.showPomodoroDone(
-        l10n.t('pomodoro'),
-        '$finished → $nextLabel',
-      );
-    }
-  }
+  /// Restart the current phase's countdown. The completed count is preserved
+  /// by [PomodoroTimer.reset] — "重置" resets the timer, not the session
+  /// progress (v1.18.4).
+  void _reset() => _timerState.reset();
 
   Future<void> _switchProfile(String id) async {
     await PomodoroService.instance.setActive(id);
     if (!mounted) return;
-    setState(() {
-      _activeId = id;
-      _applyProfile(reset: true);
-    });
+    setState(() => _activeId = id);
+    _timerState.switchToProfile(id);
   }
 
   Future<void> _pickBackground() async {
@@ -333,11 +290,9 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
         _profiles = _profiles
             .map((p) => p.id == newCfg.id ? newCfg : p)
             .toList();
-        if (!_running) {
-          _total = newCfg.secondsForPhase(_phase);
-          _remaining = _total;
-        }
       });
+      // Refresh the current phase duration while idle (no-op while running).
+      _timerState.applyProfileDurations();
     }
   }
 
@@ -478,8 +433,8 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
         setState(() {
           _profiles = [..._profiles, profile];
           _activeId = profile.id;
-          _applyProfile(reset: true);
         });
+        _timerState.switchToProfile(profile.id);
       }
     }
   }
@@ -526,7 +481,7 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
           _profiles = _profiles.where((p) => p.id != profile.id).toList();
           if (_activeId == profile.id) {
             _activeId = _profiles.first.id;
-            _applyProfile(reset: true);
+            _timerState.switchToProfile(_profiles.first.id);
           }
         });
       }
@@ -707,10 +662,12 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     FilledButton.icon(
-                      onPressed: _running ? _pause : _start,
-                      icon: Icon(_running ? Icons.pause : Icons.play_arrow),
+                      onPressed: _timerState.running ? _pause : _start,
+                      icon: Icon(
+                        _timerState.running ? Icons.pause : Icons.play_arrow,
+                      ),
                       label: Text(
-                        _running
+                        _timerState.running
                             ? l10n.t('pomodoroPause')
                             : l10n.t('pomodoroStart'),
                       ),
@@ -916,9 +873,9 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
 
   /// Switch to [id] (if needed) and start its timer immediately.
   Future<void> _startProfile(String id) async {
-    if (_running) _pause();
+    if (_timerState.running) _timerState.pause();
     if (_activeId != id) await _switchProfile(id);
-    _start();
+    _timerState.start();
   }
 
   /// Format a duration in seconds as "Xh Ym" / "Ym".

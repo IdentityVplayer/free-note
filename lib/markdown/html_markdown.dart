@@ -25,12 +25,12 @@ import 'package:markdown/markdown.dart' as md;
 /// inline renderer.
 class HtmlTagSyntax extends md.InlineSyntax {
   HtmlTagSyntax()
-      : super(
-          r'<(font|b|strong|i|em|u|s|strike|del|code|mark|span|a)'
-          r'(\s+[^>]*)?>(.*?)</\1>',
-          startCharacter: 60, // '<'
-          caseSensitive: false,
-        );
+    : super(
+        r'<(font|b|strong|i|em|u|s|strike|del|code|mark|span|a)'
+        r'(\s+[^>]*)?>(.*?)</\1>',
+        startCharacter: 60, // '<'
+        caseSensitive: false,
+      );
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
@@ -90,8 +90,9 @@ class HtmlTagBuilder extends MarkdownElementBuilder {
       case 'code':
         style = style.copyWith(
           fontFamily: 'monospace',
-          backgroundColor:
-              Theme.of(context).colorScheme.surfaceContainerHighest,
+          backgroundColor: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest,
         );
       case 'mark':
         style = style.copyWith(backgroundColor: Colors.yellow);
@@ -113,11 +114,8 @@ class HtmlTagBuilder extends MarkdownElementBuilder {
       final href = element.attributes['href'];
       return GestureDetector(
         onTap: href != null
-            ? () => onTapLink?.call(
-                text,
-                href,
-                element.attributes['title'] ?? '',
-              )
+            ? () =>
+                  onTapLink?.call(text, href, element.attributes['title'] ?? '')
             : null,
         child: Text(text, style: style),
       );

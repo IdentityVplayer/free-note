@@ -323,9 +323,20 @@ class _EditorScreenState extends State<EditorScreen>
   /// text directly. Relies on the HTML renderer (v1.18.2).
   Future<void> _showColorPicker(AppLocalizations l10n) async {
     final presets = <String>[
-      '000000', 'FF0000', 'FF8C00', 'FFA500', 'FFFF00',
-      '00AA00', '00CCCC', '0000FF', '800080', 'FF00FF',
-      'FF69B4', '964B00', '808080', 'FFFFFF',
+      '000000',
+      'FF0000',
+      'FF8C00',
+      'FFA500',
+      'FFFF00',
+      '00AA00',
+      '00CCCC',
+      '0000FF',
+      '800080',
+      'FF00FF',
+      'FF69B4',
+      '964B00',
+      '808080',
+      'FFFFFF',
     ];
     String selected = 'FF0000';
     final customCtrl = TextEditingController(text: '#$selected');
@@ -343,8 +354,7 @@ class _EditorScreenState extends State<EditorScreen>
                   spacing: 8,
                   runSpacing: 8,
                   children: presets.map((hex) {
-                    final isSel =
-                        hex.toLowerCase() == selected.toLowerCase();
+                    final isSel = hex.toLowerCase() == selected.toLowerCase();
                     return GestureDetector(
                       onTap: () {
                         selected = hex;
@@ -862,8 +872,7 @@ class _EditorScreenState extends State<EditorScreen>
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).colorScheme.surfaceContainerHighest,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

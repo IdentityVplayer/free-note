@@ -213,6 +213,8 @@
   "pomodoroPause": "Pause",
   "pomodoroResume": "Resume",
   "pomodoroReset": "Reset",
+  "pomodoroStarted": "Pomodoro started",
+  "pomodoroRunning": "Focus timer running — you can switch to other pages",
   "pomodoroSettings": "Timer Settings",
   "pomodoroWorkMinutes": "Focus length (min)",
   "pomodoroShortMinutes": "Short break (min)",

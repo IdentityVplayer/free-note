@@ -213,6 +213,8 @@
   "pomodoroPause": "暂停",
   "pomodoroResume": "继续",
   "pomodoroReset": "重置",
+  "pomodoroStarted": "番茄钟已开始",
+  "pomodoroRunning": "专注计时进行中，可随时切换到其他页面",
   "pomodoroSettings": "计时设置",
   "pomodoroWorkMinutes": "专注时长（分钟）",
   "pomodoroShortMinutes": "短休时长（分钟）",

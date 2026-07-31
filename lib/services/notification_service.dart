@@ -225,6 +225,8 @@ class NotificationService {
   /// Convenience wrappers used by callers that don't care which channel.
   Future<void> showPomodoroDone(String title, String body) =>
       showNotification(title, body, channel: _channelPomodoro);
+  Future<void> showPomodoroStarted(String title, String body) =>
+      showNotification(title, body, channel: _channelPomodoro);
   Future<void> showSync(String title, String body) =>
       showNotification(title, body, channel: _channelSync);
   Future<void> showUpdate(String title, String body) =>

@@ -130,7 +130,8 @@ class GitHubSyncService {
       final uploaded = notes.where((n) => !n.isPrivate).length;
       return SyncResult(
         success: true,
-        message: '已同步 $uploaded 篇笔记到 GitHub'
+        message:
+            '已同步 $uploaded 篇笔记到 GitHub'
             '${uploaded < notes.length ? '（${notes.length - uploaded} 篇私人笔记已跳过）' : ''}',
       );
     } catch (e) {

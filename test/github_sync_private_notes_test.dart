@@ -13,7 +13,8 @@ class _MockClient extends http.BaseClient {
   final Future<http.StreamedResponse> Function(http.BaseRequest) _handler;
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) => _handler(request);
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      _handler(request);
 }
 
 http.StreamedResponse _jsonResponse(int status, Map<String, dynamic> body) {
@@ -37,33 +38,31 @@ Future<http.StreamedResponse> Function(http.BaseRequest) _makeHandler(
     const marker = '/contents/';
 
     if (request.method == 'GET' && path.endsWith('/git/refs/heads/main')) {
-      return Future.value(_jsonResponse(200, {
-        'object': {'sha': 'abc123'},
-      }));
+      return Future.value(
+        _jsonResponse(200, {
+          'object': {'sha': 'abc123'},
+        }),
+      );
     }
     if (request.method == 'GET' && path.contains('/git/trees/')) {
       // Remote already has: a pre-existing private note (same path as the
       // local private note) and a stale public file that no longer exists.
-      return Future.value(_jsonResponse(200, {
-        'tree': [
-          {
-            'path': 'notes/私人笔记/Secret.md',
-            'type': 'blob',
-            'sha': 'sha_priv',
-          },
-          {
-            'path': 'notes/old-public.md',
-            'type': 'blob',
-            'sha': 'sha_old',
-          },
-        ],
-      }));
+      return Future.value(
+        _jsonResponse(200, {
+          'tree': [
+            {'path': 'notes/私人笔记/Secret.md', 'type': 'blob', 'sha': 'sha_priv'},
+            {'path': 'notes/old-public.md', 'type': 'blob', 'sha': 'sha_old'},
+          ],
+        }),
+      );
     }
     if (request.method == 'PUT' && path.contains(marker)) {
       uploaded.add(path.substring(path.indexOf(marker) + marker.length));
-      return Future.value(_jsonResponse(201, {
-        'content': {'sha': 'newsha'},
-      }));
+      return Future.value(
+        _jsonResponse(201, {
+          'content': {'sha': 'newsha'},
+        }),
+      );
     }
     if (request.method == 'DELETE' && path.contains(marker)) {
       deleted.add(path.substring(path.indexOf(marker) + marker.length));
@@ -83,30 +82,27 @@ Future<http.StreamedResponse> Function(http.BaseRequest) _makePullHandler(
   return (http.BaseRequest request) {
     final path = Uri.decodeFull(request.url.path);
     if (request.method == 'GET' && path.endsWith('/git/refs/heads/main')) {
-      return Future.value(_jsonResponse(200, {
-        'object': {'sha': 'abc123'},
-      }));
+      return Future.value(
+        _jsonResponse(200, {
+          'object': {'sha': 'abc123'},
+        }),
+      );
     }
     if (request.method == 'GET' && path.contains('/git/trees/')) {
-      return Future.value(_jsonResponse(200, {
-        'tree': [
-          {
-            'path': 'notes/私人笔记/Secret.md',
-            'type': 'blob',
-            'sha': 'sha_priv',
-          },
-          {
-            'path': 'notes/public.md',
-            'type': 'blob',
-            'sha': 'sha_pub',
-          },
-        ],
-      }));
+      return Future.value(
+        _jsonResponse(200, {
+          'tree': [
+            {'path': 'notes/私人笔记/Secret.md', 'type': 'blob', 'sha': 'sha_priv'},
+            {'path': 'notes/public.md', 'type': 'blob', 'sha': 'sha_pub'},
+          ],
+        }),
+      );
     }
     if (request.method == 'GET' && path.contains('/contents/')) {
       contentGets.add(path);
       if (path.contains('notes/public.md')) {
-        const md = '---\n'
+        const md =
+            '---\n'
             'id: pub1\n'
             'title: Public Note\n'
             'tags: []\n'
@@ -116,28 +112,33 @@ Future<http.StreamedResponse> Function(http.BaseRequest) _makePullHandler(
             'updatedAt: 2024-01-01T00:00:00.000\n'
             '---\n\n'
             'Hello from public\n';
-        return Future.value(_jsonResponse(200, {
-          'content': base64Encode(utf8.encode(md)).replaceAll('\n', ''),
-          'sha': 'sha_pub',
-        }));
+        return Future.value(
+          _jsonResponse(200, {
+            'content': base64Encode(utf8.encode(md)).replaceAll('\n', ''),
+            'sha': 'sha_pub',
+          }),
+        );
       }
-      return Future.value(_jsonResponse(200, {
-        'content': base64Encode(utf8.encode('---')),
-        'sha': 'x',
-      }));
+      return Future.value(
+        _jsonResponse(200, {
+          'content': base64Encode(utf8.encode('---')),
+          'sha': 'x',
+        }),
+      );
     }
     return Future.value(_jsonResponse(404, {}));
   };
 }
 
-Note _note(String id, String title, String content, {String? relativePath}) => Note(
-  id: id,
-  title: title,
-  content: content,
-  createdAt: DateTime(2026, 1, 1),
-  updatedAt: DateTime(2026, 1, 2),
-  relativePath: relativePath,
-);
+Note _note(String id, String title, String content, {String? relativePath}) =>
+    Note(
+      id: id,
+      title: title,
+      content: content,
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 2),
+      relativePath: relativePath,
+    );
 
 void main() {
   group('isPathPrivate (shared exclusion rule)', () {
@@ -148,14 +149,17 @@ void main() {
       expect(isPathPrivate('a/b/私人笔记/c.md'), isTrue);
     });
 
-    test('false for non-private paths (including a file merely named like it)', () {
-      expect(isPathPrivate('Public Note.md'), isFalse);
-      expect(isPathPrivate('sub/Public.md'), isFalse);
-      // A top-level file named "私人笔记.md" is NOT inside the folder — must NOT
-      // be excluded, otherwise a legitimately-named public note would vanish.
-      expect(isPathPrivate('notes/私人笔记.md'), isFalse);
-      expect(isPathPrivate(''), isFalse);
-    });
+    test(
+      'false for non-private paths (including a file merely named like it)',
+      () {
+        expect(isPathPrivate('Public Note.md'), isFalse);
+        expect(isPathPrivate('sub/Public.md'), isFalse);
+        // A top-level file named "私人笔记.md" is NOT inside the folder — must NOT
+        // be excluded, otherwise a legitimately-named public note would vanish.
+        expect(isPathPrivate('notes/私人笔记.md'), isFalse);
+        expect(isPathPrivate(''), isFalse);
+      },
+    );
 
     test('Note.isPrivate delegates to isPathPrivate', () {
       // Inside the private folder → private.
@@ -178,51 +182,70 @@ void main() {
       deleted = [];
     });
 
-    test('private note is NOT uploaded, but its remote copy is preserved', () async {
-      final publicNote = _note('1', 'Public Note', 'hello', relativePath: 'Public Note.md');
-      final privateNote = _note('2', 'Secret', 'top secret', relativePath: '私人笔记/Secret.md');
+    test(
+      'private note is NOT uploaded, but its remote copy is preserved',
+      () async {
+        final publicNote = _note(
+          '1',
+          'Public Note',
+          'hello',
+          relativePath: 'Public Note.md',
+        );
+        final privateNote = _note(
+          '2',
+          'Secret',
+          'top secret',
+          relativePath: '私人笔记/Secret.md',
+        );
 
-      final result = await http.runWithClient(
-        () => GitHubSyncService(token: 'tok', repo: 'a/b').syncNotes([
-          publicNote,
-          privateNote,
-        ]),
-        () => _MockClient(_makeHandler(uploaded, deleted)),
-      );
+        final result = await http.runWithClient(
+          () => GitHubSyncService(
+            token: 'tok',
+            repo: 'a/b',
+          ).syncNotes([publicNote, privateNote]),
+          () => _MockClient(_makeHandler(uploaded, deleted)),
+        );
 
-      expect(result.success, isTrue);
+        expect(result.success, isTrue);
 
-      // 1) The public note IS uploaded.
-      expect(uploaded, contains('notes/Public Note.md'));
+        // 1) The public note IS uploaded.
+        expect(uploaded, contains('notes/Public Note.md'));
 
-      // 2) The private note is NEVER uploaded — the core privacy guarantee.
-      expect(uploaded, isNot(contains('notes/私人笔记/Secret.md')));
+        // 2) The private note is NEVER uploaded — the core privacy guarantee.
+        expect(uploaded, isNot(contains('notes/私人笔记/Secret.md')));
 
-      // 3) The pre-existing remote copy of the private note is preserved
-      //    (added to localPaths, so it is not deleted).
-      expect(deleted, isNot(contains('notes/私人笔记/Secret.md')));
+        // 3) The pre-existing remote copy of the private note is preserved
+        //    (added to localPaths, so it is not deleted).
+        expect(deleted, isNot(contains('notes/私人笔记/Secret.md')));
 
-      // 4) Stale public files are still cleaned up — deletion still works.
-      expect(deleted, contains('notes/old-public.md'));
-    });
+        // 4) Stale public files are still cleaned up — deletion still works.
+        expect(deleted, contains('notes/old-public.md'));
+      },
+    );
 
-    test('a private note nested in a subfolder is also excluded from upload', () async {
-      final privateNested = _note(
-        '3',
-        'Deep',
-        'body',
-        relativePath: '私人笔记/sub/Deep.md',
-      );
+    test(
+      'a private note nested in a subfolder is also excluded from upload',
+      () async {
+        final privateNested = _note(
+          '3',
+          'Deep',
+          'body',
+          relativePath: '私人笔记/sub/Deep.md',
+        );
 
-      final result = await http.runWithClient(
-        () => GitHubSyncService(token: 'tok', repo: 'a/b').syncNotes([privateNested]),
-        () => _MockClient(_makeHandler(uploaded, deleted)),
-      );
+        final result = await http.runWithClient(
+          () => GitHubSyncService(
+            token: 'tok',
+            repo: 'a/b',
+          ).syncNotes([privateNested]),
+          () => _MockClient(_makeHandler(uploaded, deleted)),
+        );
 
-      expect(result.success, isTrue);
-      expect(uploaded, isEmpty);
-      expect(uploaded.any((p) => p.contains('私人笔记')), isFalse);
-    });
+        expect(result.success, isTrue);
+        expect(uploaded, isEmpty);
+        expect(uploaded.any((p) => p.contains('私人笔记')), isFalse);
+      },
+    );
   });
 
   group('GitHubSyncService.pullNotes — private notes never imported', () {

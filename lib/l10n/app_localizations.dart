@@ -10,8 +10,14 @@ class AppLocalizations {
 
   AppLocalizations(this.locale);
 
+  /// Most recently resolved instance, so code without a [BuildContext] (e.g.
+  /// background services) can still translate. Set on every `of()` call.
+  static AppLocalizations? current;
+
   static AppLocalizations? of(BuildContext context) {
-    return Localizations.of<AppLocalizations>(context, AppLocalizations);
+    final l = Localizations.of<AppLocalizations>(context, AppLocalizations);
+    if (l != null) current = l;
+    return l;
   }
 
   /// Load the JSON file for the current locale.

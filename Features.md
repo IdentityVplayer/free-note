@@ -1,5 +1,13 @@
 # 无边记 (Borderless Notes) — Features & Changelog
 
+## 1.18.4
+
+### Fixed
+- **点击「重置」后已完成番茄数不再归零** — 之前计时状态挂在番茄钟页面 `State`，`reset()` 会把 `_completed`（已完成番茄数）一并清零。现在把实时倒计时抽到独立单例 `PomodoroTimer`（`lib/services/pomodoro_timer.dart`），`reset()` 只重置当前阶段倒计时、不再触碰已完成数，因此「重置」只是重启当前阶段，不会清空会话进度。
+
+### Changed
+- **番茄钟开始发通知 + 期间可自由切换页面** — 计时改由单例 `PomodoroTimer` 持有（`start()` 启动后台 `Timer.periodic`，离开番茄钟页也不会停），开始专注时弹出系统通知「专注计时进行中，可随时切换到其他页面」。期间可自由打开笔记、任务等其他页面，番茄钟继续在后台走秒；阶段完成时仍推送完成通知。`AppLocalizations` 新增 `current` 静态访问器，让无 `BuildContext` 的通知文案也能取本地化字符串。
+
 ## 1.18.3
 
 ### Changed

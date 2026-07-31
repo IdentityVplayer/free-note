@@ -28,8 +28,9 @@ class FolderChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final name =
-        folderPath == null ? l10n.t('selectFolder') : p.basename(folderPath!);
+    final name = folderPath == null
+        ? l10n.t('selectFolder')
+        : p.basename(folderPath!);
     final theme = Theme.of(context);
 
     final chip = Chip(

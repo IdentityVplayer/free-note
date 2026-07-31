@@ -32,8 +32,8 @@
 | 仓库 | `https://github.com/IdentityVplayer/free-note` |
 | 导航形态 | 底部 `NavigationBar` 四标签（任务 / 笔记 / 番茄钟 / 剪切板） |
 | 跨平台目标 | Android、Windows、Web、Linux（Linux 桌面构建就绪） |
-| i18n key 总数 | **300**（三语一致，截至 v1.18.3） |
-| 当前稳定版本 | `1.18.3+62`（已发布，tag `v1.18.3`） |
+| i18n key 总数 | **302**（三语一致，截至 v1.18.4） |
+| 当前稳定版本 | `1.18.4+63`（已发布，tag `v1.18.4`） |
 
 ### 架构骨架
 - `AppProvider`（`ChangeNotifier`）：全局状态，含 `init()`（末段调 `_initNotifications`）、`chooseFolder`（记录仓库）。
@@ -352,6 +352,23 @@ v1.12.0 是一组大型多部分变更，已在本次会话中**全部实现并�
 ### 验证
 - `flutter analyze` 0 issues；`flutter test` 75 → **78 passed**（新增 `test/download_dir_test.dart`：appDataDir 路径 / download 文件夹清理 / 文件夹不存在时安全）。
 - bump `1.18.2+61` → `1.18.3+62`；commit / tag `v1.18.3` / push。
+
+---
+
+## 三·九、v1.18.4 开发上下文（已落地并发布 ✅）
+
+用户两条需求（1 修复 + 1 变更）：
+
+1. ✅ **(fix) 点击「重置」后已完成番茄数不再归零** — 根因：旧计时逻辑把运行状态放在 `PomodoroScreen` 的 `State` 里，`reset()` 会顺手把 `_completed` 清零。修复：抽出独立单例 `lib/services/pomodoro_timer.dart`（`PomodoroTimer extends ChangeNotifier`，`PomodoroTimer.instance`）。`reset()` 仅重置当前阶段倒计时（`_remaining = _total`、`_running=false`、取消 `Timer`），**不再触碰 `_completed`**，因此「重置」只是重启当前阶段，不清空会话进度。
+2. ✅ **(change) 番茄钟开始时发通知 + 期间可自由切换本 app 其他页面** — 根因：旧 `Timer` 挂在页面 `State`，`dispose()` 时取消，导致切走即停。修复：
+   - 实时倒计时改由单例 `PomodoroTimer` 持有（`start()` 启动 `Timer.periodic`，`PomodoroScreen.dispose()` 只移除监听器、不取消计时），故打开笔记/其他页面时仍持续走秒。
+   - `PomodoroTimer.start()` → `_notifyStarted()` 调 `NotificationService.showPomodoroStarted(...)` 发送「专注计时进行中，可随时切换到其他页面」通知（即使用户已离开番茄钟页也会弹）。阶段完成仍走已有 `showPomodoroDone`。
+   - 为支持无 `BuildContext` 场景的翻译，`AppLocalizations` 新增 `static AppLocalizations? current`（`of()` 每次调用赋值），通知文案用 `AppLocalizations.current?.t(...)` 取；`showNotification` 在 `!_ready` 时直接返回（单测安全）。
+   - 三语新增 2 key（`pomodoroStarted` / `pomodoroRunning`），i18n 总数 300 → 302。
+
+### 验证
+- `flutter analyze` 0 issues；`flutter test` 78 → **82 passed**（新增 `test/pomodoro_timer_test.dart`：reset 保留已完成数 / 多次 reset 不丢进度 / start 后台走秒 / start 幂等）。
+- bump `1.18.3+62` → `1.18.4+63`；commit / tag `v1.18.4` / push。
 
 ---
 

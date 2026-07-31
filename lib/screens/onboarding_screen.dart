@@ -23,18 +23,9 @@ class OnboardingScreen extends StatelessWidget {
     final provider = context.read<AppProvider>();
 
     final steps = [
-      (
-        Icons.folder_open,
-        l10n.t('onboardingStep1'),
-      ),
-      (
-        Icons.touch_app,
-        l10n.t('onboardingStep2'),
-      ),
-      (
-        Icons.edit_note,
-        l10n.t('onboardingStep3'),
-      ),
+      (Icons.folder_open, l10n.t('onboardingStep1')),
+      (Icons.touch_app, l10n.t('onboardingStep2')),
+      (Icons.edit_note, l10n.t('onboardingStep3')),
     ];
 
     return Scaffold(
@@ -71,10 +62,12 @@ class OnboardingScreen extends StatelessWidget {
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, i) => ListTile(
                     leading: CircleAvatar(
-                      backgroundColor:
-                          Theme.of(context).colorScheme.primaryContainer,
-                      foregroundColor:
-                          Theme.of(context).colorScheme.onPrimaryContainer,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer,
+                      foregroundColor: Theme.of(
+                        context,
+                      ).colorScheme.onPrimaryContainer,
                       child: Text('${i + 1}'),
                     ),
                     title: Text(steps[i].$2),
